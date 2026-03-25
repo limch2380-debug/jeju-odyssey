@@ -255,10 +255,16 @@
         /* --- Admin Panel --- */
         #admin-btn {
             position: fixed;
-            bottom: 10px;
-            right: 10px;
-            opacity: 0.3;
-            z-index: 2000;
+            bottom: 20px;
+            right: 20px;
+            padding: 15px;
+            font-size: 1rem;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            z-index: 5000;
+            opacity: 0.6;
+            border: 3px solid var(--gold-accent);
             display: none; /* HIDDEN BY DEFAULT */
         }
         #admin-btn:hover { opacity: 1; }
@@ -480,7 +486,7 @@
 
     <!-- 관리자 패널 -->
     <!-- 관리자 패널 (몬스터 & 캐릭터 에디터) -->
-    <button class="btn-metal" id="admin-btn" style="position: fixed; bottom: 20px; right: 20px; padding: 15px; font-size: 1rem; border-radius: 50%; width: 60px; height: 60px; z-index: 5000; opacity: 1; border: 3px solid var(--gold-accent);">⚙️</button>
+    <button class="btn-metal" id="admin-btn">⚙️</button>
     
     <div id="admin-panel" style="width: 450px; border-radius: 10px; background: rgba(0, 0, 0, 0.98); box-shadow: 0 0 100px #000;">
         <h2 style="font-family: 'Cinzel', serif; color: var(--gold-accent); text-align: center; margin-bottom: 20px; border-bottom: 2px solid var(--gold-accent); padding-bottom: 15px;">🛠️ 데이터 통합 에디터</h2>

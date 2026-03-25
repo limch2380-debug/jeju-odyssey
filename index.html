@@ -3,45 +3,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Jeju Odyssey - Infinite Stability v7.9</title>
+    <title>Jeju Odyssey - World Map</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Noto+Serif+KR:wght@400;700&display=swap');
-
-        body, html { height: 100%; margin: 0; background: #000; overflow: hidden; font-family: 'Noto Serif KR', serif; }
-
-        #viewport {
-            width: 100vw; height: 100vh;
-            display: flex; align-items: center; justify-content: center;
-            background: #000; position: relative;
-        }
-
-        #map-container {
-            position: absolute;
-            width: 3200px; height: 1800px;
-            background-image: url('jeju_map.png');
-            background-size: 100% 100%;
-            transform-origin: center;
-        }
-
-        .marker {
-            position: absolute; width: 100px; height: 100px; transform: translate(-50%, -50%);
-            z-index: 900; background: rgba(0, 100, 200, 0.8); border: 2px solid gold; border-radius: 50%;
-            display: flex; align-items: center; justify-content: center; color: white; text-align: center;
-            font-weight: bold; font-size: 1rem; box-shadow: 0 0 15px gold;
-            cursor: pointer;
-        }
         
-        /* DELETE MODE STYLING */
+        body, html { height: 100%; margin: 0; background: #000; overflow: hidden; font-family: 'Noto Serif KR', serif; color: white; }
+        #viewport { width: 100vw; height: 100vh; position: relative; overflow: hidden; background: radial-gradient(circle, #222, #000); cursor: crosshair; }
+        #map-container { position: absolute; width: 4000px; height: 4000px; background: url('https://www.visitjeju.net/images/jeju_map_all.png') no-repeat center; background-size: contain; transition: transform 0.1s ease-out; transform-origin: 0 0; }
+        
+        .marker {
+            position: absolute; width: 40px; height: 40px; border-radius: 50%; border: 3px solid lime; background: rgba(0,255,0,0.2);
+            transform: translate(-50%, -50%); display: flex; align-items: center; justify-content: center; color: white;
+            font-weight: bold; font-size: 0.6rem; text-align: center; white-space: nowrap; pointer-events: auto;
+            text-shadow: 0 0 5px black;
+        }
+        .marker span { position: absolute; bottom: -20px; font-weight: bold; font-size: 1rem; box-shadow: 0 0 15px gold; cursor: pointer; }
+        
         .del-active .marker { border-color: red; box-shadow: 0 0 20px red; }
         .del-active .marker::after { content: '❌'; position: absolute; top: -10px; right: -10px; font-size: 1.5rem; }
 
-        #player {
-            position: absolute; width: 60px; height: 60px; z-index: 1000;
-            transform: translate(-50%, -50%); pointer-events: none;
-        }
+        #player { position: absolute; width: 60px; height: 60px; z-index: 1000; transform: translate(-50%, -50%); pointer-events: none; }
         #player::after { content: '🚩'; font-size: 3.5rem; filter: drop-shadow(0 0 10px gold); }
 
-        /* UI */
         #ui-wrap { position: fixed; inset: 0; pointer-events: none; z-index: 9000; }
         .hud-top { position: absolute; top: 20px; left: 20px; background: rgba(0,0,0,0.8); padding: 15px; border: 1px solid gold; color: white; pointer-events: auto; }
         .btn-panel { position: absolute; bottom: 20px; right: 20px; display: flex; flex-direction: column; gap: 8px; pointer-events: auto; }
@@ -49,34 +32,21 @@
         .btn { background: #222; border: 2px solid gold; color: gold; padding: 15px 30px; cursor: pointer; font-family: 'Cinzel'; font-size: 1rem; min-width: 200px; }
         .btn.active { background: #8b0000; color: white; border-color: white; }
 
-        #form-box {
-            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            background: #111; border: 3px solid gold; padding: 25px;
-            z-index: 10000; display: none; color: white; width: 340px; pointer-events: auto;
-        }
+        #form-box { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #111; border: 3px solid gold; padding: 25px; z-index: 10000; display: none; color: white; width: 340px; pointer-events: auto; }
         #form-box input { width: 100%; background: #222; color: #fff; border: 1px solid #444; padding: 12px; margin-top: 5px; box-sizing: border-box; }
 
-        #overlay {
-            position: fixed; inset: 0; background: rgba(0,0,0,0.95); z-index: 8500; display: none;
-            flex-direction: column; align-items: center; justify-content: center; pointer-events: auto;
-        }
+        #overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.95); z-index: 8500; display: none; flex-direction: column; align-items: center; justify-content: center; pointer-events: auto; }
         #overlay img { width: 90%; height: 75%; object-fit: contain; border: 2px solid gold; }
 
         #toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 10px 20px; border-radius: 20px; display: none; }
 
-        /* STORY OVERLAY */
-        #story-overlay {
-            position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 15000;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            color: white; text-align: center; font-family: 'Cinzel'; padding: 20px;
-        }
+        #story-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 15000; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; text-align: center; font-family: 'Cinzel'; padding: 20px; }
         #story-overlay h1 { font-size: 3rem; color: gold; text-shadow: 0 0 20px gold; margin-bottom: 20px; }
         #story-overlay p { font-size: 1.2rem; max-width: 600px; line-height: 1.6; color: #ccc; margin-bottom: 40px; }
         .btn-start { background: gold; color: black; border: none; padding: 15px 40px; font-weight: bold; cursor: pointer; font-size: 1.2rem; }
     </style>
 </head>
 <body id="master-body">
-
     <div id="toast">메시지</div>
 
     <!-- STORY INTRO -->
@@ -95,45 +65,27 @@
         </div>
     </div>
 
-    <!-- ADD FORM (Region & Monster Editor) -->
-    <div id="form-box" style="width: 360px;">
+    <!-- ADD FORM -->
+    <div id="form-box">
         <h3 style="font-family:'Cinzel'; margin:0 0 15px 0; color:gold; border-bottom:1px solid #444; padding-bottom:10px;">🚩 구역 & 몬스터 편집기</h3>
-        
         <div style="background: rgba(44,44,44,0.3); padding: 10px; border-radius: 5px; margin-bottom: 10px;">
             <label style="font-size: 0.8rem; color: #aaa;">[기본 정보]</label>
-            <input type="text" id="fn" placeholder="구역 이름 (예: 성산일출봉)">
+            <input type="text" id="fn" placeholder="구역 이름">
             <div style="display:flex; gap:5px;"><input type="text" id="flat" readonly><input type="text" id="flng" readonly></div>
             <input type="number" id="fr" placeholder="범위 (m)" value="50">
         </div>
-
         <div style="background: rgba(139, 0, 0, 0.15); padding: 10px; border-radius: 5px; margin-bottom: 10px; border: 1px solid #500;">
-            <label style="font-size: 0.8rem; color: #ff3c3c;">[몬스터 출현 설정]</label>
-            <div style="display:flex; align-items:center; gap:10px; margin-top:5px;">
-                <span style="font-size:0.8rem; white-space:nowrap;">확률:</span>
-                <input type="number" id="f-spawn-prob" value="30" min="0" max="100" style="margin:0;">
-                <span style="font-size:0.8rem;">%</span>
-            </div>
+            <label style="font-size: 0.8rem; color: #ff3c3c;">[포탈 & 미션 설정]</label>
+            <input type="text" id="fms" placeholder="미션 목표 (예: 상자 3개 찾기)">
+            <label style="font-size:0.7rem; color:#888; display:flex; align-items:center; margin-top:5px;">
+                <input type="checkbox" id="fpo" style="width:20px; margin:0 5px 0 0;"> 포탈 개방 여부
+            </label>
         </div>
-
-        <label style="font-size: 0.8rem; color: #aaa;">배경 이미지:</label>
-        <input type="file" id="ff" accept="image/*">
-
-        <!-- EVENT REGISTRATION -->
-        <div style="background: rgba(0, 100, 200, 0.15); padding: 10px; border-radius: 5px; margin-top: 10px; border: 1px solid #0064c8;">
-            <label style="font-size: 0.8rem; color: #00ced1;">[이벤트 & 미션 등록]</label>
-            <input type="text" id="f-mission" placeholder="미션 내용 (예: 동굴의 수호자를 처치하라!)" style="margin-top:5px;">
-            <div style="display:flex; align-items:center; gap:10px; margin-top:5px;">
-                <span style="font-size:0.8rem; white-space:nowrap;">포탈 개방:</span>
-                <input type="checkbox" id="f-portal-check" style="width:20px; height:20px; margin:0;">
-            </div>
-        </div>
-        
         <div style="display:flex; gap:10px; margin-top:20px;">
             <button class="btn" id="fs" style="flex:2; padding:10px;" onclick="saveM()">구역 저장</button>
             <button class="btn" style="flex:1; background:#333; padding:10px;" onclick="hideF()">취소</button>
         </div>
     </div>
-
 
     <div id="viewport">
         <div id="map-container" onmousedown="mClicked(event)">
@@ -143,11 +95,10 @@
 
     <div id="ui-wrap">
         <div class="hud-top">
-            <h1 style="font-family:'Cinzel'; font-size:1.1rem; margin:0;">JEJU ODYSSEY v7.9 Stable</h1>
+            <h1 style="font-family:'Cinzel'; font-size:1.1rem; margin:0;">JEJU ODYSSEY v8.0</h1>
             <div id="gps-st" style="color:yellow; font-size:0.8rem; margin-top:5px;">GPS 감지중...</div>
             <div id="gps-co" style="font-size:0.7rem; color:#888;">-- / --</div>
         </div>
-
         <div class="btn-panel" id="admin-tools" style="display: none;">
             <button id="btn-sm" class="btn" onclick="tSim()">🕹️ 시뮬레이션: OFF</button>
             <button id="btn-ad" class="btn" onclick="tAdm()">🛡️ 배치 모드: OFF</button>
@@ -159,140 +110,53 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script>
-        // ADMIN CHECK
-        const isAdminSession = window.location.pathname.includes('admin.html');
-        if (isAdminSession) {
-            document.getElementById('admin-tools').style.display = 'flex';
-        }
+        const isAdminSession = window.location.href.includes('admin.html');
+        if (isAdminSession) { document.getElementById('admin-tools').style.display = 'flex'; }
+
         const SB_URL = "https://sdqxdrwjwdcaamezvmyf.supabase.co";
         const SB_KEY = "sb_publishable_ghjdZA43FNQjZDDMgODH6w_VJsSnMA9";
         const sb = supabase.createClient(SB_URL, SB_KEY);
 
-        const BOUNDS = { minLat: 33.00, maxLat: 33.78, minLng: 125.92, maxLng: 127.15 };
-        const MW = 3200, MH = 1800;
+        let map = document.getElementById('map-container');
+        let player = document.getElementById('player');
+        let tx=0, ty=0, px=2000, py=2000, scale=1;
+        let pLat=33.3617, pLng=126.5292;
+        let markers=[], isSim=false, isAdm=false, isDel=false, lZone=null;
 
-        let isAdm = false, isSim = false, isDel = false;
-        let pLat = 33.50, pLng = 126.54, tX = MW/2, tY = MH/2, sX = tX, sY = tY;
-        let markers = []; // Supabase에서 동적으로 가져옴
-        let pPos = { x: 0, y: 0 };
-        let activePortal = null;
-        
-        // 이동 거리 기반 조우 로직
-        let lastLat = pLat, lastLng = pLng;
-        let accumulatedDist = 0;
+        function startOdyssey() { document.getElementById('story-overlay').style.display = 'none'; }
 
-        const map = document.getElementById('map-container');
-        const player = document.getElementById('player');
-
-        // [Supabase] 데이터 로드
-        async function loadMarkers() {
+        async function loadM() {
             const { data, error } = await sb.from('regions').select('*');
-            if (error) { console.error("Error loading markers:", error); return; }
-            markers = data;
-            
-            // 포탈 체크
-            activePortal = markers.find(m => m.is_portal_open);
-
-            // 지도에 마커 표시
-            document.querySelectorAll('.marker').forEach(el => el.remove());
-            markers.forEach(plotM);
-            
-            if (activePortal) {
-                showT(`⚡ 알림: ${activePortal.name}에 이계의 포탈이 열렸습니다!`);
-            }
-        }
-        loadMarkers();
-
-        function resize() {
-            const sc = Math.min(window.innerWidth / MW, window.innerHeight / MH) * 0.98;
-            map.style.transform = `scale(${sc})`;
-        }
-        window.onresize = resize; resize();
-
-        function loop() {
-            sX += (tX - sX) * 0.1; sY += (tY - sY) * 0.1;
-            player.style.left = sX + "px"; player.style.top = sY + "px";
+            if (data) { markers = data; markers.forEach(plotM); }
             checkP();
-            requestAnimationFrame(loop);
         }
-        
-        function startOdyssey() {
-            document.getElementById('story-overlay').style.display = 'none';
-            playLevelUp();
-            if (!activePortal && markers.length > 0) {
-                triggerRandPortal();
-            }
-        }
+        loadM();
 
-        async function triggerRandPortal() {
-            if (markers.length === 0) return;
-            const randIdx = Math.floor(Math.random() * markers.length);
-            const m = markers[randIdx];
-            
-            showT(`[전설] ${m.name}에 포탈이 열리는 중입니다...`);
-            
-            const { error } = await sb.from('regions').update({ 
-                is_portal_open: true, 
-                mission: `${m.name}의 숨겨진 유물을 찾고 수호자를 처치하라!` 
-            }).eq('id', m.id);
-            
-            if (error) console.error(error);
-            loadMarkers();
-        }
-        loop();
-
-
-        function getDist(la1, lo1, la2, lo2) {
-            const R = 6371000;
-            const dLat = (la2 - la1) * Math.PI / 180, dLon = (lo2 - lo1) * Math.PI / 180;
-            const a = Math.sin(dLat/2)**2 + Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)*Math.sin(dLon/2)**2;
-            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-        }
-
-        let lZone = null;
         function checkP() {
-            if (isAdm || isDel) return;
-
-            // 이동 거리 계산
-            const moveStep = getDist(lastLat, lastLng, pLat, pLng);
-            if (moveStep > 0.5) {
-                accumulatedDist += moveStep;
-                lastLat = pLat; lastLng = pLng;
-            }
-
+            const R=6371e3;
+            let near = null;
             markers.forEach(m => {
-                const d = getDist(pLat, pLng, m.lat, m.lng);
-                if (d < m.range) {
-                    if (lZone !== m.id) {
-                        openZone(m);
-                        lZone = m.id;
-                        if (m.is_portal_open) {
-                            showT(`🔥 [포탈 감지] ${m.name}의 미션을 확인하세요!`);
-                        }
-                    }
-                    if (accumulatedDist > 5 && !m.is_portal_open) {
-                        accumulatedDist = 0;
-                        checkEncounter(m);
-                    }
-                }
-                else if (d > m.range + 5 && lZone === m.id) {
-                    lZone = null;
-                    if (!isAdm && !isDel) closeOver();
-                }
+                const φ1 = pLat * Math.PI/180;
+                const φ2 = m.lat * Math.PI/180;
+                const Δφ = (m.lat-pLat) * Math.PI/180;
+                const Δλ = (m.lng-pLng) * Math.PI/180;
+                const a = Math.sin(Δφ/2)**2 + Math.cos(φ1)*Math.cos(φ2)*Math.sin(Δλ/2)**2;
+                const d = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+                if (d < (m.radius || 50)) near = m;
             });
-
-            if (accumulatedDist > 10) accumulatedDist = 0;
+            if (near && lZone !== near.id) {
+                lZone = near.id;
+                openZone(near);
+            } else if (!near) lZone = null;
         }
 
-        function checkEncounter(m) {
-            const prob = m.spawn_prob || 30;
-            if (Math.random() * 100 < prob) {
-                showT("⚠️ 몬스터 출현! 전투 화면으로 이동합니다.");
-                setTimeout(() => {
-                    location.href = `battle.html?region=${encodeURIComponent(m.name)}`;
-                }, 1500);
-            }
+        function openZone(m) {
+            document.getElementById('oz-name').innerText = m.name + (m.is_portal_open ? " [PORTAL]" : "");
+            document.getElementById('oz-img').src = m.image_url || "https://www.visitjeju.net/images/jeju_map_all.png";
+            document.getElementById('overlay').style.display = 'flex';
         }
+
+        function closeOver() { document.getElementById('overlay').style.display = 'none'; }
 
         function enterBattle() {
             const m = markers.find(mark => mark.id === lZone);
@@ -302,109 +166,46 @@
             location.href = `battle.html?region=${encodeURIComponent(m.name)}&portal=${isPortal}&mission=${encodeURIComponent(m.mission || "")}${adminFlag}`;
         }
 
-        function openZone(m) {
-            document.getElementById('oz-name').innerText = m.name + (m.is_portal_open ? " [포탈 활성화]" : " 진입");
-            document.getElementById('oz-img').src = m.image_url || "";
-            document.getElementById('overlay').style.display = 'flex';
-            
-            if (m.is_portal_open && m.mission) {
-                const desc = document.createElement('div');
-                desc.id = "zone-mission";
-                desc.style.color = "cyan";
-                desc.style.marginTop = "10px";
-                desc.innerHTML = `<span style="color:gold;">[MISSION]</span><br>${m.mission}`;
-                const existing = document.getElementById('zone-mission');
-                if (existing) existing.remove();
-                document.getElementById('overlay').insertBefore(desc, document.getElementById('oz-img'));
-            }
-        }
-        function closeOver() { 
-            document.getElementById('overlay').style.display = 'none'; 
-            const existing = document.getElementById('zone-mission');
-            if (existing) existing.remove();
-        }
-
-
-        if (navigator.geolocation) {
-            navigator.geolocation.watchPosition(p => {
-                if (isSim) return;
-                pLat = p.coords.latitude; pLng = p.coords.longitude;
-                updateMapPos(pLat, pLng);
-                document.getElementById('gps-st').innerText = "📡 GPS 신호 연결됨";
-                document.getElementById('gps-co').innerText = `${pLat.toFixed(5)} / ${pLng.toFixed(5)}`;
-            }, null, { enableHighAccuracy: true });
-        }
-
-        function updateMapPos(la, lo) {
-            tX = ((lo - BOUNDS.minLng) / (BOUNDS.maxLng - BOUNDS.minLng)) * MW;
-            tY = ((BOUNDS.maxLat - la) / (BOUNDS.maxLat - BOUNDS.minLat)) * MH;
+        updateP();
+        function updateP() {
+            px = 2000 + (pLng - 126.5292) * 50000;
+            py = 2000 - (pLat - 33.3617) * 50000;
+            player.style.left = px + 'px';
+            player.style.top = py + 'px';
+            if (!isSim) { tx = -px * scale + window.innerWidth/2; ty = -py * scale + window.innerHeight/2; }
+            map.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
+            document.getElementById('gps-co').innerText = `${pLat.toFixed(5)} / ${pLng.toFixed(5)}`;
         }
 
         function mClicked(e) {
-            if (isDel) return;
+            if (!isAdm) return;
             const rect = map.getBoundingClientRect();
-            const sc = rect.width / MW;
-            const cx = (e.clientX - rect.left) / sc;
-            const cy = (e.clientY - rect.top) / sc;
-
-            if (isAdm) {
-                pPos = { x: cx, y: cy };
-                document.getElementById('flat').value = (BOUNDS.maxLat - (cy / MH) * (BOUNDS.maxLat - BOUNDS.minLat)).toFixed(6);
-                document.getElementById('flng').value = (BOUNDS.minLng + (cx / MW) * (BOUNDS.maxLng - BOUNDS.minLng)).toFixed(6);
-                document.getElementById('form-box').style.display = 'block';
-            } else if (isSim) {
-                pLng = BOUNDS.minLng + (cx / MW) * (BOUNDS.maxLng - BOUNDS.minLng);
-                pLat = BOUNDS.maxLat - (cy / MH) * (BOUNDS.maxLat - BOUNDS.minLat);
-                updateMapPos(pLat, pLng);
-            }
+            const x = (e.clientX - rect.left) / scale;
+            const y = (e.clientY - rect.top) / scale;
+            document.getElementById('flat').value = (33.3617 - (y - 2000) / 50000).toFixed(6);
+            document.getElementById('flng').value = (126.5292 + (x - 2000) / 50000).toFixed(6);
+            document.getElementById('form-box').style.display = 'block';
         }
 
         async function saveM() {
-            const file = document.getElementById('ff').files[0];
-            const btn = document.getElementById('fs');
-            btn.innerText = "⏳ 서버 전송중..."; btn.disabled = true;
+            const n = document.getElementById('fn').value;
+            const lat = parseFloat(document.getElementById('flat').value);
+            const lng = parseFloat(document.getElementById('flng').value);
+            const r = parseInt(document.getElementById('fr').value);
+            const ms = document.getElementById('fms').value;
+            const po = document.getElementById('fpo').checked;
+            if (!n) return;
+            const { data, error } = await sb.from('regions').insert([{ name:n, lat, lng, radius:r, mission:ms, is_portal_open:po }]).select();
+            if (!error && data) { plotM(data[0]); markers.push(data[0]); hideF(); showT("✅ 구역 등록 완료"); }
+        }
 
-            const pushM = async (dataURL) => {
-                const newRegion = {
-                    name: document.getElementById('fn').value || "새 구역",
-                    lat: parseFloat(document.getElementById('flat').value),
-                    lng: parseFloat(document.getElementById('flng').value),
-                    range: parseInt(document.getElementById('fr').value) || 50,
-                    spawn_prob: parseInt(document.getElementById('f-spawn-prob').value) || 30,
-                    image_url: dataURL,
-                    mission: document.getElementById('f-mission').value || "",
-                    is_portal_open: document.getElementById('f-portal-check').checked,
-                    x: Math.round(pPos.x), y: Math.round(pPos.y)
-                };
-
-                const { data, error } = await sb.from('regions').insert([newRegion]).select();
-                
-                if (error) { 
-                    alert("서버 저장 실패: " + error.message); 
-                } else {
-                    showT("✅ 서버 저장 성공!"); 
-                    hideF();
-                    loadMarkers();
-                }
-                btn.innerText = "구역 저장"; btn.disabled = false;
-            };
-
-            if (file) {
-                const r = new FileReader();
-                r.onload = (e) => {
-                    const i = new Image();
-                    i.onload = () => {
-                        const can = document.createElement('canvas');
-                        const MAXW = 800; let w=i.width, h=i.height;
-                        if(w>MAXW){ h*=MAXW/w; w=MAXW; }
-                        can.width=w; can.height=h;
-                        can.getContext('2d').drawImage(i,0,0,w,h);
-                        pushM(can.toDataURL('image/jpeg', 0.6));
-                    };
-                    i.src = e.target.result;
-                };
-                r.readAsDataURL(file);
-            } else await pushM("");
+        function tSim() { isSim = !isSim; document.getElementById('btn-sm').innerText = isSim ? "🕹️ 시뮬레이션: ON" : "🕹️ 시뮬레이션: OFF"; }
+        function tAdm() { isAdm = !isAdm; isDel = false; updateUI(); document.getElementById('btn-ad').innerText = isAdm ? "🛡️ 배치 모드: ON" : "🛡️ 배치 모드: OFF"; }
+        function tDel() { isDel = !isDel; isAdm = false; updateUI(); document.getElementById('btn-de').innerText = isDel ? "🗑️ 삭제 모드: ON" : "🗑️ 삭제 모드: OFF"; }
+        function updateUI() {
+            document.getElementById('master-body').className = isDel ? 'del-active' : '';
+            document.getElementById('btn-ad').classList.toggle('active', isAdm);
+            document.getElementById('btn-de').classList.toggle('active', isDel);
         }
 
         function plotM(m) {
@@ -412,66 +213,37 @@
             d.className = 'marker'; d.id = m.id;
             const pActive = m.is_portal_open ? "box-shadow: 0 0 25px cyan; border-color: cyan;" : "";
             d.style.cssText += pActive;
-            d.innerHTML = `<span>${m.name}</span><br><span style="font-size:0.6rem; color:${m.is_portal_open ? 'cyan':'lime'};">${m.is_portal_open ? '🌀 PORTAL' : (m.spawn_prob||0)+'%'}</span>`;
-            
-            d.onmousedown = (e) => {
-                e.stopPropagation();
-                if (isDel) killM(m.id);
-                else if (!isAdm) openZone(m);
-            };
+            d.style.left = (2000 + (m.lng - 126.5292) * 50000) + 'px';
+            d.style.top = (2000 - (m.lat - 33.3617) * 50000) + 'px';
+            d.innerHTML = `<span>${m.name}</span><br><span style="font-size:0.6rem; color:${m.is_portal_open ? 'cyan':'lime'};">${m.is_portal_open ? '🌀 PORTAL' : 'MONSTER'}</span>`;
+            d.onmousedown = (e) => { e.stopPropagation(); if (isDel) killM(m.id); else if (!isAdm) openZone(m); };
             map.appendChild(d);
         }
 
         async function killM(id) {
             const { error } = await sb.from('regions').delete().eq('id', id);
-            if (error) {
-                showT("❌ 삭제 실패: " + error.message);
-            } else {
-                const el = document.getElementById(id);
-                if (el) el.remove();
-                showT("🗑️ 서버에서 삭제 완료");
-                markers = markers.filter(m => m.id !== id);
-            }
+            if (!error) { document.getElementById(id).remove(); markers=markers.filter(m=>m.id!==id); showT("🗑️ 삭제 완료"); }
         }
 
-        function hideF() { document.getElementById('form-box').style.display = 'none'; }
+        function hideF() { document.getElementById('form-box').style.display='none'; }
         function showT(m) { const t=document.getElementById('toast'); t.innerText=m; t.style.display='block'; setTimeout(()=>t.style.display='none',2000); }
-        async function resetD() { 
-            if(confirm("모든 구역 데이터를 서버에서 초기화할까요?")) { 
-                const { error } = await sb.from('regions').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-                if (error) alert("초기화 실패");
-                else location.reload(); 
-            } 
+        async function resetD() { if(confirm("초기화?")) { await sb.from('regions').delete().neq('id','0'); location.reload(); } }
+
+        async function triggerRandPortal() {
+            if (markers.length === 0) return;
+            const rIdx = Math.floor(Math.random() * markers.length);
+            const m = markers[rIdx];
+            const { error } = await sb.from('regions').update({ is_portal_open: true, mission: "긴급! 지역의 차원문을 닫고 수호자를 처치하라!" }).eq('id', m.id);
+            if (!error) { showT(`⚡ ${m.name}에 포탈 발생!`); location.reload(); }
         }
 
-        function tSim() { isSim = !isSim; document.getElementById('btn-sm').innerText = isSim ? "🕹️ 시뮬레이션: ON" : "🕹️ 시뮬레이션: OFF"; }
-        function tAdm() { 
-            isAdm = !isAdm; isDel = false; updateUI(); 
-            document.getElementById('btn-ad').innerText = isAdm ? "🛡️ 배치 모드: ON" : "🛡️ 배치 모드: OFF"; 
-        }
-        function tDel() { 
-            isDel = !isDel; isAdm = false; updateUI();
-            document.getElementById('btn-de').innerText = isDel ? "🗑️ 삭제 모드: ON" : "🗑️ 삭제 모드: OFF"; 
-        }
-
-        function updateUI() {
-            document.getElementById('master-body').className = isDel ? 'del-active' : '';
-            document.getElementById('btn-ad').classList.toggle('active', isAdm);
-            document.getElementById('btn-de').classList.toggle('active', isDel);
-        }
-    </script>
-ction tDel() { 
-            isDel = !isDel; isAdm = false; updateUI();
-            document.getElementById('btn-de').innerText = isDel ? "🗑️ 삭제 모드: ON" : "🗑️ 삭제 모드: OFF"; 
-        }
-
-        function updateUI() {
-            document.getElementById('master-body').className = isDel ? 'del-active' : '';
-            document.getElementById('btn-ad').classList.toggle('active', isAdm);
-            document.getElementById('btn-de').classList.toggle('active', isDel);
-        }
-
-        markers.forEach(plotM);
+        window.onkeydown = (e) => {
+            if (!isSim) return;
+            const S=0.0005;
+            if (e.key==='ArrowUp') pLat+=S; if (e.key==='ArrowDown') pLat-=S;
+            if (e.key==='ArrowLeft') pLng-=S; if (e.key==='ArrowRight') pLng+=S;
+            updateP(); checkP();
+        };
     </script>
 </body>
 </html>
