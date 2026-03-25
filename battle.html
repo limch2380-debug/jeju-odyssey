@@ -1,0 +1,988 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dark Fantasy Boss Battle - The Beholder</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Noto+Serif+KR:wght@400;700&display=swap');
+
+        :root {
+            --primary-red: #8b0000;
+            --hp-red: #ff3c3c;
+            --metal-gray: #2c2c2c;
+            --gold-accent: #b8860b;
+            --bg-dark: #0a0a0a;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: #e0e0e0;
+            font-family: 'Noto Serif KR', serif;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: radial-gradient(circle, #1a1a1a 0%, #000000 100%);
+        }
+
+        /* --- UI Containers --- */
+        #game-container {
+            position: relative;
+            width: 100%;
+            max-width: 800px;
+            height: 90vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            padding: 20px;
+        }
+
+        /* --- Boss Section --- */
+        .boss-area {
+            position: relative;
+            width: 100%;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            margin-top: 20px;
+        }
+
+        .boss-header {
+            width: 100%;
+            max-width: 500px;
+            margin-bottom: 20px;
+            text-align: center;
+            z-index: 10;
+        }
+
+        .boss-name {
+            font-family: 'Cinzel', serif;
+            font-size: 1.8rem;
+            color: var(--gold-accent);
+            text-shadow: 0 0 10px rgba(184, 134, 11, 0.5);
+            margin-bottom: 10px;
+            letter-spacing: 2px;
+        }
+
+        /* --- HP Bar Styles --- */
+        .hp-container {
+            width: 100%;
+            height: 24px;
+            background: #111;
+            border: 2px solid #444;
+            box-shadow: inset 0 0 5px rgba(0,0,0,1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hp-bar {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, #8b0000, #ff0000);
+            transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+        }
+
+        .hp-bar::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: linear-gradient(rgba(255,255,255,0.2), transparent);
+        }
+
+        .hp-text {
+            position: absolute;
+            width: 100%;
+            text-align: center;
+            font-size: 0.8rem;
+            line-height: 20px;
+            font-weight: bold;
+            color: white;
+            z-index: 2;
+            text-shadow: 1px 1px 2px black;
+        }
+
+        /* --- Monster Image --- */
+        .boss-sprite-wrapper {
+            position: relative;
+            width: 100%;
+            max-width: 400px;
+            filter: drop-shadow(0 0 20px rgba(139, 0, 0, 0.3));
+        }
+
+        #boss-image {
+            width: 100%;
+            height: auto;
+            display: block;
+            pointer-events: none;
+            transition: transform 0.1s;
+        }
+
+        /* --- Player Section --- */
+        .player-area {
+            width: 100%;
+            max-width: 600px;
+            background: rgba(20, 20, 20, 0.8);
+            border: 2px solid var(--metal-gray);
+            border-top: 3px solid var(--gold-accent);
+            padding: 20px;
+            border-radius: 4px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            box-shadow: 0 -10px 30px rgba(0,0,0,0.8);
+        }
+
+        .player-stats {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .player-info {
+            font-family: 'Cinzel', serif;
+            color: #ccc;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        #player-level {
+            color: var(--gold-accent);
+            font-weight: bold;
+            font-size: 1.2rem;
+        }
+
+        /* --- XP Bar --- */
+        .xp-container {
+            width: 100%;
+            height: 6px;
+            background: #111;
+            border: 1px solid #333;
+            margin-top: 5px;
+            overflow: hidden;
+        }
+
+        .xp-bar {
+            width: 0%;
+            height: 100%;
+            background: linear-gradient(90deg, #00ced1, #1e90ff);
+            transition: width 0.5s ease-out;
+        }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .skills-row {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            margin-top: 10px;
+        }
+
+        /* --- Metal Style Button --- */
+        .btn-metal {
+            background: linear-gradient(to bottom, #4a4a4a, #2c2c2c);
+            border: 2px solid #5a5a5a;
+            color: #ddd;
+            padding: 10px 20px;
+            font-family: 'Cinzel', serif;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.2s;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.5);
+            outline: none;
+            font-size: 0.9rem;
+        }
+
+        .btn-metal:hover:not(:disabled) {
+            border-color: var(--gold-accent);
+            color: white;
+            text-shadow: 0 0 5px var(--gold-accent);
+        }
+
+        .btn-metal:active:not(:disabled) {
+            transform: translateY(2px);
+            background: linear-gradient(to bottom, #2c2c2c, #4a4a4a);
+            box-shadow: 0 2px 3px rgba(0,0,0,0.8);
+        }
+
+        .btn-metal:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            filter: grayscale(1);
+        }
+
+        .btn-auto-active {
+            border-color: #00ff00 !important;
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.4);
+            color: #fff !important;
+        }
+
+        .btn-skill {
+            background: linear-gradient(to bottom, #3a2a4a, #1a0a2a);
+            border-color: #5a3a7a;
+        }
+        
+        .btn-potion {
+            background: linear-gradient(to bottom, #4a1a1a, #2a0a0a);
+            border-color: #7a3a3a;
+        }
+
+        /* --- Admin Panel --- */
+        #admin-btn {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            opacity: 0.3;
+            z-index: 2000;
+        }
+        #admin-btn:hover { opacity: 1; }
+
+        #admin-panel {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 90%;
+            max-width: 500px;
+            background: rgba(10, 10, 10, 0.95);
+            border: 3px solid var(--gold-accent);
+            padding: 20px;
+            z-index: 3000;
+            display: none;
+            box-shadow: 0 0 50px rgba(0,0,0,1);
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        #admin-panel h3 {
+            font-family: 'Cinzel', serif;
+            color: var(--gold-accent);
+            margin-bottom: 20px;
+            text-align: center;
+            border-bottom: 1px solid #444;
+            padding-bottom: 10px;
+        }
+
+        .admin-section {
+            margin-bottom: 20px;
+            border-bottom: 1px solid #333;
+            padding-bottom: 10px;
+        }
+
+        .admin-section h4 {
+            font-size: 0.9rem;
+            color: #ccc;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .admin-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .admin-group {
+            margin-bottom: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+
+        .admin-group label {
+            font-size: 0.75rem;
+            color: #888;
+        }
+
+        .admin-group input {
+            background: #222;
+            border: 1px solid #444;
+            color: #fff;
+            padding: 5px 10px;
+            font-family: inherit;
+            width: 100%;
+        }
+
+        .admin-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        /* --- Animations & VFX --- */
+        @keyframes shake {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            10% { transform: translate(-1px, -2px) rotate(-1deg); }
+            20% { transform: translate(-3px, 0px) rotate(1deg); }
+            30% { transform: translate(3px, 2px) rotate(0deg); }
+            40% { transform: translate(1px, -1px) rotate(1deg); }
+            50% { transform: translate(-1px, 2px) rotate(-1deg); }
+            60% { transform: translate(-3px, 1px) rotate(0deg); }
+            70% { transform: translate(3px, 1px) rotate(-1deg); }
+            80% { transform: translate(-1px, -1px) rotate(1deg); }
+            90% { transform: translate(1px, 2px) rotate(0deg); }
+            100% { transform: translate(1px, -2px) rotate(-1deg); }
+        }
+
+        .shake {
+            animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both;
+        }
+
+        @keyframes floatDamage {
+            0% { transform: translateY(0); opacity: 0; }
+            20% { opacity: 1; }
+            80% { opacity: 1; }
+            100% { transform: translateY(-50px); opacity: 0; }
+        }
+
+        .damage-popup {
+            position: absolute;
+            font-family: 'Cinzel', serif;
+            font-weight: 900;
+            font-size: 2rem;
+            color: #ff0000;
+            text-shadow: 2px 2px 4px #000;
+            pointer-events: none;
+            z-index: 100;
+            animation: floatDamage 1s ease-out forwards;
+        }
+
+        .damage-popup.player {
+            color: #ff3333;
+        }
+
+        .damage-popup.monster {
+            color: #ffffff;
+            font-size: 2.2rem;
+        }
+
+        .damage-popup.critical {
+            color: #ffcc00 !important;
+            font-size: 3.5rem !important;
+            text-shadow: 0 0 20px rgba(255, 204, 0, 0.8), 2px 2px 4px #000;
+            z-index: 110;
+        }
+
+        /* Flash effect for hits */
+        .flash {
+            filter: brightness(2) contrast(2);
+        }
+
+        /* --- Overlay for Game State --- */
+        #game-over {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            text-align: center;
+        }
+
+        #game-over h2 {
+            font-family: 'Cinzel', serif;
+            font-size: 3rem;
+            color: var(--gold-accent);
+            margin-bottom: 20px;
+        }
+
+        #mission-banner {
+            position: fixed; top: 10px; left: 50%; transform: translateX(-50%);
+            background: rgba(0, 50, 100, 0.85); color: cyan; padding: 10px 30px;
+            border: 2px solid cyan; border-radius: 5px; font-family: 'Cinzel';
+            z-index: 1000; box-shadow: 0 0 15px cyan; display: none; text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div id="mission-banner">
+        <div style="font-size:0.7rem; color:gold;">[ACTIVE MISSION]</div>
+        <div id="mission-text">지역의 비밀을 밝혀내라!</div>
+    </div>
+
+    <div id="game-container">
+        <!-- Boss Area -->
+        <div class="boss-area">
+            <div class="boss-header">
+                <div class="boss-name">ANCIENT OVERSEER</div>
+                <div class="hp-container">
+                    <div id="boss-hp-bar" class="hp-bar" style="width: 100%;"></div>
+                    <div id="boss-hp-text" class="hp-text">1000 / 1000</div>
+                </div>
+            </div>
+
+            <div class="boss-sprite-wrapper" id="boss-sprite-wrapper">
+                <!-- Using fixed image name as per request -->
+                <img id="boss-image" src="image_1.png" alt="Boss Monster">
+            </div>
+        </div>
+
+        <!-- Player Area -->
+        <div class="player-area">
+            <div class="player-stats">
+                <div class="player-info">
+                    <span id="player-level">LV. 1</span>
+                    <span>PLAYER CHAMPION</span>
+                </div>
+                <div style="flex-grow: 1; max-width: 300px; margin-left: 20px;">
+                    <div class="hp-container">
+                        <div id="player-hp-bar" class="hp-bar" style="width: 100%;"></div>
+                        <div id="player-hp-text" class="hp-text">500 / 500</div>
+                    </div>
+                    <div class="xp-container">
+                        <div id="player-xp-bar" class="xp-bar"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="actions">
+                <button class="btn-metal" id="btn-attack">Attack</button>
+                <button class="btn-metal btn-potion" id="btn-potion">Potion (0)</button>
+                <button class="btn-metal" id="btn-auto">Auto OFF</button>
+            </div>
+
+            <div class="skills-row">
+                <button class="btn-metal btn-skill" id="btn-skill-1" disabled title="Unlock at LV. 3">Double Strike</button>
+                <button class="btn-metal btn-skill" id="btn-skill-2" disabled title="Unlock at LV. 5">Healing Light</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 관리자 패널 -->
+    <!-- 관리자 패널 (몬스터 & 캐릭터 에디터) -->
+    <button class="btn-metal" id="admin-btn" style="position: fixed; bottom: 20px; right: 20px; padding: 15px; font-size: 1rem; border-radius: 50%; width: 60px; height: 60px; z-index: 5000; opacity: 1; border: 3px solid var(--gold-accent);">⚙️</button>
+    
+    <div id="admin-panel" style="width: 450px; border-radius: 10px; background: rgba(0, 0, 0, 0.98); box-shadow: 0 0 100px #000;">
+        <h2 style="font-family: 'Cinzel', serif; color: var(--gold-accent); text-align: center; margin-bottom: 20px; border-bottom: 2px solid var(--gold-accent); padding-bottom: 15px;">🛠️ 데이터 통합 에디터</h2>
+
+        <!-- [1] 캐릭터(플레이어) 편집 -->
+        <div class="admin-section" style="background: rgba(44, 44, 44, 0.3); padding: 15px; border-radius: 8px;">
+            <h4 style="color: #00ced1; margin-bottom: 12px; font-family: 'Cinzel', serif;">👤 캐릭터 설정 (Character Edit)</h4>
+            <div class="admin-grid">
+                <div class="admin-group">
+                    <label>플레이어 레벨</label>
+                    <input type="number" id="adm-p-lvl">
+                </div>
+                <div class="admin-group">
+                    <label>공격력 (ATK)</label>
+                    <input type="number" id="adm-p-atk">
+                </div>
+                <div class="admin-group">
+                    <label>최대 체력 (Max HP)</label>
+                    <input type="number" id="adm-p-maxhp">
+                </div>
+                <div class="admin-group">
+                    <label>현재 체력 (HP)</label>
+                    <input type="number" id="adm-p-hp">
+                </div>
+                <div class="admin-group">
+                    <label>포션 개수</label>
+                    <input type="number" id="adm-p-pos">
+                </div>
+                <div class="admin-group">
+                    <label>현재 경험치</label>
+                    <input type="number" id="adm-p-xp">
+                </div>
+            </div>
+        </div>
+
+        <!-- [2] 몬스터 편집 -->
+        <div class="admin-section" style="background: rgba(139, 0, 0, 0.1); padding: 15px; border-radius: 8px; margin-top: 15px;">
+            <h4 style="color: #ff3c3c; margin-bottom: 12px; font-family: 'Cinzel', serif;">👹 몬스터 설정 (Monster Edit)</h4>
+            <div class="admin-group">
+                <label>등장 몬스터 선택</label>
+                <select id="adm-m-select" style="width: 100%; padding: 8px; background: #222; color: #fff; border: 1px solid #444;">
+                    <option value="0">슬라임</option>
+                    <option value="1">고블린</option>
+                    <option value="2">박쥐</option>
+                    <option value="3">스켈레톤</option>
+                    <option value="4">오크</option>
+                    <option value="5">거미</option>
+                    <option value="6">미믹</option>
+                </select>
+            </div>
+            <div class="admin-grid" style="margin-top: 10px;">
+                <div class="admin-group">
+                    <label>최대 체력 (Max HP)</label>
+                    <input type="number" id="adm-m-maxhp">
+                </div>
+                <div class="admin-group">
+                    <label>공격력 (ATK)</label>
+                    <input type="number" id="adm-m-atk">
+                </div>
+                <div class="admin-group">
+                    <label>경험치 보상</label>
+                    <input type="number" id="adm-m-xp">
+                </div>
+                <div class="admin-group">
+                    <label>아이템 드랍 (%)</label>
+                    <input type="number" id="adm-m-drop">
+                </div>
+            </div>
+        </div>
+
+        <div class="admin-actions" style="margin-top: 25px;">
+            <button class="btn-metal" style="flex: 2; border-color: #00ff00;" onclick="saveAdminSettings()">💾 설정 적용 및 저장</button>
+            <button class="btn-metal" style="flex: 1; background: #444;" onclick="toggleAdmin()">닫기</button>
+        </div>
+        <div style="margin-top: 10px;">
+            <button class="btn-metal" style="width: 100%; background: #660000; font-size: 0.7rem; padding: 5px;" onclick="resetGameData()">⚠️ 모든 캐시 및 데이터 초기화</button>
+        </div>
+    </div>
+
+
+    <!-- UI Overlay -->
+    <div id="game-over">
+        <h2 id="result-text">YOU DIED</h2>
+        <button class="btn-metal" onclick="location.reload()">Try Again</button>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+        const SB_URL = "https://sdqxdrwjwdcaamezvmyf.supabase.co";
+        const SB_KEY = "sb_publishable_ghjdZA43FNQjZDDMgODH6w_VJsSnMA9";
+        const sb = supabase.createClient(SB_URL, SB_KEY);
+
+        // --- 몬스터 종류 정의 ---
+        const MONSTER_TYPES = [
+            { name: "슬라임", img: "moster/monster(1).png", minHp: 100, maxHp: 120, minAtk: 5, maxAtk: 7, xp: 20 },
+            { name: "고블린", img: "moster/monster(2).png", minHp: 100, maxHp: 120, minAtk: 5, maxAtk: 7, xp: 25 },
+            { name: "박쥐", img: "moster/monster(3).png", minHp: 100, maxHp: 120, minAtk: 5, maxAtk: 7, xp: 22 },
+            { name: "스켈레톤", img: "moster/monster(4).png", minHp: 100, maxHp: 120, minAtk: 5, maxAtk: 7, xp: 30 },
+            { name: "오크", img: "moster/monster(5).png", minHp: 100, maxHp: 120, minAtk: 5, maxAtk: 7, xp: 35 },
+            { name: "거미", img: "moster/monster(6).png", minHp: 100, maxHp: 120, minAtk: 5, maxAtk: 7, xp: 28 },
+            { name: "미믹", img: "moster/monster(7).png", minHp: 100, maxHp: 120, minAtk: 5, maxAtk: 7, xp: 40 }
+        ];
+
+        // --- Game State ---
+        let gameState = {
+            player: { hp: 200, maxHp: 200, atk: 12, level: 1, xp: 0, nextXp: 100, potions: 3 },
+            monster: { id: 0, name: "슬라임", img: "moster/monster(1).png", hp: 100, maxHp: 100, atk: 5, xpReward: 20, dropRate: 50 },
+            isBusy: false,
+            isAuto: false
+        };
+
+        // [Supabase] 데이터 로드
+        async function initGame() {
+            const { data, error } = await sb.from('player_stats').select('*').limit(1).single();
+            if (!error && data) {
+                gameState.player.level = data.level;
+                gameState.player.hp = data.hp;
+                gameState.player.maxHp = data.max_hp;
+                gameState.player.atk = data.atk;
+                gameState.player.xp = data.xp;
+                gameState.player.nextXp = data.next_xp;
+                gameState.player.potions = data.potions;
+            }
+
+            // URL 파라미터 읽기
+            const params = new URLSearchParams(window.location.search);
+            const isPortal = params.get('portal') === 'true';
+            const missionText = params.get('mission');
+
+            if (isPortal) {
+                const banner = document.getElementById('mission-banner');
+                const mTxt = document.getElementById('mission-text');
+                if (banner && mTxt) {
+                    banner.style.display = 'block';
+                    mTxt.innerText = missionText || "지역의 수호자를 처치하라!";
+                }
+            }
+
+            // 몬스터는 매번 새로 만남
+            const mType = MONSTER_TYPES[Math.floor(Math.random() * MONSTER_TYPES.length)];
+            gameState.monster.name = mType.name;
+            gameState.monster.img = mType.img;
+            gameState.monster.maxHp = Math.floor(mType.minHp + Math.random() * (mType.maxHp - mType.minHp + 1));
+            gameState.monster.hp = gameState.monster.maxHp;
+            gameState.monster.atk = Math.floor(mType.minAtk + Math.random() * (mType.maxAtk - mType.minAtk + 1));
+            gameState.monster.xpReward = mType.xp;
+            
+            updateUI();
+        }
+        initGame();
+
+        async function saveState() {
+            // 플레이어 정보만 서버에 동기화
+            const { error } = await sb.from('player_stats').update({
+                level: gameState.player.level,
+                hp: gameState.player.hp,
+                max_hp: gameState.player.maxHp,
+                atk: gameState.player.atk,
+                xp: gameState.player.xp,
+                next_xp: gameState.player.nextXp,
+                potions: gameState.player.potions
+            }).eq('id', (await sb.from('player_stats').select('id').limit(1).single()).data.id);
+            
+            if (error) console.error("Sync error:", error);
+        }
+
+
+        // --- DOM Elements ---
+        const bossImg = document.getElementById('boss-image');
+        const bossContainer = document.getElementById('boss-sprite-wrapper');
+        const gameContainer = document.body;
+        const btnAttack = document.getElementById('btn-attack');
+        const btnAuto = document.getElementById('btn-auto');
+        const btnPotion = document.getElementById('btn-potion');
+        const btnSkill1 = document.getElementById('btn-skill-1');
+        const btnSkill2 = document.getElementById('btn-skill-2');
+        
+        const bossHPBar = document.getElementById('boss-hp-bar');
+        const bossHPText = document.getElementById('boss-hp-text');
+        const playerHPBar = document.getElementById('player-hp-bar');
+        const playerHPText = document.getElementById('player-hp-text');
+        const playerLevelText = document.getElementById('player-level');
+        const playerXPBar = document.getElementById('player-xp-bar');
+        
+        const gameOverOverlay = document.getElementById('game-over');
+        const resultText = document.getElementById('result-text');
+        const adminPanel = document.getElementById('admin-panel');
+
+        // --- Audio Logic (Simplified) ---
+        let audioCtx;
+        function initAudio() { if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+        function playSfx(freq1, freq2, type, duration) {
+            initAudio();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq1, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(freq2, audioCtx.currentTime + duration);
+            gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            osc.start(); osc.stop(audioCtx.currentTime + duration);
+        }
+
+        const playClang = () => playSfx(800, 100, 'square', 0.15);
+        const playThump = () => playSfx(120, 40, 'sine', 0.2);
+        const playHeal = () => playSfx(400, 800, 'triangle', 0.3);
+        const playLevelUp = () => {
+            playSfx(400, 1200, 'sawtooth', 0.5);
+            setTimeout(() => playSfx(600, 1500, 'sawtooth', 0.5), 100);
+        };
+
+        // --- UI 업데이트 ---
+        function updateUI() {
+            // 0으로 나누기 방지
+            const mMaxHp = gameState.monster.maxHp || 1;
+            const pMaxHp = gameState.player.maxHp || 1;
+            const pNextXp = gameState.player.nextXp || 1;
+
+            bossHPBar.style.width = `${Math.min(100, (gameState.monster.hp / mMaxHp) * 100)}%`;
+            bossHPText.innerText = `${Math.ceil(gameState.monster.hp)} / ${gameState.monster.maxHp}`;
+            document.querySelector('.boss-name').innerText = gameState.monster.name || "Unknown";
+            bossImg.src = gameState.monster.img || "";
+            
+            playerHPBar.style.width = `${Math.min(100, (gameState.player.hp / pMaxHp) * 100)}%`;
+            playerHPText.innerText = `${Math.ceil(gameState.player.hp)} / ${gameState.player.maxHp}`;
+            
+            playerLevelText.innerText = `LV. ${gameState.player.level}`;
+            const xpPercent = (gameState.player.xp / pNextXp) * 100;
+            playerXPBar.style.width = `${Math.min(100, xpPercent)}%`;
+            
+            btnPotion.innerText = `포션 (${gameState.player.potions})`;
+            btnPotion.disabled = gameState.player.potions <= 0 || gameState.player.hp >= gameState.player.maxHp;
+
+            // 스킬 비활성화 (평타만 가능하도록 요청)
+            btnSkill1.style.display = 'none';
+            btnSkill2.style.display = 'none';
+        }
+
+        // --- VFX 헬퍼 ---
+        function createPopup(text, targetEl, className) {
+            const popup = document.createElement('div');
+            popup.className = `damage-popup ${className}`;
+            popup.innerText = text;
+            const rect = targetEl.getBoundingClientRect();
+            popup.style.left = `${rect.left + rect.width / 2 + (Math.random() * 40 - 20)}px`;
+            popup.style.top = `${rect.top + rect.height / 2 + (Math.random() * 40 - 20)}px`;
+            document.body.appendChild(popup);
+            setTimeout(() => popup.remove(), 1000);
+        }
+
+        function triggerVfx(type) {
+            if (type === 'shake') {
+                gameContainer.classList.remove('shake');
+                void gameContainer.offsetWidth;
+                gameContainer.classList.add('shake');
+            } else if (type === 'flash') {
+                bossImg.classList.add('flash');
+                setTimeout(() => bossImg.classList.remove('flash'), 100);
+            }
+        }
+
+        // --- RPG 로직 ---
+        function gainXp(amount) {
+            gameState.player.xp += amount;
+            createPopup(`+${amount} XP 획득!`, document.querySelector('.player-area'), 'monster');
+            if (gameState.player.xp >= gameState.player.nextXp) {
+                levelUp();
+            }
+            saveState();
+            updateUI();
+        }
+
+        function levelUp() {
+            gameState.player.level++;
+            gameState.player.xp -= gameState.player.nextXp;
+            
+            // 능력치 상승 (폭을 줄여서 요청하신 밸런스로 유지)
+            gameState.player.maxHp += 20;
+            gameState.player.hp = gameState.player.maxHp;
+            gameState.player.atk += 2;
+
+            // 다음 레벨 경험치 재계산 (최소 1 보장)
+            gameState.player.nextXp = Math.max(1, Math.floor(100 * Math.pow(gameState.player.level, 1.5)));
+            
+            playLevelUp();
+            createPopup(`레벨 업! LV.${gameState.player.level}`, document.querySelector('.player-area'), 'critical');
+            
+            if (gameState.player.xp >= gameState.player.nextXp) levelUp();
+        }
+
+        function handleDrops() {
+            if (Math.random() * 100 < gameState.monster.dropRate) {
+                gameState.player.potions++;
+                createPopup(`포션 발견!`, document.querySelector('.player-area'), 'critical');
+            }
+        }
+
+        // --- 전투 턴 ---
+        async function performCombat(specialMove = null) {
+            if (gameState.isBusy || gameState.player.hp <= 0) return;
+            gameState.isBusy = true;
+            btnAttack.disabled = true;
+
+            // 1. 플레이어 턴
+            let dmg = Math.floor(gameState.player.atk * (0.8 + Math.random() * 0.4));
+            let isCrit = Math.random() < 0.2;
+            let moveName = "공격";
+
+            if (specialMove === 'double') {
+                dmg *= 2;
+                moveName = "연속 공격";
+                isCrit = true;
+            }
+
+            if (isCrit) dmg = Math.floor(dmg * 2.5);
+            
+            gameState.monster.hp -= dmg;
+            if (gameState.monster.hp < 0) gameState.monster.hp = 0;
+
+            playClang();
+            triggerVfx('shake');
+            triggerVfx('flash');
+            createPopup(`-${dmg} ${moveName}`, bossContainer, isCrit ? 'critical' : 'monster');
+            updateUI();
+
+            if (gameState.monster.hp <= 0) {
+                await new Promise(r => setTimeout(r, 500));
+                handleDrops();
+                gainXp(gameState.monster.xpReward);
+                endGame(`승리! ${gameState.monster.xpReward} XP 획득`);
+                return;
+            }
+
+            await new Promise(r => setTimeout(r, 800));
+
+            // 2. 몬스터 턴
+            let mDmg = Math.floor(gameState.monster.atk * (0.8 + Math.random() * 0.4));
+            let mCrit = Math.random() < 0.15;
+            if (mCrit) mDmg *= 2;
+
+            gameState.player.hp -= mDmg;
+            if (gameState.player.hp < 0) gameState.player.hp = 0;
+
+            playThump();
+            triggerVfx('shake');
+            createPopup(`-${mDmg}`, document.querySelector('.player-area'), mCrit ? 'critical' : 'player');
+            updateUI();
+
+            if (gameState.player.hp <= 0) {
+                endGame("패배하였습니다...");
+                return;
+            }
+
+            gameState.isBusy = false;
+            btnAttack.disabled = false;
+            if (gameState.isAuto) setTimeout(() => performCombat(), 1000);
+        }
+
+        function endGame(msg) {
+            resultText.innerText = msg;
+            gameOverOverlay.style.display = 'flex';
+            
+            // 새로운 몬스터 스폰 (랜덤 선택)
+            const mType = MONSTER_TYPES[Math.floor(Math.random() * MONSTER_TYPES.length)];
+            gameState.monster.name = mType.name;
+            gameState.monster.img = mType.img;
+            gameState.monster.maxHp = Math.floor(mType.minHp + Math.random() * (mType.maxHp - mType.minHp + 1));
+            gameState.monster.hp = gameState.monster.maxHp;
+            gameState.monster.atk = Math.floor(mType.minAtk + Math.random() * (mType.maxAtk - mType.minAtk + 1));
+            gameState.monster.xpReward = mType.xp;
+            
+            // 상태 초기화
+            gameState.isBusy = false;
+            btnAttack.disabled = false;
+            
+            saveState();
+        }
+
+        // --- 입력 핸들링 ---
+        btnAttack.addEventListener('click', () => {
+            console.log("Attack clicked, isBusy:", gameState.isBusy);
+            performCombat();
+        });
+        
+        btnAuto.addEventListener('click', () => {
+            gameState.isAuto = !gameState.isAuto;
+            btnAuto.innerText = gameState.isAuto ? "자동 ON" : "자동 OFF";
+            btnAuto.classList.toggle('btn-auto-active', gameState.isAuto);
+            if (gameState.isAuto && !gameState.isBusy) performCombat();
+        });
+
+        btnPotion.addEventListener('click', () => {
+            if (gameState.player.potions > 0 && gameState.player.hp < gameState.player.maxHp) {
+                gameState.player.potions--;
+                const healAmt = 150;
+                gameState.player.hp = Math.min(gameState.player.maxHp, gameState.player.hp + healAmt);
+                playHeal();
+                createPopup(`+${healAmt} HP 회복`, document.querySelector('.player-area'), 'monster');
+                updateUI();
+                saveState();
+            }
+        });
+
+        btnSkill1.addEventListener('click', () => performCombat('double'));
+        btnSkill2.addEventListener('click', () => {
+            if (gameState.isBusy) return;
+            const healAmt = Math.floor(gameState.player.maxHp * 0.3);
+            gameState.player.hp = Math.min(gameState.player.maxHp, gameState.player.hp + healAmt);
+            playHeal();
+            createPopup(`치유의 빛! +${healAmt}`, document.querySelector('.player-area'), 'critical');
+            updateUI();
+            performMoveWait();
+        });
+
+        async function performMoveWait() {
+            gameState.isBusy = true;
+            await new Promise(r => setTimeout(r, 800));
+            gameState.isBusy = false;
+            btnAttack.disabled = false;
+            updateUI();
+            if (gameState.isAuto) performCombat();
+        }
+
+        // --- 관리자 기능 ---
+        const toggleAdmin = () => {
+            if (adminPanel.style.display === 'block') {
+                adminPanel.style.display = 'none';
+            } else {
+                adminPanel.style.display = 'block';
+                // 캐릭터 데이터 필드 채우기
+                document.getElementById('adm-p-lvl').value = gameState.player.level;
+                document.getElementById('adm-p-atk').value = gameState.player.atk;
+                document.getElementById('adm-p-maxhp').value = gameState.player.maxHp;
+                document.getElementById('adm-p-hp').value = Math.ceil(gameState.player.hp);
+                document.getElementById('adm-p-pos').value = gameState.player.potions;
+                document.getElementById('adm-p-xp').value = gameState.player.xp;
+
+                // 몬스터 데이터 필드 채우기
+                document.getElementById('adm-m-maxhp').value = gameState.monster.maxHp;
+                document.getElementById('adm-m-atk').value = gameState.monster.atk;
+                document.getElementById('adm-m-xp').value = gameState.monster.xpReward;
+                document.getElementById('adm-m-drop').value = gameState.monster.dropRate;
+                
+                // 현재 몬스터 인덱스 찾기
+                const mIdx = MONSTER_TYPES.findIndex(m => m.img === gameState.monster.img);
+                if (mIdx !== -1) document.getElementById('adm-m-select').value = mIdx;
+            }
+        };
+        
+        document.getElementById('admin-btn').addEventListener('click', toggleAdmin);
+
+        function saveAdminSettings() {
+            const getVal = (id, current) => {
+                const val = parseInt(document.getElementById(id).value);
+                return isNaN(val) ? current : val;
+            };
+
+            // [1] 플레이어 데이터 저장
+            gameState.player.level = getVal('adm-p-lvl', gameState.player.level);
+            gameState.player.atk = getVal('adm-p-atk', gameState.player.atk);
+            gameState.player.maxHp = Math.max(1, getVal('adm-p-maxhp', gameState.player.maxHp));
+            gameState.player.hp = Math.min(gameState.player.maxHp, getVal('adm-p-hp', gameState.player.hp));
+            gameState.player.potions = getVal('adm-p-pos', gameState.player.potions);
+            gameState.player.xp = getVal('adm-p-xp', gameState.player.xp);
+            
+            // [2] 몬스터 데이터 저장
+            const mIdx = document.getElementById('adm-m-select').value;
+            const mType = MONSTER_TYPES[mIdx];
+            
+            // 상세 스펙 저장
+            gameState.monster.name = mType.name;
+            gameState.monster.img = mType.img;
+            gameState.monster.maxHp = Math.max(1, getVal('adm-m-maxhp', gameState.monster.maxHp));
+            gameState.monster.hp = gameState.monster.maxHp; // 수정 시 체력 리셋 (편의성)
+            gameState.monster.atk = getVal('adm-m-atk', gameState.monster.atk);
+            gameState.monster.xpReward = getVal('adm-m-xp', gameState.monster.xpReward);
+            gameState.monster.dropRate = getVal('adm-m-drop', gameState.monster.dropRate);
+
+            // 레벨에 따른 다음 XP 재계산
+            gameState.player.nextXp = Math.max(1, Math.floor(100 * Math.pow(gameState.player.level, 1.5)));
+            
+            gameState.isBusy = false;
+            btnAttack.disabled = false;
+            
+            saveState();
+            updateUI();
+            toggleAdmin();
+            
+            createPopup("데이터 수정 완료!", document.querySelector('.player-area'), 'critical');
+            if (gameState.isAuto) performCombat();
+        }
+
+        function resetGameData() {
+            if (confirm("정말로 모든 게임 데이터를 초기화하시겠습니까?")) {
+                localStorage.removeItem('jeju_rpg_state');
+                location.reload();
+            }
+        }
+
+        // 초기화
+        updateUI();
+
+    </script>
+</body>
+</html>
