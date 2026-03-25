@@ -259,6 +259,7 @@
             right: 10px;
             opacity: 0.3;
             z-index: 2000;
+            display: none; /* HIDDEN BY DEFAULT */
         }
         #admin-btn:hover { opacity: 1; }
 
@@ -608,6 +609,7 @@
             const params = new URLSearchParams(window.location.search);
             const isPortal = params.get('portal') === 'true';
             const missionText = params.get('mission');
+            const adminFlag = params.get('admin') === 'true';
 
             if (isPortal) {
                 const banner = document.getElementById('mission-banner');
@@ -616,6 +618,13 @@
                     banner.style.display = 'block';
                     mTxt.innerText = missionText || "지역의 수호자를 처치하라!";
                 }
+            }
+            
+            if (adminFlag) {
+                document.getElementById('admin-btn').style.display = 'block';
+                // 업데이트 버튼 링크도 수정
+                const mapBtn = document.getElementById('map-return-btn');
+                if (mapBtn) mapBtn.onclick = () => location.href='admin.html';
             }
 
             // 몬스터는 매번 새로 만남
