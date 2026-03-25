@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monster World - Virtual Map Version</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Noto+Serif+KR:wght@400;700&display=swap');
+
+        :root {
+            --primary-red: #8b0000;
+            --gold-accent: #b8860b;
+            --bg-dark: #0a0a0a;
+        }
+
+        body, html {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            font-family: 'Noto Serif KR', serif;
+            background: #000;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        /* --- Map Canvas --- */
+        #viewport {
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            position: relative;
+            cursor: crosshair;
+            background: #000;
+        }
+
+        #map-container {
+            position: absolute;
+            width: 2000px;
+            height: 2000px;
+            background-image: url('virtual_map.png');
+            background-size: cover;
+            background-position: center;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            transition: transform 1.5s cubic-bezier(0.23, 1, 0.32, 1);
+        }
+
+        /* --- Player Sprite --- */
+        #player {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            background: rgba(184, 134, 11, 0.3);
+            border: 2px solid var(--gold-accent);
+            border-radius: 50%;
+            z-index: 100;
+            transform: translate(-50%, -50%); /* Center on coords */
+            box-shadow: 0 0 20px var(--gold-accent);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+        }
+
+        #player::after {
+            content: '⚔️';
+            font-size: 1.2rem;
+        }
+
+        /* --- Monster Markers --- */
+        .monster-marker {
+            position: absolute;
+            width: 50px;
+            height: 50px;
+            background: rgba(139, 0, 0, 0.4);
+            border: 2px solid #ff3c3c;
+            border-radius: 50%;
+            z-index: 90;
+            transform: translate(-50%, -50%);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.2s, scale 0.2s;
+            box-shadow: 0 0 15px rgba(255, 0, 0, 0.5);
+            animation: bounce 2s infinite ease-in-out;
+        }
+
+        .monster-marker:hover {
+            transform: translate(-50%, -50%) scale(1.2);
+            background: rgba(139, 0, 0, 0.8);
+            box-shadow: 0 0 30px #ff3c3c;
+        }
+
+        @keyframes bounce {
+            0%, 100% { margin-top: 0; }
+            50% { margin-top: -10px; }
+        }
+
+        /* --- UI Overlay --- */
+        #ui-layer {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 1000;
+            pointer-events: none;
+        }
+
+        .status-panel {
+            background: rgba(10, 10, 10, 0.9);
+            border: 2px solid var(--gold-accent);
+            padding: 15px;
+            color: #fff;
+            box-shadow: 0 0 20px rgba(0,0,0,0.8);
+            pointer-events: auto;
+            min-width: 280px;
+        }
+
+        .status-panel h1 {
+            font-family: 'Cinzel', serif;
+            font-size: 1.2rem;
+            margin: 0 0 5px 0;
+            color: var(--gold-accent);
+            letter-spacing: 1px;
+        }
+
+        .hint {
+            font-size: 0.8rem;
+            color: #888;
+            margin-top: 10px;
+            font-style: italic;
+        }
+
+        /* --- Battle Overlay --- */
+        #battle-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            z-index: 10000;
+            display: none;
+        }
+
+        #battle-frame {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
+        .close-battle {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: var(--primary-red);
+            color: white;
+            border: 2px solid #fff;
+            padding: 10px 20px;
+            cursor: pointer;
+            font-family: 'Cinzel', serif;
+            z-index: 10001;
+        }
+
+        /* Click Marker effect */
+        .click-effect {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #fff;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            animation: ripple 0.6s linear forwards;
+            pointer-events: none;
+        }
+
+        @keyframes ripple {
+            0% { width: 0; height: 0; opacity: 1; border-width: 4px; }
+            100% { width: 100px; height: 100px; opacity: 0; border-width: 1px; }
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="ui-layer">
+        <div class="status-panel">
+            <h1>HUNTER'S ODYSSEY</h1>
+            <div id="loc-status">가상 좌표계 활성화됨</div>
+            <div id="region-status" style="margin-top: 5px; font-size: 0.9rem; color: var(--gold-accent);"></div>
+            <div class="hint">지도를 클릭하면 이동하고, 몬스터를 클릭하면 전투가 시작됩니다.</div>
+        </div>
+    </div>
+
+    <!-- The Virtual Map Viewport -->
+    <div id="viewport">
+        <div id="map-container">
+            <div id="player"></div>
+            <!-- Monsters will be spawned here -->
+        </div>
+    </div>
+
+    <!-- Battle Engine Overlay -->
+    <div id="battle-overlay">
+        <button class="close-battle" onclick="hideBattle()">EXIT WORLD</button>
+        <iframe id="battle-frame" src="index.html"></iframe>
+    </div>
+
+    <script>
+        const mapContainer = document.getElementById('map-container');
+        const player = document.getElementById('player');
+        const viewport = document.getElementById('viewport');
+        const regionStatus = document.getElementById('region-status');
+
+        // Map dimensions: 2000x2000
+        let playerX = 1000;
+        let playerY = 1000;
+        
+        const monsters = [];
+
+        // Initial Position
+        updatePlayerPosition();
+
+        // 1. Click to move logic
+        viewport.addEventListener('click', (e) => {
+            // Get click position relative to the map-container
+            const rect = mapContainer.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+            const clickY = e.clientY - rect.top;
+
+            // Update player coordinates
+            playerX = clickX;
+            playerY = clickY;
+
+            updatePlayerPosition();
+            createClickEffect(e.clientX, e.clientY);
+        });
+
+        function updatePlayerPosition() {
+            // Move player element
+            player.style.left = `${playerX}px`;
+            player.style.top = `${playerY}px`;
+
+            // Center the camera on the player
+            // Viewport is 100vw/100vh. Center is 50,50.
+            const moveX = 50 - (playerX / 20); // Scale down for translation or simple offset
+            // Better: use direct offset
+            const offsetX = (viewport.clientWidth / 2) - playerX;
+            const offsetY = (viewport.clientHeight / 2) - playerY;
+
+            mapContainer.style.transform = `translate(${offsetX}px, ${offsetY}px)`;
+
+            // Region Check (Example: Bottom-Left 0-500, 1500-2000 is "Dark Swamp")
+            if (playerX < 500 && playerY > 1500) {
+                regionStatus.innerText = "🚩 [특수 구역] 어둠의 늪지";
+            } else if (playerX > 1500 && playerY < 500) {
+                regionStatus.innerText = "🚩 [특수 구역] 잊혀진 봉우리";
+            } else {
+                regionStatus.innerText = "🚩 평온한 대지";
+            }
+        }
+
+        function createClickEffect(x, y) {
+            const ripple = document.createElement('div');
+            ripple.className = 'click-effect';
+            ripple.style.left = `${x}px`;
+            ripple.style.top = `${y}px`;
+            document.body.appendChild(ripple);
+            setTimeout(() => ripple.remove(), 600);
+        }
+
+        // 2. Virtual Monster Spawning
+        function spawnMonsters() {
+            const types = ["💀 OVERSEER", "👁️ GAZER", "🐉 WATCHER"];
+            for (let i = 0; i < 15; i++) {
+                const mx = Math.random() * 1800 + 100;
+                const my = Math.random() * 1800 + 100;
+                
+                const mEl = document.createElement('div');
+                mEl.className = 'monster-marker';
+                mEl.style.left = `${mx}px`;
+                mEl.style.top = `${my}px`;
+                mEl.title = types[i % 3];
+                mEl.innerHTML = `<span>${types[i % 3].split(' ')[0]}</span>`;
+
+                mEl.addEventListener('click', (e) => {
+                    e.stopPropagation(); // Avoid triggering map move
+                    if (confirm(`${types[i % 3]}와(과) 전투를 시작하겠습니까?`)) {
+                        showBattle();
+                    }
+                });
+
+                mapContainer.appendChild(mEl);
+                monsters.push({ x: mx, y: my, el: mEl });
+            }
+        }
+
+        function showBattle() {
+            document.getElementById('battle-overlay').style.display = 'block';
+        }
+
+        function hideBattle() {
+            document.getElementById('battle-overlay').style.display = 'none';
+        }
+
+        // Initialize world
+        spawnMonsters();
+
+    </script>
+</body>
+</html>
