@@ -39,9 +39,35 @@
                     <button class="btn-nav">업적 시스템 (LOCK)</button>
                 </div>
             </div>
-            <div style="position: absolute; bottom: 30px; left: 30px; display: flex; gap: 10px;">
-                <div onclick="startCombat()" class="glass-panel" style="padding: 10px 15px; border-radius: 12px; border-color: rgba(255,77,77,0.3); cursor: pointer;">
-                    <span style="font-family: 'Space Grotesk'; font-size: 0.6rem; color: var(--accent-red); letter-spacing: 2px;">TEST_COMBAT</span>
+            <!-- 사냥 기록 패널 -->
+            <div id="hunt-log-panel" class="glass-panel" style="position: absolute; bottom: 80px; left: 20px; right: 20px; padding: 15px 20px; border-radius: 14px; border-color: rgba(0,253,236,0.15);">
+                <div style="font-size: 0.55rem; color: var(--secondary-cyan); letter-spacing: 2px; margin-bottom: 10px; font-weight: 700;">📊 세션 사냥 기록 (HUNT_LOG)</div>
+                <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; text-align: center;">
+                    <div>
+                        <div style="font-size: 1rem; font-weight: 700; color: #fff;" id="hunt-kills">0</div>
+                        <div style="font-size: 0.45rem; color: var(--text-dim);">처치</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 1rem; font-weight: 700; color: var(--primary-gold);" id="hunt-boss-kills">0</div>
+                        <div style="font-size: 0.45rem; color: var(--text-dim);">보스</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 1rem; font-weight: 700; color: var(--secondary-cyan);" id="hunt-potions">0</div>
+                        <div style="font-size: 0.45rem; color: var(--text-dim);">포션</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 1rem; font-weight: 700; color: #a78bfa;" id="hunt-spirit">0</div>
+                        <div style="font-size: 0.45rem; color: var(--text-dim);">정령카드</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 1rem; font-weight: 700; color: var(--primary-gold);" id="hunt-xp">0</div>
+                        <div style="font-size: 0.45rem; color: var(--text-dim);">경험치</div>
+                    </div>
+                </div>
+            </div>
+            <div style="position: absolute; bottom: 20px; left: 30px; display: flex; gap: 10px;">
+                <div onclick="startCombat()" class="glass-panel" style="padding: 8px 15px; border-radius: 12px; border-color: rgba(255,77,77,0.3); cursor: pointer;">
+                    <span style="font-family: 'Space Grotesk'; font-size: 0.55rem; color: var(--accent-red); letter-spacing: 2px;">TEST_COMBAT</span>
                 </div>
             </div>
         </div>

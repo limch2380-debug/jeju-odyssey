@@ -14,6 +14,42 @@ let pendingConfirmationPortalId = null;
 let ignoredPortalIds = new Set();
 let encounterPending = false;
 
+// ===== 세션 사냥 기록 =====
+let huntLog = { kills: 0, bossKills: 0, potions: 0, spiritCards: 0, xpTotal: 0 };
+
+// ===== WAKE LOCK — 백그라운드 유지 =====
+let wakeLock = null;
+async function requestWakeLock() {
+    try {
+        if ('wakeLock' in navigator) {
+            wakeLock = await navigator.wakeLock.request('screen');
+            console.log('[WAKELOCK] 화면 유지 활성화');
+            wakeLock.addEventListener('release', () => { console.log('[WAKELOCK] 해제됨, 재획득 시도'); });
+        }
+    } catch(e) { console.log('[WAKELOCK] 실패:', e); }
+}
+// 화면 다시 활성화되면 즉시 wake lock 재획득
+document.addEventListener('visibilitychange', async () => {
+    if (document.visibilityState === 'visible' && !wakeLock) {
+        await requestWakeLock();
+    }
+});
+
+// ===== 백그라운드 오디오 트릭 — 화면 꺼져도 JS 실행 유지 =====
+let bgAudioCtx = null;
+function startBackgroundKeepAlive() {
+    try {
+        bgAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = bgAudioCtx.createOscillator();
+        const gainNode = bgAudioCtx.createGain();
+        gainNode.gain.value = 0.001; // 거의 무음
+        oscillator.connect(gainNode);
+        gainNode.connect(bgAudioCtx.destination);
+        oscillator.start();
+        console.log('[BG_AUDIO] 백그라운드 유지 오디오 시작');
+    } catch(e) { console.log('[BG_AUDIO] 실패:', e); }
+}
+
 // SUPABASE CONNECTION
 const SUPABASE_URL = "https://icggdzxzifbhegvdwzdc.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImljZ2dkenh6aWZiaGVndmR3emRjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2MzE2NTQsImV4cCI6MjA5MDIwNzY1NH0.ceUvWu-78qaIxJcq490LUCUcwHS4NVCMYzL3YGemWjs";
@@ -42,26 +78,35 @@ async function getPortals() {
     return data || [];
 }
 
-// 포탈의 target_monster_name을 배열로 파싱하는 유틸
 function parsePortalMonsters(raw) {
     if (!raw) return [];
     try {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) return parsed;
         return [String(parsed)];
-    } catch(e) {
-        return [String(raw)]; // 구버전 단일 문자열 호환
-    }
+    } catch(e) { return [String(raw)]; }
 }
 
-// ===== SOUNDS — 칼 전투 사운드 =====
+// ===== SOUNDS =====
 const SOUNDS = {
     hit: new Audio('https://assets.mixkit.co/active_storage/sfx/2788/2788-preview.mp3'),
     enemyHit: new Audio('https://assets.mixkit.co/active_storage/sfx/2790/2790-preview.mp3'),
     potion: new Audio('https://assets.mixkit.co/active_storage/sfx/1487/1487-preview.mp3'),
     victory: new Audio('https://assets.mixkit.co/active_storage/sfx/2019/2019-preview.mp3'),
-    swordSwing: new Audio('https://assets.mixkit.co/active_storage/sfx/2786/2786-preview.mp3')
+    swordSwing: new Audio('https://assets.mixkit.co/active_storage/sfx/2786/2786-preview.mp3'),
+    alarm: new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3') // 포탈 진입 알람
 };
+// 사운드 프리로드
+Object.values(SOUNDS).forEach(s => { s.preload = 'auto'; s.load(); });
+
+// ===== 진동 + 알람 =====
+function triggerPortalAlert() {
+    // 진동 패턴: 200ms진동 - 100ms쉼 - 200ms진동 - 100ms쉼 - 300ms진동
+    if ('vibrate' in navigator) {
+        navigator.vibrate([200, 100, 200, 100, 300]);
+    }
+    playSound('alarm');
+}
 
 let combatState = { playerHP: 100, playerMaxHP: 100, potions: 1, currentEnemy: null, isGameOver: false, isAuto: false };
 let autoBattleInterval = null;
@@ -75,6 +120,7 @@ async function initApp() {
     } catch(e) { console.log("Init warning:", e); }
     updateClock();
     await updateDashboardHUD();
+    updateHuntLogUI();
 }
 initApp();
 
@@ -115,6 +161,10 @@ async function loadPortals() {
 }
 
 function startTracking() {
+    // 백그라운드 유지 시스템 시작
+    requestWakeLock();
+    startBackgroundKeepAlive();
+    
     if ("geolocation" in navigator) {
         watchId = navigator.geolocation.watchPosition((pos) => {
             const newPos = [pos.coords.latitude, pos.coords.longitude];
@@ -150,6 +200,17 @@ async function updateDashboardHUD() {
     if (hpBar) hpBar.style.width = `${(combatState.playerHP/combatState.playerMaxHP)*100}%`;
     const xpBar = document.getElementById('xp-bar');
     if (xpBar) xpBar.style.width = `${xpPercent}%`;
+}
+
+// ===== 사냥 기록 UI 업데이트 =====
+function updateHuntLogUI() {
+    const el = document.getElementById('hunt-log-panel');
+    if (!el) return;
+    document.getElementById('hunt-kills').innerText = huntLog.kills;
+    document.getElementById('hunt-boss-kills').innerText = huntLog.bossKills;
+    document.getElementById('hunt-potions').innerText = huntLog.potions;
+    document.getElementById('hunt-spirit').innerText = huntLog.spiritCards;
+    document.getElementById('hunt-xp').innerText = huntLog.xpTotal;
 }
 
 // ===== PROXIMITY / ENCOUNTER =====
@@ -189,22 +250,30 @@ async function checkProximity() {
 
                 if (walkAccumulator >= targetDist) {
                     encounterPending = true;
-                    // 포탈에 지정된 몬스터 목록에서 랜덤 선택
                     const assignedNames = parsePortalMonsters(insidePortal.target_monster_name);
                     let monsterToSpawn = null;
                     if (assignedNames.length > 0) {
                         monsterToSpawn = assignedNames[Math.floor(Math.random() * assignedNames.length)];
                     }
                     console.log('[ENCOUNTER] 게이지 충족! monster:', monsterToSpawn);
-                    document.getElementById('map-status').innerHTML = `<span style="color: var(--accent-red); animation: pulse 1s infinite; font-weight:bold;">[!] 적의 기습! 전투 화면으로 전환합니다...</span>`;
+                    
+                    // ★ 인카운터 시 진동 + 알람
+                    triggerPortalAlert();
+                    
+                    document.getElementById('map-status').innerHTML = `<span style="color: var(--accent-red); animation: pulse 1s infinite; font-weight:bold;">[!] 적의 기습! 자동전투 진입...</span>`;
                     missionOverlay.style.display = 'none';
-                    setTimeout(() => { walkAccumulator = 0; activeMissionPortalId = null; encounterPending = false; startCombat(monsterToSpawn); }, 1200);
+                    // ★ 인카운터 → 자동전투 모드로 즉시 진입
+                    setTimeout(() => { walkAccumulator = 0; activeMissionPortalId = null; encounterPending = false; startCombat(monsterToSpawn, true); }, 1200);
                     proximityRunning = false;
                     return;
                 }
             } else if (!ignoredPortalIds.has(insidePortal.id) && pendingConfirmationPortalId !== insidePortal.id) {
                 pendingConfirmationPortalId = insidePortal.id;
                 document.getElementById('confirm-portal-name').innerText = insidePortal.name;
+                
+                // ★ 포탈 감지 시에도 진동
+                if ('vibrate' in navigator) navigator.vibrate([100, 50, 100]);
+                
                 confirmModal.style.display = 'flex';
                 missionOverlay.style.display = 'none';
             }
@@ -222,6 +291,10 @@ function acceptMission() {
         pendingConfirmationPortalId = null;
         walkAccumulator = 0; lastWalkPos = currentUserPos;
         document.getElementById('portal-confirm-modal').style.display = 'none';
+        
+        // ★ 미션 수락 시 진동
+        if ('vibrate' in navigator) navigator.vibrate(200);
+        
         checkProximity();
     }
 }
@@ -234,8 +307,8 @@ function ignoreMission() {
 }
 function stopTracking() { if (watchId) navigator.geolocation.clearWatch(watchId); }
 
-// ===== COMBAT =====
-async function startCombat(forcedMonsterName = null) {
+// ===== COMBAT — autoStart 파라미터 추가 =====
+async function startCombat(forcedMonsterName = null, autoStart = false) {
     const playerStats = await getPlayerSettings();
     const pool = await getMonsterPool();
     let targetMonster;
@@ -256,7 +329,7 @@ async function startCombat(forcedMonsterName = null) {
     document.getElementById('enemy-name-label').innerText = combatState.currentEnemy.name;
     document.getElementById('enemy-img-main').src = combatState.currentEnemy.img;
     document.getElementById('enemy-img-main').style.opacity = "1";
-    document.getElementById('btn-auto-battle').innerText = "AUTO_BATTLE: OFF";
+    document.getElementById('btn-auto-battle').innerText = "AUTO: OFF";
     document.getElementById('btn-auto-battle').style.background = "var(--bg-space)";
     const isBoss = combatState.currentEnemy.type === 'boss';
     const nameLabel = document.getElementById('enemy-name-label');
@@ -265,6 +338,14 @@ async function startCombat(forcedMonsterName = null) {
     stopAutoBattle(); updateCombatUI();
     document.getElementById('combat-log').innerHTML = `<div class="log-entry">${isBoss ? '⚔ 강력한 보스가 나타났다!' : '전장에 진입했습니다. TARGET_ACQUIRED!'}</div>`;
     playSound('swordSwing'); showScreen('combat');
+    
+    // ★ 포탈에서 진입한 경우 자동전투 즉시 시작
+    if (autoStart) {
+        setTimeout(() => {
+            toggleAutoBattle();
+            renderLog('🤖 자동전투 모드 활성화!', 'player');
+        }, 800);
+    }
 }
 
 async function usePotion() {
@@ -282,7 +363,7 @@ function updateActionButtons(enabled) {
     if (a) a.disabled = !enabled; if (p) p.disabled = !enabled || combatState.potions <= 0;
 }
 function playSound(name) { if (SOUNDS[name]) { SOUNDS[name].currentTime = 0; SOUNDS[name].play().catch(() => {}); } }
-function triggerShake() { const s = document.querySelector('.combat-scene'); s.classList.add('shake'); setTimeout(() => s.classList.remove('shake'), 400); }
+function triggerShake() { const s = document.querySelector('.combat-scene'); if(s) { s.classList.add('shake'); setTimeout(() => s.classList.remove('shake'), 400); } }
 
 function executeEnemyTurn() {
     if (combatState.isGameOver) return;
@@ -293,23 +374,43 @@ function executeEnemyTurn() {
     combatState.playerHP = Math.max(0, combatState.playerHP - dmg);
     triggerShake(); playSound('enemyHit');
     const scene = document.querySelector('.combat-scene');
-    scene.classList.add('flash-red', 'glitch'); setTimeout(() => scene.classList.remove('flash-red', 'glitch'), 300);
+    if(scene) { scene.classList.add('flash-red', 'glitch'); setTimeout(() => scene.classList.remove('flash-red', 'glitch'), 300); }
     renderLog(`${enemy.name}의 공격! ${dmg} 대미지.`, "enemy");
-    if (combatState.playerHP <= 0) { renderLog("심각한 손상! 후퇴.", "enemy"); combatState.isGameOver = true; setTimeout(() => showScreen('main'), 2000); stopAutoBattle(); }
-    else { setTimeout(() => { combatState.busy = false; updateActionButtons(true); }, 500); }
+    if (combatState.playerHP <= 0) {
+        renderLog("심각한 손상! 후퇴.", "enemy");
+        combatState.isGameOver = true;
+        stopAutoBattle();
+        // 패배 시에도 진동
+        if ('vibrate' in navigator) navigator.vibrate([500, 200, 500]);
+        setTimeout(() => { showScreen('dashboard'); }, 2000);
+    } else {
+        // 자동전투 중이면 포션 자동 사용 (HP 30% 이하)
+        if (combatState.isAuto && combatState.potions > 0 && (combatState.playerHP / combatState.playerMaxHP) < 0.3) {
+            setTimeout(() => { usePotion(); }, 500);
+        } else {
+            setTimeout(() => { combatState.busy = false; updateActionButtons(true); }, 500);
+        }
+    }
     updateCombatUI();
 }
 
 function toggleAutoBattle() {
     combatState.isAuto = !combatState.isAuto;
     const btn = document.getElementById('btn-auto-battle');
-    if (combatState.isAuto) { btn.innerText = "AUTO: ON"; btn.style.background = "rgba(0,253,236,0.2)"; autoBattleInterval = setInterval(() => { if (!combatState.isGameOver) executePlayerTurn('slash'); else stopAutoBattle(); }, 1000); }
-    else stopAutoBattle();
+    if (combatState.isAuto) { 
+        btn.innerText = "AUTO: ON"; 
+        btn.style.background = "rgba(0,253,236,0.2)";
+        btn.style.color = "var(--secondary-cyan)";
+        autoBattleInterval = setInterval(() => { 
+            if (!combatState.isGameOver && !combatState.busy) executePlayerTurn(); 
+            else if (combatState.isGameOver) stopAutoBattle(); 
+        }, 1200);
+    } else stopAutoBattle();
 }
 function stopAutoBattle() {
     combatState.isAuto = false;
     const btn = document.getElementById('btn-auto-battle');
-    if (btn) { btn.innerText = "AUTO: OFF"; btn.style.background = "var(--bg-space)"; }
+    if (btn) { btn.innerText = "AUTO: OFF"; btn.style.background = "var(--bg-space)"; btn.style.color = ""; }
     if (autoBattleInterval) clearInterval(autoBattleInterval); autoBattleInterval = null;
 }
 
@@ -320,7 +421,8 @@ function executePlayerTurn() {
     let dmg = Math.floor(Math.random() * 10) + combatState.playerAtk;
     enemy.hp = Math.max(0, enemy.hp - dmg);
     playSound('swordSwing'); setTimeout(() => playSound('hit'), 150);
-    const img = document.getElementById('enemy-img-main'); img.classList.add('shake'); setTimeout(() => img.classList.remove('shake'), 400);
+    const img = document.getElementById('enemy-img-main'); 
+    if(img) { img.classList.add('shake'); setTimeout(() => img.classList.remove('shake'), 400); }
     renderLog(`검을 휘둘러 ${dmg} 데미지!`, "player"); updateCombatUI();
     if (enemy.hp <= 0) handleVictory();
     else setTimeout(() => { combatState.busy = false; executeEnemyTurn(); }, 1000);
@@ -328,22 +430,52 @@ function executePlayerTurn() {
 
 async function handleVictory() {
     playSound('victory'); renderLog("전투 승리!", "player");
-    combatState.isGameOver = true; document.getElementById('enemy-img-main').style.opacity = "0";
+    combatState.isGameOver = true; 
+    const eImg = document.getElementById('enemy-img-main');
+    if(eImg) eImg.style.opacity = "0";
+    
+    // ★ 승리 시 진동
+    if ('vibrate' in navigator) navigator.vibrate([100, 50, 100, 50, 200]);
+    
     let stats = await getPlayerSettings();
     const xp = 30 + Math.floor(Math.random() * 20);
     stats.xp = (stats.xp || 0) + xp; renderLog(`경험치 +${xp}`, "player");
+    
+    // 사냥 기록 업데이트
+    huntLog.kills++;
+    huntLog.xpTotal += xp;
+    
     const xpNeeded = (stats.level || 1) * 100;
     if (stats.xp >= xpNeeded) { stats.level++; stats.xp -= xpNeeded; stats.hp += 20; stats.atk += 5; renderLog(`LEVEL ${stats.level} 달성!`, "player"); }
-    // ★ 보스 처치 → 정령카드 100%
+    
+    // 보스 처치 → 정령카드 100%
     if (combatState.currentEnemy.type === 'boss') {
         stats.spirit_cards = (stats.spirit_cards || 0) + 1;
+        huntLog.bossKills++;
+        huntLog.spiritCards++;
         renderLog("★ 보스 처치! [정령 카드] 확보!", "player"); playSound('victory');
     }
+    
     const loot = await getLootSettings();
-    if (loot.fixed || Math.random() < loot.chance) { stats.potions++; renderLog("포션 획득!", "player"); }
+    if (loot.fixed || Math.random() < loot.chance) { 
+        stats.potions++; 
+        huntLog.potions++;
+        renderLog("포션 획득!", "player"); 
+    }
+    
     await db.from('player_state').update(stats).eq('id', 'singleton');
     updateDashboardHUD();
-    setTimeout(() => { if (combatState.isGameOver) { showScreen('dashboard'); stopAutoBattle(); } }, 4000);
+    updateHuntLogUI();
+    
+    // 자동전투 중이면 바로 대시보드로 복귀
+    const wasAuto = combatState.isAuto;
+    stopAutoBattle();
+    
+    setTimeout(() => { 
+        if (combatState.isGameOver) { 
+            showScreen('dashboard');
+        } 
+    }, wasAuto ? 2000 : 4000); // 자동전투면 더 빨리 복귀
 }
 
 function updateCombatUI() {
@@ -355,7 +487,7 @@ function updateCombatUI() {
     const pot = document.getElementById('btn-potion'); if (pot) { pot.innerText = `HEAL (${combatState.potions})`; pot.disabled = combatState.potions <= 0; }
     const ml = document.getElementById('main-level'); if (ml && cachedPlayerStats) ml.innerText = cachedPlayerStats.level || 1;
 }
-function renderLog(msg, type) { const log = document.getElementById('combat-log'); const e = document.createElement('div'); e.className = `log-entry ${type}`; e.innerText = msg; log.prepend(e); }
+function renderLog(msg, type) { const log = document.getElementById('combat-log'); if(!log) return; const e = document.createElement('div'); e.className = `log-entry ${type}`; e.innerText = msg; log.prepend(e); }
 function updateClock() { const t = document.getElementById('system-time'); if (t) { const n = new Date(); t.innerText = n.toTimeString().split(' ')[0] + " // " + n.toLocaleDateString('ko-KR'); } }
 setInterval(updateClock, 1000); updateClock();
 window.addEventListener('resize', () => { if (map) map.invalidateSize(); if (setMap) setMap.invalidateSize(); });
@@ -376,7 +508,6 @@ async function initSettings() {
     renderSettingsPortalList();
 }
 
-// ===== MONSTER LIST (이름 수정, 이미지 업로드, 타입 구분) =====
 async function renderSettingsMonsterList() {
     const pool = await getMonsterPool();
     const container = document.getElementById('set-monster-list');
@@ -397,8 +528,7 @@ async function renderSettingsMonsterList() {
                     </span>
                     <span style="font-size:0.6rem; color:var(--text-dim);">#${i+1}</span>
                 </div>
-                <button class="btn-nav" style="padding:4px 12px; font-size:0.55rem; color:var(--accent-red); border-color:var(--accent-red);" 
-                    onclick="deleteMonster(${i})">삭제</button>
+                <button class="btn-nav" style="padding:4px 12px; font-size:0.55rem; color:var(--accent-red); border-color:var(--accent-red);" onclick="deleteMonster(${i})">삭제</button>
             </div>
             <div style="display:flex; gap:15px; align-items:flex-start;">
                 <div style="flex-shrink:0; text-align:center;">
@@ -474,7 +604,6 @@ async function saveMonsterPool() {
     alert("몬스터 데이터 저장 완료!"); renderSettingsMonsterList();
 }
 
-// ===== PORTAL MANAGEMENT =====
 function initSettingsMap() {
     if (setMap) return;
     setMap = L.map('set-map', { zoomControl: true }).setView(currentUserPos, 13);
@@ -494,22 +623,18 @@ async function renderSettingsPortalList() {
     const container = document.getElementById('set-portal-list');
     container.innerHTML = '';
     setMap.eachLayer((layer) => { if (layer instanceof L.Marker) setMap.removeLayer(layer); });
-
     portals.forEach(p => {
         const assignedNames = parsePortalMonsters(p.target_monster_name);
         const hasBoss = assignedNames.some(n => { const m = pool.find(x => x.name === n); return m && m.type === 'boss'; });
         const normalAssigned = assignedNames.filter(n => { const m = pool.find(x => x.name === n); return m && m.type !== 'boss'; });
         const bossAssigned = assignedNames.filter(n => { const m = pool.find(x => x.name === n); return m && m.type === 'boss'; });
-
         const item = document.createElement('div');
         item.className = 'glass-panel';
         item.style.cssText = `margin-bottom:12px; padding:14px 16px; ${hasBoss ? 'border-left:4px solid var(--primary-gold); background:rgba(233,196,0,0.03);' : ''}`;
-        
         let monsterTags = '';
         if (normalAssigned.length > 0) monsterTags += normalAssigned.map(n => `<span style="font-size:0.5rem; padding:2px 8px; border-radius:10px; background:rgba(0,253,236,0.1); color:var(--secondary-cyan); border:1px solid rgba(0,253,236,0.2); margin-right:4px;">🗡 ${n}</span>`).join('');
         if (bossAssigned.length > 0) monsterTags += bossAssigned.map(n => `<span style="font-size:0.5rem; padding:2px 8px; border-radius:10px; background:rgba(233,196,0,0.15); color:var(--primary-gold); border:1px solid rgba(233,196,0,0.3); margin-right:4px;">⚔ ${n}</span>`).join('');
         if (assignedNames.length === 0) monsterTags = '<span style="font-size:0.5rem; color:var(--text-dim);">랜덤 일반 몬스터</span>';
-
         item.innerHTML = `
             <div style="display:flex; justify-content:space-between; align-items:flex-start;">
                 <div style="flex:1;">
@@ -532,7 +657,6 @@ async function renderSettingsPortalList() {
     });
 }
 
-// ===== PORTAL EDITOR — 체크박스 기반 몬스터 선택 =====
 let editingPortalId = null;
 async function openPortalEditor(id) {
     editingPortalId = id;
@@ -540,61 +664,37 @@ async function openPortalEditor(id) {
     const p = portals.find(x => x.id == id);
     const pool = await getMonsterPool();
     const assignedNames = parsePortalMonsters(p.target_monster_name);
-
     document.getElementById('ed-p-name').value = p.name;
     document.getElementById('ed-p-mission').value = p.mission_text || "";
     document.getElementById('ed-p-radius').value = p.radius || 100;
     document.getElementById('ed-p-walk').value = p.spawn_distance_requirement || 20;
-
-    // 체크박스 목록 생성
     const normalContainer = document.getElementById('ed-normal-monsters');
     const bossContainer = document.getElementById('ed-boss-monsters');
-    normalContainer.innerHTML = '';
-    bossContainer.innerHTML = '';
-
+    normalContainer.innerHTML = ''; bossContainer.innerHTML = '';
     const normals = pool.filter(m => m.type !== 'boss');
     const bosses = pool.filter(m => m.type === 'boss');
-
-    if (normals.length === 0) normalContainer.innerHTML = '<div style="font-size:0.6rem; color:var(--text-dim);">일반 몬스터가 없습니다. 설정에서 추가해주세요.</div>';
+    if (normals.length === 0) normalContainer.innerHTML = '<div style="font-size:0.6rem; color:var(--text-dim);">일반 몬스터 없음</div>';
     normals.forEach(m => {
         const checked = assignedNames.includes(m.name) ? 'checked' : '';
-        normalContainer.innerHTML += `
-            <label style="display:flex; align-items:center; gap:10px; padding:10px 12px; background:rgba(0,253,236,0.03); border:1px solid rgba(0,253,236,0.1); border-radius:10px; cursor:pointer; margin-bottom:6px;">
-                <input type="checkbox" class="ed-monster-check" value="${m.name}" data-type="normal" ${checked} style="width:18px; height:18px; accent-color:var(--secondary-cyan);">
-                <img src="${m.img}" style="width:32px; height:32px; object-fit:contain; border-radius:6px; background:rgba(0,0,0,0.3);"
-                    onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22><text x=%2216%22 y=%2222%22 text-anchor=%22middle%22 font-size=%2218%22>👾</text></svg>'">
-                <div>
-                    <div style="font-size:0.75rem; color:#fff;">${m.name}</div>
-                    <div style="font-size:0.5rem; color:var(--text-dim);">HP:${m.hp} ATK:${m.dmg}</div>
-                </div>
-            </label>`;
+        normalContainer.innerHTML += `<label style="display:flex; align-items:center; gap:10px; padding:10px 12px; background:rgba(0,253,236,0.03); border:1px solid rgba(0,253,236,0.1); border-radius:10px; cursor:pointer; margin-bottom:6px;">
+            <input type="checkbox" class="ed-monster-check" value="${m.name}" data-type="normal" ${checked} style="width:18px; height:18px; accent-color:var(--secondary-cyan);">
+            <img src="${m.img}" style="width:32px; height:32px; object-fit:contain; border-radius:6px; background:rgba(0,0,0,0.3);" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22><text x=%2216%22 y=%2222%22 text-anchor=%22middle%22 font-size=%2218%22>👾</text></svg>'">
+            <div><div style="font-size:0.75rem; color:#fff;">${m.name}</div><div style="font-size:0.5rem; color:var(--text-dim);">HP:${m.hp} ATK:${m.dmg}</div></div></label>`;
     });
-
-    if (bosses.length === 0) bossContainer.innerHTML = '<div style="font-size:0.6rem; color:var(--text-dim);">보스 몬스터가 없습니다. 설정에서 추가해주세요.</div>';
+    if (bosses.length === 0) bossContainer.innerHTML = '<div style="font-size:0.6rem; color:var(--text-dim);">보스 몬스터 없음</div>';
     bosses.forEach(m => {
         const checked = assignedNames.includes(m.name) ? 'checked' : '';
-        bossContainer.innerHTML += `
-            <label style="display:flex; align-items:center; gap:10px; padding:10px 12px; background:rgba(233,196,0,0.05); border:1px solid rgba(233,196,0,0.15); border-radius:10px; cursor:pointer; margin-bottom:6px;">
-                <input type="checkbox" class="ed-monster-check" value="${m.name}" data-type="boss" ${checked} style="width:18px; height:18px; accent-color:var(--primary-gold);">
-                <img src="${m.img}" style="width:32px; height:32px; object-fit:contain; border-radius:6px; background:rgba(0,0,0,0.3);"
-                    onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22><text x=%2216%22 y=%2222%22 text-anchor=%22middle%22 font-size=%2218%22>👹</text></svg>'">
-                <div>
-                    <div style="font-size:0.75rem; color:var(--primary-gold); font-weight:700;">⚔ ${m.name}</div>
-                    <div style="font-size:0.5rem; color:var(--text-dim);">HP:${m.hp} ATK:${m.dmg} | 처치 시 정령카드 100%</div>
-                </div>
-            </label>`;
+        bossContainer.innerHTML += `<label style="display:flex; align-items:center; gap:10px; padding:10px 12px; background:rgba(233,196,0,0.05); border:1px solid rgba(233,196,0,0.15); border-radius:10px; cursor:pointer; margin-bottom:6px;">
+            <input type="checkbox" class="ed-monster-check" value="${m.name}" data-type="boss" ${checked} style="width:18px; height:18px; accent-color:var(--primary-gold);">
+            <img src="${m.img}" style="width:32px; height:32px; object-fit:contain; border-radius:6px; background:rgba(0,0,0,0.3);" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22><text x=%2216%22 y=%2222%22 text-anchor=%22middle%22 font-size=%2218%22>👹</text></svg>'">
+            <div><div style="font-size:0.75rem; color:var(--primary-gold); font-weight:700;">⚔ ${m.name}</div><div style="font-size:0.5rem; color:var(--text-dim);">HP:${m.hp} ATK:${m.dmg} | 정령카드 100%</div></div></label>`;
     });
-
     document.getElementById('portal-editor-modal').style.display = 'block';
 }
-
 function closePortalEditor() { document.getElementById('portal-editor-modal').style.display = 'none'; }
-
 async function applyPortalEdit() {
-    // 체크된 몬스터 이름 수집
     const checks = document.querySelectorAll('.ed-monster-check:checked');
     const selectedNames = Array.from(checks).map(c => c.value);
-    
     const data = {
         name: document.getElementById('ed-p-name').value,
         mission_text: document.getElementById('ed-p-mission').value,
@@ -603,15 +703,10 @@ async function applyPortalEdit() {
         target_monster_name: selectedNames.length > 0 ? JSON.stringify(selectedNames) : null
     };
     await db.from('portals').update(data).eq('id', editingPortalId);
-    closePortalEditor();
-    renderSettingsPortalList();
+    closePortalEditor(); renderSettingsPortalList();
 }
-
 async function deletePortalInSettings(id) {
-    if (confirm("이 포탈을 삭제하시겠습니까?")) {
-        await db.from('portals').delete().eq('id', id);
-        renderSettingsPortalList();
-    }
+    if (confirm("삭제?")) { await db.from('portals').delete().eq('id', id); renderSettingsPortalList(); }
 }
 async function savePlayerSettings() {
     const stats = { hp: parseInt(document.getElementById('set-p-hp').value), atk: parseInt(document.getElementById('set-p-atk').value), def: parseInt(document.getElementById('set-p-def').value), potions: parseInt(document.getElementById('set-p-pot').value) };
