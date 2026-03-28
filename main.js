@@ -513,20 +513,30 @@ async function handleVictory() {
 
 function updateCombatUI() {
     const enemy = combatState.currentEnemy;
-    const enemyHPPercent = (enemy.hp / enemy.maxHp * 100);
-    document.getElementById('enemy-hp-bar').style.width = enemyHPPercent + "%";
+    if (!enemy) return;
+
+    const enemyHPBar = document.getElementById('enemy-hp-bar');
+    if (enemyHPBar) {
+        const enemyHPPercent = (enemy.hp / enemy.maxHp * 100);
+        enemyHPBar.style.width = enemyHPPercent + "%";
+    }
     
+    const playerBar = document.getElementById('hud-hp-bar');
     const playerHPPercent = (combatState.playerHP / combatState.playerMaxHP * 100);
-    const playerBar = document.getElementById('player-hp-bar');
     if (playerBar) playerBar.style.width = playerHPPercent + "%";
     
-    document.getElementById('player-hp-text').innerText = Math.round(playerHPPercent) + "%";
+    const hpText = document.getElementById('hud-hp-text');
+    if (hpText) hpText.innerText = Math.round(playerHPPercent) + "%";
     
     const potionBtn = document.getElementById('btn-potion');
     if (potionBtn) {
         potionBtn.innerText = `HEAL (${combatState.potions})`;
-        potionBtn.disabled = combatState.potions <= 0;
+        potionBtn.disabled = (combatState.potions <= 0);
     }
+
+    // Main HUD sync
+    const mainLevel = document.getElementById('main-level');
+    if (mainLevel && cachedPlayerStats) mainLevel.innerText = cachedPlayerStats.level || 1;
 }
 
 function renderLog(msg, type) {
