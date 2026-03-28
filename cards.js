@@ -1,8 +1,8 @@
 // ===== 카드 시스템 =====
 const DEFAULT_CARD_TEMPLATES = [
-    { templateId:'goblin_soldier', name:'고블린 병사', hp:100, atk:20, def:10, img:'goblin_card.png', skill:'double_attack', skillChance:20, rarity:'common', type:'normal' },
-    { templateId:'goblin_archer', name:'고블린 궁수', hp:70, atk:25, def:5, img:'goblin_card.png', skill:'dodge', skillChance:25, rarity:'common', type:'normal' },
-    { templateId:'great_goblin', name:'대왕 고블린', hp:250, atk:35, def:20, img:'boss_goblin_card.png', skill:'magic_attack', skillChance:30, rarity:'rare', type:'boss' }
+    { templateId:'goblin_soldier', name:'고블린 병사', hp:100, atk:20, def:10, img:'goblin_card.png', skill:'double_attack', skillChance:20, skillEnabled:true, rarity:'common', type:'normal' },
+    { templateId:'goblin_archer', name:'고블린 궁수', hp:70, atk:25, def:5, img:'goblin_card.png', skill:'dodge', skillChance:25, skillEnabled:true, rarity:'common', type:'normal' },
+    { templateId:'great_goblin', name:'대왕 고블린', hp:250, atk:35, def:20, img:'boss_goblin_card.png', skill:'magic_attack', skillChance:30, skillEnabled:true, rarity:'rare', type:'boss' }
 ];
 const SKILLS = {
     double_attack: { name:'이중 어택', desc:'2회 연속 공격', icon:'⚔' },
@@ -54,7 +54,7 @@ async function addCardToInventory(templateId) {
     const templates = await getCardTemplates();
     const t = templates.find(x=>x.templateId===templateId);
     if (!t) return false;
-    inv.push({ id:Date.now(), templateId:t.templateId, name:t.name, hp:t.hp, atk:t.atk, def:t.def, img:t.img, skill:t.skill, skillChance:t.skillChance, rarity:t.rarity, type:t.type, level:1, xp:0 });
+    inv.push({ id:Date.now(), templateId:t.templateId, name:t.name, hp:t.hp, atk:t.atk, def:t.def, img:t.img, skill:t.skill, skillChance:t.skillChance, skillEnabled:t.skillEnabled!==false, rarity:t.rarity, type:t.type, level:1, xp:0 });
     await saveInventory(inv);
     return true;
 }
@@ -120,7 +120,7 @@ async function renderInventory() {
             <div style="font-size:0.65rem;color:${rarityColor(c.rarity)};font-weight:700;">${c.name}</div>
             <div style="font-size:0.45rem;color:var(--text-dim);">Lv.${c.level||1} | ${rarityLabel(c.rarity)}</div>
             <div style="font-size:0.4rem;color:var(--text-dim);margin-top:4px;">HP:${e.hp} ATK:${e.atk} DEF:${e.def}</div>
-            <div style="font-size:0.4rem;color:var(--secondary-cyan);">${SKILLS[c.skill]?.icon||''} ${SKILLS[c.skill]?.name||''} ${c.skillChance}%</div>
+            <div style="font-size:0.4rem;color:var(--secondary-cyan);">${c.skillEnabled!==false ? (SKILLS[c.skill]?.icon||'')+' '+(SKILLS[c.skill]?.name||'')+' '+c.skillChance+'%' : '<span style="color:var(--text-dim);">기술 OFF</span>'}</div>
             <div style="height:3px;background:rgba(255,255,255,0.05);border-radius:2px;margin-top:4px;"><div style="width:${xpPct}%;height:100%;background:var(--secondary-cyan);border-radius:2px;"></div></div>
             <div style="font-size:0.35rem;color:var(--text-dim);">XP: ${c.xp||0}/${xpNext}</div>
             <div style="display:flex;gap:4px;margin-top:8px;">
@@ -209,12 +209,20 @@ async function renderCardEditor() {
                         <option value="dodge" ${t.skill==='dodge'?'selected':''}>💨 회피</option>
                     </select></div>
                 <div><label style="font-size:0.45rem;color:var(--text-dim);">기술확률%</label><input type="number" class="ce-schance btn-nav" style="width:100%;padding:6px;" value="${t.skillChance}" data-i="${i}" min="1" max="100"></div>
-                <div><label style="font-size:0.45rem;color:var(--text-dim);">희귀도</label>
-                    <select class="ce-rarity btn-nav" style="width:100%;padding:6px;" data-i="${i}">
-                        <option value="common" ${t.rarity==='common'?'selected':''}>일반</option>
-                        <option value="rare" ${t.rarity==='rare'?'selected':''}>★희귀</option>
-                        <option value="legendary" ${t.rarity==='legendary'?'selected':''}>★★전설</option>
-                    </select></div>
+                <div style="display:flex;align-items:flex-end;padding-bottom:4px;">
+                    <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+                        <input type="checkbox" class="ce-skill-enabled" data-i="${i}" ${t.skillEnabled!==false?'checked':''} style="width:18px;height:18px;accent-color:var(--secondary-cyan);">
+                        <span style="font-size:0.5rem;color:${t.skillEnabled!==false?'var(--secondary-cyan)':'var(--text-dim)'};font-weight:700;">기술 ${t.skillEnabled!==false?'ON':'OFF'}</span>
+                    </label>
+                </div>
+            </div>
+            <div style="margin-top:8px;">
+                <label style="font-size:0.45rem;color:var(--text-dim);">희귀도</label>
+                <select class="ce-rarity btn-nav" style="width:100%;padding:6px;" data-i="${i}">
+                    <option value="common" ${t.rarity==='common'?'selected':''}>일반</option>
+                    <option value="rare" ${t.rarity==='rare'?'selected':''}>★희귀</option>
+                    <option value="legendary" ${t.rarity==='legendary'?'selected':''}>★★전설</option>
+                </select>
             </div>
         </div>`;
     });
@@ -228,6 +236,7 @@ async function saveCardTemplates() {
         templates[i].def = parseInt(document.querySelectorAll('.ce-def')[i].value);
         templates[i].skill = document.querySelectorAll('.ce-skill')[i].value;
         templates[i].skillChance = parseInt(document.querySelectorAll('.ce-schance')[i].value);
+        templates[i].skillEnabled = document.querySelectorAll('.ce-skill-enabled')[i].checked;
         templates[i].rarity = document.querySelectorAll('.ce-rarity')[i].value;
     });
     await db.from('game_settings').upsert({name:'cardTemplates', value:templates});

@@ -399,6 +399,7 @@ async function startCombat(forcedMonsterName = null, autoStart = false) {
         playerHP: ec.hp, playerMaxHP: ec.hp,
         playerAtk: ec.atk, playerDef: ec.def,
         playerSkill: card.skill, playerSkillChance: card.skillChance || 20,
+        playerSkillEnabled: card.skillEnabled !== false,
         potions: playerData.potions || 1,
         currentEnemy: { ...targetMonster, hp: targetMonster.hp, maxHp: targetMonster.hp },
         isGameOver: false, isAuto: false, busy: false,
@@ -447,8 +448,8 @@ function executeEnemyTurn() {
     combatState.busy = true; updateActionButtons(false);
     const enemy = combatState.currentEnemy;
     let raw = Math.floor(Math.random() * 5) + enemy.dmg;
-    // 회피 기술 체크
-    if (combatState.playerSkill === 'dodge' && Math.random() * 100 < combatState.playerSkillChance) {
+    // 회피 기술 체크 (활성화된 경우만)
+    if (combatState.playerSkillEnabled && combatState.playerSkill === 'dodge' && Math.random() * 100 < combatState.playerSkillChance) {
         renderLog(`💨 ${combatState.cardName} 회피 성공!`, 'player');
         setTimeout(() => { combatState.busy = false; updateActionButtons(true); }, 500);
         updateCombatUI(); return;
@@ -500,8 +501,8 @@ function executePlayerTurn() {
     let enemy = combatState.currentEnemy;
     let dmg = Math.floor(Math.random() * 10) + combatState.playerAtk;
     let skillUsed = false;
-    // 고유기술 확률 체크
-    if (Math.random() * 100 < combatState.playerSkillChance) {
+    // 고유기술 확률 체크 (활성화된 경우만)
+    if (combatState.playerSkillEnabled && Math.random() * 100 < combatState.playerSkillChance) {
         if (combatState.playerSkill === 'double_attack') {
             const dmg2 = Math.floor(Math.random() * 8) + combatState.playerAtk;
             dmg += dmg2; skillUsed = true;
@@ -613,14 +614,6 @@ window.addEventListener('resize', () => { if (map) map.invalidateSize(); if (set
 // ===== SETTINGS =====
 let setMap;
 async function initSettings() {
-    const p = await getPlayerSettings();
-    document.getElementById('set-p-hp').value = p.hp;
-    document.getElementById('set-p-atk').value = p.atk;
-    document.getElementById('set-p-def').value = p.def;
-    document.getElementById('set-p-pot').value = p.potions;
-    const l = await getLootSettings();
-    document.getElementById('set-l-chance').value = l.chance;
-    document.getElementById('set-l-fixed').checked = l.fixed;
     renderSettingsMonsterList();
     initSettingsMap();
     renderSettingsPortalList();
