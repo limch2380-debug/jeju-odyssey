@@ -49,6 +49,8 @@ body {
     background-repeat: repeat;
     background-size: 200px 200px;
     opacity: 0.3;
+    pointer-events: none;
+    z-index: 1;
 }
 
 .screen {
@@ -82,7 +84,9 @@ body {
     font-size: 0.65rem;
     letter-spacing: 2px;
     color: var(--primary-gold);
+    pointer-events: none;
 }
+.hud-fixed > * { pointer-events: all; }
 
 /* Main Menu Contents */
 .main-menu-content {

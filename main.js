@@ -59,12 +59,25 @@ const monsterPool = [
 let combatState = { 
     playerHP: 100, 
     playerMaxHP: 100,
-    potions: parseInt(localStorage.getItem('potions') || '1'),
+    potions: 1, 
     currentEnemy: null, 
     isGameOver: false, 
     isAuto: false 
 };
 let autoBattleInterval = null;
+
+// Safe Initialization
+async function initApp() {
+    try {
+        const savedPotions = localStorage.getItem('potions');
+        if (savedPotions) combatState.potions = parseInt(savedPotions);
+    } catch(e) { console.log("LocalStorage access inhibited."); }
+    
+    // Initial UI Setup
+    updateClock();
+    await updateDashboardHUD();
+}
+initApp();
 
 function showScreen(screenId) {
     activeScreen = screenId;
