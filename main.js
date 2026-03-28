@@ -13,6 +13,7 @@ let activeMissionPortalId = null;
 let pendingConfirmationPortalId = null;
 let ignoredPortalIds = new Set();
 let encounterPending = false;
+let autoHuntPortal = null; // 현재 자동사냥 중인 포탈 정보
 
 // ===== 세션 사냥 기록 =====
 let huntLog = { kills: 0, bossKills: 0, potions: 0, spiritCards: 0, xpTotal: 0 };
@@ -241,7 +242,7 @@ async function checkProximity() {
             if (dist < (p.radius || 100)) insidePortal = p;
             else {
                 if (ignoredPortalIds.has(p.id) && dist > (p.radius || 100) * 1.5) ignoredPortalIds.delete(p.id);
-                if (activeMissionPortalId === p.id && dist > (p.radius || 100)) { activeMissionPortalId = null; walkAccumulator = 0; }
+                if (activeMissionPortalId === p.id && dist > (p.radius || 100)) { activeMissionPortalId = null; walkAccumulator = 0; autoHuntPortal = null; }
             }
         });
         const statusText = document.getElementById('distance-info');
@@ -251,6 +252,22 @@ async function checkProximity() {
 
         if (insidePortal) {
             currentMissionPortal = insidePortal;
+            
+            // ★ 아직 미션 수락 안 했으면 자동 수락 (확인 모달 스킵)
+            if (activeMissionPortalId !== insidePortal.id && !ignoredPortalIds.has(insidePortal.id)) {
+                activeMissionPortalId = insidePortal.id;
+                autoHuntPortal = insidePortal;
+                pendingConfirmationPortalId = null;
+                walkAccumulator = 0;
+                lastWalkPos = currentUserPos;
+                confirmModal.style.display = 'none';
+                // 최초 진입 시 진동 + 알람
+                triggerPortalAlert();
+                document.getElementById('map-status').innerHTML = `<span style="color: var(--secondary-cyan); font-weight:bold;">📍 ${insidePortal.name} 자동 탐사 시작!</span>`;
+                console.log('[AUTO_HUNT] 포탈 자동 진입:', insidePortal.name);
+            }
+            
+            // 이미 미션 진행 중
             if (activeMissionPortalId === insidePortal.id) {
                 missionOverlay.style.display = 'block';
                 confirmModal.style.display = 'none';
@@ -269,31 +286,24 @@ async function checkProximity() {
                         monsterToSpawn = assignedNames[Math.floor(Math.random() * assignedNames.length)];
                     }
                     console.log('[ENCOUNTER] 게이지 충족! monster:', monsterToSpawn);
-                    
-                    // ★ 인카운터 시 진동 + 알람
                     triggerPortalAlert();
-                    
                     document.getElementById('map-status').innerHTML = `<span style="color: var(--accent-red); animation: pulse 1s infinite; font-weight:bold;">[!] 적의 기습! 자동전투 진입...</span>`;
                     missionOverlay.style.display = 'none';
-                    // ★ 인카운터 → 자동전투 모드로 즉시 진입
-                    setTimeout(() => { walkAccumulator = 0; activeMissionPortalId = null; encounterPending = false; startCombat(monsterToSpawn, true); }, 1200);
+                    setTimeout(() => { walkAccumulator = 0; encounterPending = false; startCombat(monsterToSpawn, true); }, 1200);
                     proximityRunning = false;
                     return;
                 }
-            } else if (!ignoredPortalIds.has(insidePortal.id) && pendingConfirmationPortalId !== insidePortal.id) {
-                pendingConfirmationPortalId = insidePortal.id;
-                document.getElementById('confirm-portal-name').innerText = insidePortal.name;
-                
-                // ★ 포탈 감지 시에도 진동
-                if ('vibrate' in navigator) navigator.vibrate([100, 50, 100]);
-                
-                confirmModal.style.display = 'flex';
-                missionOverlay.style.display = 'none';
             }
         } else {
+            // 포탈 반경 밖으로 나감
+            if (autoHuntPortal) {
+                document.getElementById('map-status').innerHTML = `<span style="color: var(--secondary-cyan);">[!] ${autoHuntPortal.name} 구역 이탈. 자동사냥 종료.</span>`;
+                autoHuntPortal = null;
+                activeMissionPortalId = null;
+                walkAccumulator = 0;
+            }
             currentMissionPortal = null; pendingConfirmationPortalId = null;
             confirmModal.style.display = 'none'; missionOverlay.style.display = 'none';
-            document.getElementById('map-status').innerText = "시스템 온라인 // 신호 분석 중";
         }
     } finally { proximityRunning = false; }
 }
@@ -301,13 +311,11 @@ async function checkProximity() {
 function acceptMission() {
     if (currentMissionPortal) {
         activeMissionPortalId = currentMissionPortal.id;
+        autoHuntPortal = currentMissionPortal;
         pendingConfirmationPortalId = null;
         walkAccumulator = 0; lastWalkPos = currentUserPos;
         document.getElementById('portal-confirm-modal').style.display = 'none';
-        
-        // ★ 미션 수락 시 진동
         if ('vibrate' in navigator) navigator.vibrate(200);
-        
         checkProximity();
     }
 }
@@ -480,15 +488,32 @@ async function handleVictory() {
     updateDashboardHUD();
     updateHuntLogUI();
     
-    // 자동전투 중이면 바로 대시보드로 복귀
-    const wasAuto = combatState.isAuto;
+    // 자동전투 종료 후 포탈 반경 내면 재사냥
     stopAutoBattle();
     
-    setTimeout(() => { 
-        if (combatState.isGameOver) { 
-            showScreen('dashboard');
-        } 
-    }, wasAuto ? 2000 : 4000); // 자동전투면 더 빨리 복귀
+    setTimeout(async () => { 
+        if (!combatState.isGameOver) return;
+        showScreen('dashboard');
+        
+        // ★ 아직 포탈 반경 안에 있으면 자동으로 다시 사냥 시작
+        if (autoHuntPortal) {
+            const dist = L.latLng(currentUserPos).distanceTo(L.latLng(autoHuntPortal.lat, autoHuntPortal.lng));
+            if (dist < (autoHuntPortal.radius || 100)) {
+                // 아직 반경 안 → 조사 거리 리셋하고 다시 사냥 시작
+                activeMissionPortalId = autoHuntPortal.id;
+                walkAccumulator = 0;
+                lastWalkPos = currentUserPos;
+                renderLog(`📍 ${autoHuntPortal.name} 구역 내 재탐사 시작...`, 'player');
+                document.getElementById('map-status').innerHTML = `<span style="color: var(--secondary-cyan); font-weight:bold;">🔄 ${autoHuntPortal.name} 재탐사 중... ${(autoHuntPortal.spawn_distance_requirement||20)}m 이동 필요</span>`;
+                console.log('[AUTO_HUNT] 포탈 반경 내 재사냥 시작');
+            } else {
+                // 반경 밖으로 나감
+                document.getElementById('map-status').innerHTML = `<span style="color: var(--text-dim);">[!] 구역 이탈. 자동사냥 종료.</span>`;
+                autoHuntPortal = null;
+                activeMissionPortalId = null;
+            }
+        }
+    }, 2000);
 }
 
 function updateCombatUI() {
