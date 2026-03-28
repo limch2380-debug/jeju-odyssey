@@ -2,289 +2,246 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>제주 오디세이 (Jeju Odyssey)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>제주 오디세이 — 카드 배틀 RPG</title>
+    <meta name="description" content="제주도를 배경으로 한 위치기반 카드 배틀 RPG. 몬스터 카드를 수집하고 전투하세요.">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;700;900&family=Space+Grotesk:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&family=Space+Grotesk:wght@300;500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
-    <div class="app-wrapper">
-        <div class="stars-bg"></div>
-        
-        <!-- GLOBAL HUD -->
-        <div class="hud-fixed">
-            <div id="gps-status" style="color: var(--secondary-cyan);">GPS_OS: ONLINE</div>
-            <div id="system-time">00:00:00</div>
-        </div>
-
+    <div id="app-container">
         <!-- MAIN MENU -->
         <div id="screen-main" class="screen active">
-            <div style="position: absolute; top: 120px; left: var(--safe-padding); z-index: 30; font-family: 'Space Grotesk';">
-                <div style="font-size: 0.6rem; color: var(--primary-gold); letter-spacing: 2px;">COMMANDER_PROFILE</div>
-                <div style="font-size: 1.2rem; font-weight: 700;">LV. <span id="main-level">1</span></div>
-                <div style="font-size: 0.65rem; color: var(--secondary-cyan); margin-top: 5px;">정령 카드 보유: <span id="hud-spirit-cards">0</span></div>
-                <div style="width: 150px; height: 4px; background: rgba(255,255,255,0.05); margin-top: 8px; border-radius: 2px;">
-                    <div id="main-xp-bar" style="width: 0%; height: 100%; background: var(--primary-gold); box-shadow: 0 0 10px var(--primary-gold);"></div>
-                </div>
+            <div class="top-bar">
+                <span id="system-time" style="font-family: 'Space Grotesk'; font-size: 0.7rem; color: var(--text-dim); letter-spacing: 2px;"></span>
             </div>
             <div class="main-menu-content">
                 <h1 class="game-title">제주 오디세이</h1>
-                <div class="title-sub">차원 탐사 시스템 // JEJU_PROTOTYPE</div>
+                <div class="title-sub">카드 배틀 시스템 // CARD_BATTLE_RPG</div>
+                
+                <!-- 선택된 카드 표시 -->
+                <div id="selected-card-display" class="glass-panel" style="margin: 20px auto; padding: 15px; max-width: 280px; text-align: center; border-color: rgba(233,196,0,0.2);">
+                    <div style="font-size: 0.55rem; color: var(--primary-gold); letter-spacing: 2px; margin-bottom: 10px;">전투 카드</div>
+                    <div id="selected-card-preview" style="font-size: 0.8rem; color: var(--text-dim);">카드를 선택해주세요</div>
+                </div>
+
                 <div class="menu-controls">
-                    <button class="btn-primary" onclick="showScreen('dashboard')">모험 시작 (ADVENTURE)</button>
+                    <button class="btn-primary" onclick="tryStartAdventure()">모험 시작 (ADVENTURE)</button>
+                    <button class="btn-nav" onclick="showScreen('inventory')">카드 인벤토리 (INVENTORY)</button>
+                    <button class="btn-nav" onclick="showScreen('collection')">카드 도감 (COLLECTION)</button>
                     <button class="btn-nav" onclick="showScreen('settings')">시스템 설정 (SETTINGS)</button>
-                    <button class="btn-nav">업적 시스템 (LOCK)</button>
                 </div>
             </div>
+
             <!-- 사냥 기록 패널 -->
-            <div id="hunt-log-panel" class="glass-panel" style="position: absolute; bottom: 80px; left: 20px; right: 20px; padding: 15px 20px; border-radius: 14px; border-color: rgba(0,253,236,0.15);">
-                <div style="font-size: 0.55rem; color: var(--secondary-cyan); letter-spacing: 2px; margin-bottom: 10px; font-weight: 700;">📊 세션 사냥 기록 (HUNT_LOG)</div>
-                <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; text-align: center;">
-                    <div>
-                        <div style="font-size: 1rem; font-weight: 700; color: #fff;" id="hunt-kills">0</div>
-                        <div style="font-size: 0.45rem; color: var(--text-dim);">처치</div>
-                    </div>
-                    <div>
-                        <div style="font-size: 1rem; font-weight: 700; color: var(--primary-gold);" id="hunt-boss-kills">0</div>
-                        <div style="font-size: 0.45rem; color: var(--text-dim);">보스</div>
-                    </div>
-                    <div>
-                        <div style="font-size: 1rem; font-weight: 700; color: var(--secondary-cyan);" id="hunt-potions">0</div>
-                        <div style="font-size: 0.45rem; color: var(--text-dim);">포션</div>
-                    </div>
-                    <div>
-                        <div style="font-size: 1rem; font-weight: 700; color: #a78bfa;" id="hunt-spirit">0</div>
-                        <div style="font-size: 0.45rem; color: var(--text-dim);">정령카드</div>
-                    </div>
-                    <div>
-                        <div style="font-size: 1rem; font-weight: 700; color: var(--primary-gold);" id="hunt-xp">0</div>
-                        <div style="font-size: 0.45rem; color: var(--text-dim);">경험치</div>
-                    </div>
+            <div id="hunt-log-panel" class="glass-panel" style="position: absolute; bottom: 70px; left: 20px; right: 20px; padding: 12px 16px; border-radius: 14px; border-color: rgba(0,253,236,0.15);">
+                <div style="font-size: 0.5rem; color: var(--secondary-cyan); letter-spacing: 2px; margin-bottom: 8px; font-weight: 700;">📊 세션 사냥 기록</div>
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; text-align: center;">
+                    <div><div style="font-size: 0.9rem; font-weight: 700; color: #fff;" id="hunt-kills">0</div><div style="font-size: 0.4rem; color: var(--text-dim);">처치</div></div>
+                    <div><div style="font-size: 0.9rem; font-weight: 700; color: var(--primary-gold);" id="hunt-boss-kills">0</div><div style="font-size: 0.4rem; color: var(--text-dim);">보스</div></div>
+                    <div><div style="font-size: 0.9rem; font-weight: 700; color: #a78bfa;" id="hunt-cards">0</div><div style="font-size: 0.4rem; color: var(--text-dim);">카드획득</div></div>
+                    <div><div style="font-size: 0.9rem; font-weight: 700; color: var(--secondary-cyan);" id="hunt-potions">0</div><div style="font-size: 0.4rem; color: var(--text-dim);">포션</div></div>
                 </div>
             </div>
-            <div style="position: absolute; bottom: 20px; left: 30px; display: flex; gap: 10px;">
-                <div onclick="startCombat()" class="glass-panel" style="padding: 8px 15px; border-radius: 12px; border-color: rgba(255,77,77,0.3); cursor: pointer;">
-                    <span style="font-family: 'Space Grotesk'; font-size: 0.55rem; color: var(--accent-red); letter-spacing: 2px;">TEST_COMBAT</span>
+            <div style="position: absolute; bottom: 15px; left: 30px;">
+                <div onclick="startCombat(null,false)" class="glass-panel" style="padding: 6px 12px; border-radius: 10px; border-color: rgba(255,77,77,0.3); cursor:pointer; display: inline-block;">
+                    <span style="font-family:'Space Grotesk'; font-size:0.5rem; color:var(--accent-red); letter-spacing:2px;">TEST</span>
                 </div>
             </div>
         </div>
 
+        <!-- INVENTORY SCREEN -->
+        <div id="screen-inventory" class="screen" style="background: var(--bg-space); overflow-y: auto;">
+            <div style="padding: 20px; padding-top: 60px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                    <h2 style="color: var(--primary-gold); font-size: 1.1rem;">🃏 카드 인벤토리</h2>
+                    <span id="inv-count" style="font-size:0.6rem; color:var(--text-dim);">0 / 10</span>
+                </div>
+                
+                <div id="inventory-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;"></div>
+                
+                <div class="glass-panel" style="margin-top: 20px; padding: 15px; border-color: rgba(233,196,0,0.15);">
+                    <div style="font-size: 0.6rem; color: var(--primary-gold); font-weight: 700; margin-bottom: 10px;">⚗ 카드 합성</div>
+                    <div style="font-size: 0.5rem; color: var(--text-dim); margin-bottom: 10px;">같은 카드 2장 선택 → 합성 시 경험치 증가 + 레벨업 가능</div>
+                    <div id="fusion-selection" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;"></div>
+                    <button class="btn-primary" style="width:100%; padding:12px; font-size:0.75rem;" onclick="fuseCards()">합성하기</button>
+                </div>
+
+                <button class="btn-nav" style="width:100%; text-align:center; margin-top:20px;" onclick="showScreen('main')">뒤로가기</button>
+            </div>
+        </div>
+
+        <!-- COLLECTION SCREEN (업적/도감) -->
+        <div id="screen-collection" class="screen" style="background: var(--bg-space); overflow-y: auto;">
+            <div style="padding: 20px; padding-top: 60px;">
+                <h2 style="color: var(--secondary-cyan); font-size: 1.1rem; margin-bottom: 20px;">📖 카드 도감 (COLLECTION)</h2>
+                <div id="collection-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;"></div>
+                <button class="btn-nav" style="width:100%; text-align:center; margin-top:20px;" onclick="showScreen('main')">뒤로가기</button>
+            </div>
+        </div>
+
+        <!-- DASHBOARD / MAP -->
         <div id="screen-dashboard" class="screen" style="background: var(--bg-space);">
             <div id="map" style="position: absolute; inset: 0; z-index: 1;"></div>
-            
-            <div id="mission-overlay" class="glass-panel" style="display: none; position: absolute; top: 110px; left: 20px; right: 20px; padding: 20px; border-color: var(--primary-gold); z-index: 1000; animation: slideDown 0.5s ease-out;">
-                <div style="font-size: 0.6rem; color: var(--primary-gold); letter-spacing: 2px; margin-bottom: 5px;">활성 미션</div>
-                <h3 id="mission-title" style="font-size: 1.1rem; color: #fff; margin-bottom: 10px;">균열 조사 명령</h3>
-                <p id="mission-desc" style="font-size: 0.75rem; color: var(--text-dim); line-height: 1.4;">이 지역에서 발생하는 에너지 변칙 현상을 조사하십시오.</p>
-                <div id="mission-progress-container" style="margin-top: 15px;">
-                    <div style="font-size: 0.5rem; color: var(--secondary-cyan); margin-bottom: 5px;">조사 게이지: <span id="mission-walk-dist">0</span>m / <span id="mission-target-dist">20</span>m</div>
-                    <div class="hp-bar-outer" style="height: 4px; border-color: rgba(255,255,255,0.1);">
-                        <div class="hp-bar-inner" id="mission-xp-bar" style="width: 0%; background: var(--secondary-cyan);"></div>
+            <div style="position: absolute; top: 0; left: 0; right: 0; z-index: 10; padding: 15px;">
+                <div class="glass-panel" style="padding: 12px 16px; border-radius: 16px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <div>
+                            <span id="battle-card-name" style="font-size: 0.7rem; color: var(--primary-gold); font-weight: 700;">카드 미선택</span>
+                            <span id="battle-card-lv" style="font-size: 0.55rem; color: var(--text-dim); margin-left: 8px;">Lv.1</span>
+                        </div>
+                        <div style="display:flex; gap:10px; align-items:center;">
+                            <span id="hud-hp-text" style="font-size:0.6rem; color:var(--accent-red);">100%</span>
+                            <button class="btn-nav" style="padding:5px 10px; font-size:0.5rem;" onclick="showScreen('main')">EXIT</button>
+                        </div>
+                    </div>
+                    <div style="height:4px; background:rgba(255,255,255,0.05); border-radius:2px; margin-top:8px;">
+                        <div id="hud-hp-bar" style="width:100%; height:100%; background:var(--accent-red); border-radius:2px; transition:0.3s;"></div>
                     </div>
                 </div>
             </div>
-
-            <div class="hud" style="position: absolute; bottom: 30px; left: 20px; right: 20px; z-index: 1000;">
-                <button class="btn-nav" style="width: 100%; text-align: center; background: rgba(0,0,0,0.5);" onclick="showScreen('main')">시스템 종료 (EXIT_MAP)</button>
-                <div id="map-status" style="margin-top: 15px; font-size: 0.6rem; color: var(--secondary-cyan); text-align: center; letter-spacing: 1px;">SYSTEM_READY // GPS_ACTIVE</div>
-                <div id="distance-info" style="margin-top: 5px; font-size: 0.6rem; color: var(--text-dim); text-align: center;">가까운 균열을 찾는 중...</div>
+            <div style="position:absolute; bottom:0; left:0; right:0; z-index:10; padding:15px;">
+                <div class="glass-panel" style="padding:12px 16px; border-radius:16px;">
+                    <div id="map-status" style="font-size:0.65rem; color:var(--secondary-cyan); text-align:center;">시스템 온라인</div>
+                    <div id="distance-info" style="margin-top:5px; font-size:0.55rem; color:var(--text-dim); text-align:center;">가까운 균열을 찾는 중...</div>
+                </div>
             </div>
         </div>
 
-        <!-- 포탈 확인 모달 (자동진입으로 대체됨 - 호환성 유지용 숨김) -->
+        <!-- 포탈 확인 모달 (자동진입으로 숨김) -->
         <div id="portal-confirm-modal" style="display:none !important;"></div>
+
+        <!-- MISSION OVERLAY -->
+        <div id="mission-overlay" style="display:none; position:fixed; bottom:80px; left:15px; right:15px; z-index:20;">
+            <div class="glass-panel" style="padding:15px; border-radius:14px; border-color:rgba(0,253,236,0.2);">
+                <div style="font-size:0.55rem; color:var(--secondary-cyan); letter-spacing:2px; margin-bottom:6px;">MISSION_ACTIVE</div>
+                <div id="mission-title" style="font-size:0.8rem; color:#fff; font-weight:700; margin-bottom:4px;"></div>
+                <div id="mission-desc" style="font-size:0.55rem; color:var(--text-dim); margin-bottom:10px;"></div>
+                <div style="height:6px; background:rgba(255,255,255,0.05); border-radius:3px;">
+                    <div id="mission-xp-bar" style="width:0%; height:100%; background:linear-gradient(90deg, var(--secondary-cyan), var(--primary-gold)); border-radius:3px; transition:0.3s;"></div>
+                </div>
+                <div style="font-size:0.5rem; color:var(--text-dim); margin-top:5px; text-align:center;"><span id="mission-walk-dist">0</span>m / <span id="mission-target-dist">20</span>m</div>
+            </div>
+        </div>
 
         <!-- COMBAT SCENE -->
         <div id="screen-combat" class="screen">
             <div class="combat-scene">
                 <div class="enemy-area">
                     <div class="enemy-container" id="current-enemy-ui">
-                        <div id="enemy-name-label" style="font-family: 'Space Grotesk'; color: var(--accent-red); font-size: 0.8rem; margin-bottom: 10px; letter-spacing: 2px;">타겟 스캔 중...</div>
-                        <div class="hp-bar-outer" style="width: 15rem; height: 12px; margin-bottom: 20px;">
-                            <div class="hp-bar-inner" id="enemy-hp-bar" style="width: 100%;"></div>
+                        <div id="enemy-name-label" style="font-family:'Space Grotesk'; color:var(--accent-red); font-size:0.8rem; margin-bottom:10px; letter-spacing:2px;">타겟 스캔 중...</div>
+                        <div class="hp-bar-outer" style="width:15rem; height:12px; margin-bottom:20px;">
+                            <div id="enemy-hp-bar" class="hp-bar-inner" style="width:100%;"></div>
                         </div>
-                        <img id="enemy-img-main" src="" class="boss-img" alt="Enemy" style="transition: all 0.5s;">
+                        <img id="enemy-img-main" src="" style="width:150px; height:150px; object-fit:contain; filter:drop-shadow(0 0 20px rgba(255,0,0,0.3)); transition:0.3s;">
                     </div>
                 </div>
-
-                <div class="combat-log" id="combat-log"></div>
-
-                <div class="glass-panel" style="background: rgba(11, 13, 25, 0.95);">
-                    <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 20px;">
-                        <div class="hud" style="top: 20px; left: 20px; right: 20px;">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                                <div>
-                                    <span style="font-size: 0.6rem; color: var(--secondary-cyan); letter-spacing: 2px;">LV.<span id="hud-level">1</span> 커맨더</span>
-                                    <div style="font-size: 1.2rem; font-weight: 700; color: #fff; margin-top: 5px;" id="hud-hp-text">100%</div>
-                                </div>
-                                <div style="text-align: right;">
-                                    <span style="font-size: 0.5rem; color: var(--text-dim);">경험치 진행도</span>
-                                    <div class="hp-bar-outer" style="width: 80px; height: 6px; border-color: rgba(255,255,255,0.1);">
-                                        <div class="hp-bar-inner" id="xp-bar" style="width: 0%; background: var(--primary-gold);"></div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="hp-bar-outer" style="height: 10px; border-color: rgba(0, 253, 236, 0.3);">
-                                <div class="hp-bar-inner" id="hud-hp-bar" style="width: 100%; background: var(--secondary-cyan);"></div>
-                            </div>
+                <div class="player-area glass-panel" style="padding:15px;">
+                    <!-- 전투 카드 정보 -->
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                        <div>
+                            <span id="combat-card-name" style="font-size:0.7rem; color:var(--primary-gold); font-weight:700;"></span>
+                            <span id="combat-card-lv" style="font-size:0.55rem; color:var(--text-dim); margin-left:6px;"></span>
                         </div>
-
-                        </div>
-                        <div class="hud" style="bottom: 30px; left: 20px; right: 20px;">
-                            <button class="btn-nav" style="width: 100%; text-align: center; background: rgba(0,0,0,0.5);" onclick="showScreen('main')">지휘부 복구 (종료)</button>
-                            <div id="map-status-combat" style="margin-top: 15px; font-size: 0.6rem; color: var(--secondary-cyan); text-align: center; letter-spacing: 1px;">전투 중 // ENGAGING_TARGET</div>
-                        </div>
-                        <button id="btn-auto-battle" onclick="toggleAutoBattle()" class="glass-panel" style="padding: 10px 20px; border-color: var(--secondary-cyan); color: var(--secondary-cyan); cursor: pointer; border-radius: 12px;">자동 전투: 꺼짐</button>
+                        <span id="combat-card-skill" style="font-size:0.5rem; color:var(--secondary-cyan);"></span>
                     </div>
-
-                    <div class="combat-controls">
-                        <button class="btn-primary" id="btn-attack" onclick="executePlayerTurn('slash')">⚔ 검 공격 (SLASH)</button>
-                        <button class="btn-primary" id="btn-potion" style="background: linear-gradient(135deg, var(--secondary-cyan) 0%, #00a89d 100%);" onclick="usePotion()">회복하기 (0)</button>
-                        <button class="btn-nav" style="text-align: center;" onclick="showScreen('dashboard'); stopAutoBattle();">후퇴 (퇴각)</button>
+                    <div class="action-buttons" style="display:flex; gap:8px; margin-bottom:10px;">
+                        <button id="btn-attack" class="btn-primary" style="flex:2; padding:14px;" onclick="executePlayerTurn()">⚔ ATTACK</button>
+                        <button id="btn-potion" class="btn-nav" style="flex:1; text-align:center; padding:14px;" onclick="usePotion()">HEAL (0)</button>
+                        <button id="btn-auto-battle" class="btn-nav" style="flex:1; text-align:center; padding:14px; font-size:0.6rem;" onclick="toggleAutoBattle()">AUTO: OFF</button>
                     </div>
+                    <div id="combat-log" style="max-height:100px; overflow-y:auto; font-size:0.6rem;"></div>
                 </div>
             </div>
         </div>
 
-        <!-- SETTINGS SCREEN (완전 리뉴얼) -->
-        <div id="screen-settings" class="screen" style="overflow-y: auto; background: var(--bg-void); padding: 100px 20px 50px;">
-            <div style="max-width: 800px; margin: 0 auto;">
-                <h1 style="font-family: 'Space Grotesk'; color: var(--primary-gold); font-size: 1.5rem; margin-bottom: 30px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 15px;">시스템 관리자 메뉴 // SYNC_HUB</h1>
-                
-                <!-- Player Settings -->
+        <!-- SETTINGS -->
+        <div id="screen-settings" class="screen" style="background: var(--bg-space); overflow-y: auto;">
+            <div style="padding: 20px; padding-top: 60px;">
+                <h2 style="color: var(--primary-gold); font-size: 1.1rem; margin-bottom: 20px;">⚙ 시스템 설정</h2>
+
+                <!-- 카드 에디터 -->
                 <div class="glass-panel" style="margin-bottom: 20px; padding: 25px;">
-                    <h3 style="color: var(--secondary-cyan); font-size: 0.9rem; margin-bottom: 20px;">커맨더 핵심 스탯 (PLAYER_CORE)</h3>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                        <div>
-                            <label style="font-size: 0.6rem; color: var(--text-dim);">최대 체력 (MAX_HP)</label>
-                            <input type="number" id="set-p-hp" class="btn-nav" style="width: 100%;" value="100">
-                        </div>
-                        <div>
-                            <label style="font-size: 0.6rem; color: var(--text-dim);">기본 공격력 (ATK)</label>
-                            <input type="number" id="set-p-atk" class="btn-nav" style="width: 100%;" value="20">
-                        </div>
-                        <div>
-                            <label style="font-size: 0.6rem; color: var(--text-dim);">방어율 (DEF%)</label>
-                            <input type="number" id="set-p-def" class="btn-nav" style="width: 100%;" value="10">
-                        </div>
-                        <div>
-                            <label style="font-size: 0.6rem; color: var(--text-dim);">초기 포션</label>
-                            <input type="number" id="set-p-pot" class="btn-nav" style="width: 100%;" value="1">
-                        </div>
-                    </div>
-                    <button class="btn-primary" style="margin-top: 20px; width: 100%; padding: 12px; font-size: 0.8rem;" onclick="savePlayerSettings()">캐릭터 데이터 동기화</button>
+                    <h3 style="color: var(--primary-gold); font-size: 0.9rem; margin-bottom: 15px;">🃏 카드 능력치 에디터</h3>
+                    <div style="font-size:0.5rem; color:var(--text-dim); margin-bottom:15px;">각 몬스터 카드의 기본 능력치와 고유기술을 설정합니다.</div>
+                    <div id="card-editor-list"></div>
+                    <button class="btn-primary" style="margin-top:15px; width:100%; padding:12px; font-size:0.8rem; background:linear-gradient(135deg, var(--primary-gold) 0%, #b38600 100%);" onclick="saveCardTemplates()">카드 템플릿 저장</button>
                 </div>
 
-                <!-- Monster Database (리뉴얼) -->
+                <!-- 드랍률 설정 -->
                 <div class="glass-panel" style="margin-bottom: 20px; padding: 25px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                        <h3 style="color: var(--accent-red); font-size: 0.9rem; margin: 0;">몬스터 데이터베이스 (CREATURE_DB)</h3>
-                    </div>
-                    
-                    <div style="display: flex; gap: 10px; margin-bottom: 20px;">
-                        <div class="glass-panel" style="flex:1; padding: 12px; text-align: center; cursor: pointer; border-color: rgba(0,253,236,0.3);" onclick="addMonster('normal')">
-                            <div style="font-size: 0.7rem; color: var(--secondary-cyan);">🗡 일반 몬스터 추가</div>
+                    <h3 style="color: var(--secondary-cyan); font-size: 0.9rem; margin-bottom: 15px;">🎲 드랍 확률 설정</h3>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px;">
+                        <div>
+                            <label style="font-size:0.6rem; color:var(--text-dim);">카드 드랍률 (%)</label>
+                            <input type="number" id="set-card-drop" class="btn-nav" style="width:100%;" value="30" min="1" max="100">
                         </div>
-                        <div class="glass-panel" style="flex:1; padding: 12px; text-align: center; cursor: pointer; border-color: rgba(233,196,0,0.3);" onclick="addMonster('boss')">
-                            <div style="font-size: 0.7rem; color: var(--primary-gold);">⚔ 보스 몬스터 추가</div>
+                        <div>
+                            <label style="font-size:0.6rem; color:var(--text-dim);">포션 드랍률 (%)</label>
+                            <input type="number" id="set-potion-drop" class="btn-nav" style="width:100%;" value="30" min="1" max="100">
                         </div>
                     </div>
-                    
+                    <div style="margin-top:10px;">
+                        <label style="font-size:0.6rem; color:var(--primary-gold);">보스 희귀카드 드랍률 (%)</label>
+                        <input type="number" id="set-boss-card-drop" class="btn-nav" style="width:100%;" value="100" min="1" max="100">
+                    </div>
+                    <button class="btn-primary" style="margin-top:15px; width:100%; padding:12px; font-size:0.8rem;" onclick="saveDropSettings()">드랍 설정 저장</button>
+                </div>
+
+                <!-- 몬스터 DB -->
+                <div class="glass-panel" style="margin-bottom: 20px; padding: 25px;">
+                    <h3 style="color: var(--accent-red); font-size: 0.9rem; margin-bottom: 15px;">몬스터 데이터베이스</h3>
+                    <div style="display:flex; gap:10px; margin-bottom:20px;">
+                        <div class="glass-panel" style="flex:1; padding:12px; text-align:center; cursor:pointer; border-color:rgba(0,253,236,0.3);" onclick="addMonster('normal')"><div style="font-size:0.7rem; color:var(--secondary-cyan);">🗡 일반 추가</div></div>
+                        <div class="glass-panel" style="flex:1; padding:12px; text-align:center; cursor:pointer; border-color:rgba(233,196,0,0.3);" onclick="addMonster('boss')"><div style="font-size:0.7rem; color:var(--primary-gold);">⚔ 보스 추가</div></div>
+                    </div>
                     <div id="set-monster-list"></div>
-                    
-                    <button class="btn-primary" style="margin-top: 15px; width: 100%; padding: 12px; font-size: 0.8rem; background: linear-gradient(135deg, var(--accent-red) 0%, #b30000 100%);" onclick="saveMonsterPool()">전체 몬스터 데이터 저장</button>
-                    
-                    <div style="margin-top: 10px; padding: 10px; background: rgba(233,196,0,0.05); border-radius: 8px; border: 1px solid rgba(233,196,0,0.1);">
-                        <div style="font-size: 0.55rem; color: var(--primary-gold); line-height: 1.5;">
-                            💡 <b>보스 몬스터</b>는 포탈에 지정하면 해당 위치에서만 등장합니다.<br>
-                            💡 보스 처치 시 <b>정령 카드 100%</b> 드랍이 보장됩니다.<br>
-                            💡 지정 없는 포탈에서는 <b>일반 몬스터</b>가 랜덤 출현합니다.
-                        </div>
-                    </div>
+                    <button class="btn-primary" style="margin-top:15px; width:100%; padding:12px; font-size:0.8rem; background:linear-gradient(135deg, var(--accent-red) 0%, #b30000 100%);" onclick="saveMonsterPool()">몬스터 데이터 저장</button>
                 </div>
 
-                <!-- Loot Settings -->
+                <!-- 포탈 관리 -->
                 <div class="glass-panel" style="margin-bottom: 20px; padding: 25px;">
-                    <h3 style="color: var(--primary-gold); font-size: 0.9rem; margin-bottom: 20px;">아이템 드랍 프로토콜</h3>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                        <div>
-                            <label style="font-size: 0.6rem; color: var(--text-dim);">드랍 확률 (0.1 ~ 1.0)</label>
-                            <input type="number" id="set-l-chance" step="0.1" class="btn-nav" style="width: 100%;" value="0.3">
-                        </div>
-                        <div style="display: flex; align-items: center; gap: 10px; padding-top: 15px;">
-                            <input type="checkbox" id="set-l-fixed" style="width: 20px; height: 20px;">
-                            <label style="margin-bottom: 0;">확정 드랍 모드</label>
-                        </div>
-                    </div>
-                    <button class="btn-primary" style="margin-top: 20px; width: 100%; padding: 12px; font-size: 0.8rem;" onclick="saveLootSettings()">아이템 설정 동기화</button>
-                </div>
-
-                <!-- Portal Management -->
-                <div class="glass-panel" style="margin-bottom: 20px; padding: 25px;">
-                    <h3 style="color: var(--secondary-cyan); font-size: 0.9rem; margin-bottom: 20px;">차원 균열 및 미션 관리 (RIFT_CONTROL)</h3>
+                    <h3 style="color: var(--secondary-cyan); font-size: 0.9rem; margin-bottom: 20px;">차원 균열 관리</h3>
                     <div id="set-map" style="height: 300px; border-radius: 12px; margin-bottom: 20px; border: 1px solid var(--glass-border);"></div>
                     <div id="set-portal-list"></div>
-                    <div style="margin-top: 15px; padding: 12px; background: rgba(0,253,236,0.03); border-radius: 8px; border: 1px solid rgba(0,253,236,0.1);">
-                        <div style="font-size: 0.55rem; color: var(--secondary-cyan); line-height: 1.5;">
-                            📍 지도를 클릭하여 새 포탈을 생성하세요.<br>
-                            📍 EDIT 버튼으로 <b>보스 몬스터 지정, 반경, 조사 거리</b>를 설정합니다.<br>
-                            📍 <span style="color: var(--accent-red);">빨간 마커</span> = 보스 구역 / <span style="color: var(--secondary-cyan);">파란 마커</span> = 일반 구역
-                        </div>
-                    </div>
                 </div>
 
-                <button class="btn-nav" style="width: 100%; text-align: center; margin-bottom: 50px;" onclick="showScreen('main')">설정 종료 (EXIT_SETTINGS)</button>
+                <button class="btn-nav" style="width:100%; text-align:center; margin-bottom:50px;" onclick="showScreen('main')">설정 종료</button>
             </div>
         </div>
 
         <!-- Portal Editor Modal -->
         <div id="portal-editor-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:2000; padding:20px; overflow-y:auto;">
             <div class="glass-panel" style="max-width:420px; margin:50px auto; padding:25px;">
-                <h3 style="color:var(--primary-gold); margin-bottom:20px; font-size: 1rem;">⚙ 포탈 상세 설정</h3>
-                
-                <label style="font-size:0.6rem; color: var(--text-dim);">지역 이름</label>
+                <h3 style="color:var(--primary-gold); margin-bottom:20px; font-size:1rem;">⚙ 포탈 설정</h3>
+                <label style="font-size:0.6rem; color:var(--text-dim);">지역 이름</label>
                 <input type="text" id="ed-p-name" class="btn-nav" style="width:100%; margin-bottom:12px;">
-                
-                <label style="font-size:0.6rem; color: var(--text-dim);">미션 문구</label>
+                <label style="font-size:0.6rem; color:var(--text-dim);">미션 문구</label>
                 <textarea id="ed-p-mission" class="btn-nav" style="width:100%; height:60px; margin-bottom:12px;"></textarea>
-                
-                <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-bottom: 15px;">
-                    <div>
-                        <label style="font-size:0.6rem; color: var(--text-dim);">감지 반경 (m)</label>
-                        <input type="number" id="ed-p-radius" class="btn-nav" style="width:100%;" placeholder="100">
-                    </div>
-                    <div>
-                        <label style="font-size:0.6rem; color: var(--text-dim);">조사 거리 (m)</label>
-                        <input type="number" id="ed-p-walk" class="btn-nav" style="width:100%;" placeholder="20">
-                    </div>
-                    <div>
-                        <label style="font-size:0.6rem; color: var(--accent-red);">출현율 (%)</label>
-                        <input type="number" id="ed-p-chance" class="btn-nav" style="width:100%; border-color:rgba(255,77,77,0.3);" placeholder="50" min="1" max="100">
-                    </div>
+                <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-bottom:15px;">
+                    <div><label style="font-size:0.6rem; color:var(--text-dim);">반경 (m)</label><input type="number" id="ed-p-radius" class="btn-nav" style="width:100%;" placeholder="100"></div>
+                    <div><label style="font-size:0.6rem; color:var(--text-dim);">조사 거리 (m)</label><input type="number" id="ed-p-walk" class="btn-nav" style="width:100%;" placeholder="20"></div>
+                    <div><label style="font-size:0.6rem; color:var(--accent-red);">출현율 (%)</label><input type="number" id="ed-p-chance" class="btn-nav" style="width:100%; border-color:rgba(255,77,77,0.3);" placeholder="50" min="1" max="100"></div>
                 </div>
-                
-                <div style="margin-bottom: 15px; padding: 15px; background: rgba(0,253,236,0.03); border-radius: 12px; border: 1px solid rgba(0,253,236,0.12);">
-                    <label style="font-size: 0.65rem; color: var(--secondary-cyan); display: block; margin-bottom: 10px; font-weight: 700;">🗡 일반 몬스터 (체크한 몬스터만 출현)</label>
+                <div style="margin-bottom:15px; padding:15px; background:rgba(0,253,236,0.03); border-radius:12px; border:1px solid rgba(0,253,236,0.12);">
+                    <label style="font-size:0.65rem; color:var(--secondary-cyan); display:block; margin-bottom:10px; font-weight:700;">🗡 일반 몬스터</label>
                     <div id="ed-normal-monsters"></div>
-                    <div style="font-size: 0.45rem; color: var(--text-dim); margin-top: 6px;">체크 안 하면 모든 일반 몬스터가 랜덤 출현</div>
                 </div>
-                
-                <div style="margin-bottom: 20px; padding: 15px; background: rgba(233,196,0,0.05); border-radius: 12px; border: 1px solid rgba(233,196,0,0.15);">
-                    <label style="font-size: 0.65rem; color: var(--primary-gold); display: block; margin-bottom: 10px; font-weight: 700;">⚔ 보스 몬스터 (체크 시 이 위치가 보스 존)</label>
+                <div style="margin-bottom:20px; padding:15px; background:rgba(233,196,0,0.05); border-radius:12px; border:1px solid rgba(233,196,0,0.15);">
+                    <label style="font-size:0.65rem; color:var(--primary-gold); display:block; margin-bottom:10px; font-weight:700;">⚔ 보스 몬스터</label>
                     <div id="ed-boss-monsters"></div>
-                    <div style="font-size: 0.45rem; color: var(--text-dim); margin-top: 6px;">보스 체크 시 정령카드 100% 드랍 보장</div>
                 </div>
-                
                 <div style="display:flex; gap:10px;">
-                    <button class="btn-primary" style="flex:1; padding: 14px;" onclick="applyPortalEdit()">적용하기</button>
-                    <button class="btn-nav" style="flex:1; text-align: center;" onclick="closePortalEditor()">취소</button>
+                    <button class="btn-primary" style="flex:1; padding:14px;" onclick="applyPortalEdit()">적용</button>
+                    <button class="btn-nav" style="flex:1; text-align:center;" onclick="closePortalEditor()">취소</button>
                 </div>
             </div>
         </div>
     </div>
+    <script src="cards.js"></script>
     <script src="main.js"></script>
 </body>
 </html>

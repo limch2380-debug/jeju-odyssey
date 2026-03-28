@@ -16,7 +16,7 @@ let encounterPending = false;
 let autoHuntPortal = null; // 현재 자동사냥 중인 포탈 정보
 
 // ===== 세션 사냥 기록 =====
-let huntLog = { kills: 0, bossKills: 0, potions: 0, spiritCards: 0, xpTotal: 0 };
+let huntLog = { kills: 0, bossKills: 0, potions: 0, cardsGot: 0 };
 
 // ===== WAKE LOCK — 백그라운드 유지 =====
 let wakeLock = null;
@@ -118,9 +118,15 @@ async function initApp() {
     try {
         cachedMonsterPool = await getMonsterPool();
         cachedPlayerStats = await getPlayerSettings();
+        // 첫 시작 시 고블린 카드 1장 지급
+        const inv = await getInventory();
+        if (inv.length === 0) {
+            await addCardToInventory('goblin_soldier');
+            console.log('[CARD] 초기 고블린 카드 지급');
+        }
+        await updateSelectedCardDisplay();
     } catch(e) { console.log("Init warning:", e); }
     updateClock();
-    await updateDashboardHUD();
     updateHuntLogUI();
 }
 initApp();
@@ -133,7 +139,13 @@ function showScreen(screenId) {
     if (screenId === 'dashboard') {
         setTimeout(() => { initMap(); startTracking(); loadPortals(); if (map) { map.invalidateSize(); map.setView(currentUserPos, 17); } }, 100);
     } else if (screenId === 'settings') {
-        setTimeout(() => initSettings(), 100);
+        setTimeout(() => { initSettings(); renderCardEditor(); loadDropSettingsUI(); }, 100);
+    } else if (screenId === 'inventory') {
+        renderInventory();
+    } else if (screenId === 'collection') {
+        renderCollection();
+    } else if (screenId === 'main') {
+        updateSelectedCardDisplay();
     } else { stopTracking(); }
 }
 
@@ -210,35 +222,29 @@ function startTracking() {
 }
 
 async function updateDashboardHUD() {
-    const stats = await getPlayerSettings();
-    cachedPlayerStats = stats;
-    const mainLevel = document.getElementById('main-level');
-    if (mainLevel) mainLevel.innerText = stats.level || 1;
-    const hudSpirit = document.getElementById('hud-spirit-cards');
-    if (hudSpirit) hudSpirit.innerText = stats.spirit_cards || 0;
-    const xpNeeded = (stats.level || 1) * 100;
-    const xpPercent = Math.min(100, ((stats.xp || 0) / xpNeeded) * 100);
-    const mainXpBar = document.getElementById('main-xp-bar');
-    if (mainXpBar) mainXpBar.style.width = `${xpPercent}%`;
-    const hudLevel = document.getElementById('hud-level');
-    if (hudLevel) hudLevel.innerText = stats.level || 1;
+    const inv = await getInventory();
+    selectedCardIdx = await getSelectedIdx();
+    if (selectedCardIdx >= 0 && selectedCardIdx < inv.length) {
+        const c = inv[selectedCardIdx];
+        const e = getCardEffective(c);
+        const bcn = document.getElementById('battle-card-name');
+        if (bcn) bcn.innerText = c.name;
+        const bcl = document.getElementById('battle-card-lv');
+        if (bcl) bcl.innerText = `Lv.${c.level||1}`;
+    }
     const hpText = document.getElementById('hud-hp-text');
-    if (hpText) hpText.innerText = `${Math.ceil((combatState.playerHP/combatState.playerMaxHP)*100)}%`;
+    if (hpText && combatState.playerMaxHP > 0) hpText.innerText = `${Math.ceil((combatState.playerHP/combatState.playerMaxHP)*100)}%`;
     const hpBar = document.getElementById('hud-hp-bar');
-    if (hpBar) hpBar.style.width = `${(combatState.playerHP/combatState.playerMaxHP)*100}%`;
-    const xpBar = document.getElementById('xp-bar');
-    if (xpBar) xpBar.style.width = `${xpPercent}%`;
+    if (hpBar && combatState.playerMaxHP > 0) hpBar.style.width = `${(combatState.playerHP/combatState.playerMaxHP)*100}%`;
 }
 
-// ===== 사냥 기록 UI 업데이트 =====
 function updateHuntLogUI() {
     const el = document.getElementById('hunt-log-panel');
     if (!el) return;
-    document.getElementById('hunt-kills').innerText = huntLog.kills;
-    document.getElementById('hunt-boss-kills').innerText = huntLog.bossKills;
-    document.getElementById('hunt-potions').innerText = huntLog.potions;
-    document.getElementById('hunt-spirit').innerText = huntLog.spiritCards;
-    document.getElementById('hunt-xp').innerText = huntLog.xpTotal;
+    const hk = document.getElementById('hunt-kills'); if(hk) hk.innerText = huntLog.kills;
+    const hb = document.getElementById('hunt-boss-kills'); if(hb) hb.innerText = huntLog.bossKills;
+    const hc = document.getElementById('hunt-cards'); if(hc) hc.innerText = huntLog.cardsGot;
+    const hp = document.getElementById('hunt-potions'); if(hp) hp.innerText = huntLog.potions;
 }
 
 // ===== PROXIMITY / ENCOUNTER =====
@@ -367,9 +373,19 @@ function ignoreMission() {
 }
 function stopTracking() { if (watchId) navigator.geolocation.clearWatch(watchId); }
 
-// ===== COMBAT — autoStart 파라미터 추가 =====
+// ===== COMBAT — 카드 기반 전투 =====
 async function startCombat(forcedMonsterName = null, autoStart = false) {
-    const playerStats = await getPlayerSettings();
+    // 카드 확인
+    const inv = await getInventory();
+    selectedCardIdx = await getSelectedIdx();
+    if (selectedCardIdx < 0 || selectedCardIdx >= inv.length) {
+        alert('전투 카드가 없습니다! 인벤토리에서 선택하세요.');
+        showScreen('main'); return;
+    }
+    const card = inv[selectedCardIdx];
+    const ec = getCardEffective(card);
+    const playerData = await getPlayerSettings();
+    
     const pool = await getMonsterPool();
     let targetMonster;
     if (forcedMonsterName) {
@@ -380,31 +396,32 @@ async function startCombat(forcedMonsterName = null, autoStart = false) {
         targetMonster = p[Math.floor(Math.random() * p.length)];
     }
     combatState = {
-        playerHP: playerStats.hp, playerMaxHP: playerStats.hp,
-        playerAtk: playerStats.atk, playerDef: playerStats.def,
-        potions: playerStats.potions,
+        playerHP: ec.hp, playerMaxHP: ec.hp,
+        playerAtk: ec.atk, playerDef: ec.def,
+        playerSkill: card.skill, playerSkillChance: card.skillChance || 20,
+        potions: playerData.potions || 1,
         currentEnemy: { ...targetMonster, hp: targetMonster.hp, maxHp: targetMonster.hp },
-        isGameOver: false, isAuto: false
+        isGameOver: false, isAuto: false, busy: false,
+        cardName: card.name, cardLevel: card.level || 1
     };
     document.getElementById('enemy-name-label').innerText = combatState.currentEnemy.name;
     document.getElementById('enemy-img-main').src = combatState.currentEnemy.img;
-    document.getElementById('enemy-img-main').style.opacity = "1";
-    document.getElementById('btn-auto-battle').innerText = "AUTO: OFF";
-    document.getElementById('btn-auto-battle').style.background = "var(--bg-space)";
+    document.getElementById('enemy-img-main').style.opacity = '1';
+    document.getElementById('btn-auto-battle').innerText = 'AUTO: OFF';
+    document.getElementById('btn-auto-battle').style.background = 'var(--bg-space)';
     const isBoss = combatState.currentEnemy.type === 'boss';
     const nameLabel = document.getElementById('enemy-name-label');
     if (isBoss) { nameLabel.style.color = 'var(--primary-gold)'; nameLabel.innerText = `⚔ ${combatState.currentEnemy.name} [BOSS]`; }
     else { nameLabel.style.color = 'var(--accent-red)'; }
+    // 카드 정보 표시
+    const ccn = document.getElementById('combat-card-name'); if(ccn) ccn.innerText = card.name;
+    const ccl = document.getElementById('combat-card-lv'); if(ccl) ccl.innerText = `Lv.${card.level||1}`;
+    const ccs = document.getElementById('combat-card-skill'); if(ccs) ccs.innerText = `${SKILLS[card.skill]?.icon||''} ${SKILLS[card.skill]?.name||''} ${card.skillChance}%`;
     stopAutoBattle(); updateCombatUI();
-    document.getElementById('combat-log').innerHTML = `<div class="log-entry">${isBoss ? '⚔ 강력한 보스가 나타났다!' : '전장에 진입했습니다. TARGET_ACQUIRED!'}</div>`;
+    document.getElementById('combat-log').innerHTML = `<div class="log-entry">${card.name}(Lv.${card.level||1})${isBoss ? ' vs ⚔ BOSS!' : ' 전투 개시!'}</div>`;
     playSound('swordSwing'); showScreen('combat');
-    
-    // ★ 포탈에서 진입한 경우 자동전투 즉시 시작
     if (autoStart) {
-        setTimeout(() => {
-            toggleAutoBattle();
-            renderLog('🤖 자동전투 모드 활성화!', 'player');
-        }, 800);
+        setTimeout(() => { toggleAutoBattle(); renderLog('🤖 자동전투 활성화!', 'player'); }, 800);
     }
 }
 
@@ -430,22 +447,25 @@ function executeEnemyTurn() {
     combatState.busy = true; updateActionButtons(false);
     const enemy = combatState.currentEnemy;
     let raw = Math.floor(Math.random() * 5) + enemy.dmg;
+    // 회피 기술 체크
+    if (combatState.playerSkill === 'dodge' && Math.random() * 100 < combatState.playerSkillChance) {
+        renderLog(`💨 ${combatState.cardName} 회피 성공!`, 'player');
+        setTimeout(() => { combatState.busy = false; updateActionButtons(true); }, 500);
+        updateCombatUI(); return;
+    }
     let dmg = Math.max(1, raw - Math.floor(raw * (combatState.playerDef / 100)));
     combatState.playerHP = Math.max(0, combatState.playerHP - dmg);
     triggerShake(); playSound('enemyHit');
     const scene = document.querySelector('.combat-scene');
-    if(scene) { scene.classList.add('flash-red', 'glitch'); setTimeout(() => scene.classList.remove('flash-red', 'glitch'), 300); }
-    renderLog(`${enemy.name}의 공격! ${dmg} 대미지.`, "enemy");
+    if(scene) { scene.classList.add('flash-red','glitch'); setTimeout(() => scene.classList.remove('flash-red','glitch'), 300); }
+    renderLog(`${enemy.name}의 공격! ${dmg} 대미지.`, 'enemy');
     if (combatState.playerHP <= 0) {
-        renderLog("심각한 손상! 후퇴.", "enemy");
-        combatState.isGameOver = true;
-        stopAutoBattle();
-        // 패배 시에도 진동
+        renderLog('카드 파괴! 후퇴.', 'enemy');
+        combatState.isGameOver = true; stopAutoBattle();
         if ('vibrate' in navigator) navigator.vibrate([500, 200, 500]);
         setTimeout(() => { showScreen('dashboard'); }, 2000);
     } else {
-        // 자동전투 중이면 포션 자동 사용 (HP 30% 이하)
-        if (combatState.isAuto && combatState.potions > 0 && (combatState.playerHP / combatState.playerMaxHP) < 0.3) {
+        if (combatState.isAuto && combatState.potions > 0 && (combatState.playerHP/combatState.playerMaxHP) < 0.3) {
             setTimeout(() => { usePotion(); }, 500);
         } else {
             setTimeout(() => { combatState.busy = false; updateActionButtons(true); }, 500);
@@ -479,51 +499,72 @@ function executePlayerTurn() {
     combatState.busy = true; updateActionButtons(false);
     let enemy = combatState.currentEnemy;
     let dmg = Math.floor(Math.random() * 10) + combatState.playerAtk;
+    let skillUsed = false;
+    // 고유기술 확률 체크
+    if (Math.random() * 100 < combatState.playerSkillChance) {
+        if (combatState.playerSkill === 'double_attack') {
+            const dmg2 = Math.floor(Math.random() * 8) + combatState.playerAtk;
+            dmg += dmg2; skillUsed = true;
+            renderLog(`⚔ 이중 어택! 추가 ${dmg2} 대미지!`, 'player');
+        } else if (combatState.playerSkill === 'magic_attack') {
+            dmg = Math.floor(dmg * 1.5); skillUsed = true; // 방어 무시 보너스
+            renderLog('🔮 마법 공격! 방어 무시!', 'player');
+        }
+    }
     enemy.hp = Math.max(0, enemy.hp - dmg);
     playSound('swordSwing'); setTimeout(() => playSound('hit'), 150);
-    const img = document.getElementById('enemy-img-main'); 
+    const img = document.getElementById('enemy-img-main');
     if(img) { img.classList.add('shake'); setTimeout(() => img.classList.remove('shake'), 400); }
-    renderLog(`검을 휘둘러 ${dmg} 데미지!`, "player"); updateCombatUI();
+    renderLog(`${combatState.cardName}의 공격! ${dmg} 대미지!`, 'player'); updateCombatUI();
     if (enemy.hp <= 0) handleVictory();
     else setTimeout(() => { combatState.busy = false; executeEnemyTurn(); }, 1000);
 }
 
 async function handleVictory() {
-    playSound('victory'); renderLog("전투 승리!", "player");
-    combatState.isGameOver = true; 
+    playSound('victory'); renderLog('전투 승리!', 'player');
+    combatState.isGameOver = true;
     const eImg = document.getElementById('enemy-img-main');
-    if(eImg) eImg.style.opacity = "0";
-    
-    // ★ 승리 시 진동
+    if(eImg) eImg.style.opacity = '0';
     if ('vibrate' in navigator) navigator.vibrate([100, 50, 100, 50, 200]);
     
-    let stats = await getPlayerSettings();
-    const xp = 30 + Math.floor(Math.random() * 20);
-    stats.xp = (stats.xp || 0) + xp; renderLog(`경험치 +${xp}`, "player");
-    
-    // 사냥 기록 업데이트
     huntLog.kills++;
-    huntLog.xpTotal += xp;
+    const isBoss = combatState.currentEnemy.type === 'boss';
+    if (isBoss) huntLog.bossKills++;
     
-    const xpNeeded = (stats.level || 1) * 100;
-    if (stats.xp >= xpNeeded) { stats.level++; stats.xp -= xpNeeded; stats.hp += 20; stats.atk += 5; renderLog(`LEVEL ${stats.level} 달성!`, "player"); }
+    // 카드 드랍
+    const dropS = await getDropSettings();
+    const templates = await getCardTemplates();
+    const enemyName = combatState.currentEnemy.name;
+    const matchT = templates.find(t => t.name === enemyName);
     
-    // 보스 처치 → 정령카드 100%
-    if (combatState.currentEnemy.type === 'boss') {
-        stats.spirit_cards = (stats.spirit_cards || 0) + 1;
-        huntLog.bossKills++;
-        huntLog.spiritCards++;
-        renderLog("★ 보스 처치! [정령 카드] 확보!", "player"); playSound('victory');
+    if (isBoss) {
+        // 보스 → 희귀 카드 드랍
+        if (Math.random() * 100 < (dropS.bossCardDrop||100)) {
+            if (matchT) {
+                const added = await addCardToInventory(matchT.templateId);
+                if (added) { huntLog.cardsGot++; renderLog(`★ 희귀 카드 [${enemyName}] 획득!`, 'player'); playSound('victory'); }
+                else renderLog('인벤토리 가득! 카드 획득 불가.', 'enemy');
+            }
+        }
+    } else {
+        // 일반 → 카드 드랍 확률
+        if (Math.random() * 100 < (dropS.cardDrop||30)) {
+            if (matchT) {
+                const added = await addCardToInventory(matchT.templateId);
+                if (added) { huntLog.cardsGot++; renderLog(`🃏 카드 [${enemyName}] 드랍!`, 'player'); }
+                else renderLog('인벤토리 가득!', 'enemy');
+            }
+        }
     }
     
-    const loot = await getLootSettings();
-    if (loot.fixed || Math.random() < loot.chance) { 
-        stats.potions++; 
+    // 포션 드랍
+    let stats = await getPlayerSettings();
+    if (Math.random() * 100 < (dropS.potionDrop||30)) {
+        stats.potions = (stats.potions||0) + 1;
         huntLog.potions++;
-        renderLog("포션 획득!", "player"); 
+        renderLog('포션 드랍!', 'player');
     }
-    
-    await db.from('player_state').update(stats).eq('id', 'singleton');
+    await db.from('player_state').update(stats).eq('id','singleton');
     updateDashboardHUD();
     updateHuntLogUI();
     
