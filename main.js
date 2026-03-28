@@ -4,6 +4,11 @@ let portalMarkers = [];
 let watchId, isFirstFix = true;
 let currentUserPos = [33.4890, 126.4908];
 let forcedPortalId = null;
+let lastEncounterId = null;
+let activeScreen = 'main';
+const ENCOUNTER_RANGE = 50;
+let lastEncounteredPortalId = null; // Prevent infinite combat loop
+const PROXIMITY_THRESHOLD = 50; // Combat trigger distance in meters
 
 // SUPABASE CONNECTION
 const SUPABASE_URL = "https://icggdzxzifbhegvdwzdc.supabase.co";
@@ -62,6 +67,7 @@ let combatState = {
 let autoBattleInterval = null;
 
 function showScreen(screenId) {
+    activeScreen = screenId;
     const screens = document.querySelectorAll('.screen');
     screens.forEach(screen => screen.classList.remove('active'));
     const target = document.getElementById(`screen-${screenId}`);
@@ -70,7 +76,7 @@ function showScreen(screenId) {
     if (screenId === 'dashboard') {
         setTimeout(() => {
             initMap(); startTracking(); loadPortals();
-            if (map) map.invalidateSize();
+            if (map) { map.invalidateSize(); map.setView(currentUserPos, 17); }
         }, 100);
     } else if (screenId === 'settings') {
         setTimeout(() => initSettings(), 100);
@@ -101,25 +107,47 @@ function startTracking() {
         watchId = navigator.geolocation.watchPosition((pos) => {
             currentUserPos = [pos.coords.latitude, pos.coords.longitude];
             if (userMarker) userMarker.setLatLng(currentUserPos);
-            if (accuracyCircle) { accuracyCircle.setLatLng(currentUserPos); accuracyCircle.setRadius(pos.coords.accuracy); }
-            if (isFirstFix) { map.setView(currentUserPos, 16); isFirstFix = false; }
+            if (accuracyCircle) { 
+                accuracyCircle.setLatLng(currentUserPos); 
+                accuracyCircle.setRadius(pos.coords.accuracy); 
+            }
+            if (map && activeScreen === 'dashboard') {
+                map.panTo(currentUserPos);
+            }
             checkProximity();
-        }, () => {}, { enableHighAccuracy: true });
+        }, (err) => console.error("GPS_ERROR:", err), { enableHighAccuracy: true, maximumAge: 0 });
     }
 }
 
 async function checkProximity() {
+    if (activeScreen !== 'dashboard') return;
     const portals = await getPortals();
-    let nearest = Infinity; let nearP = null;
+    let nearest = Infinity; let nearestP = null;
+    
     portals.forEach(p => {
         const dist = L.latLng(currentUserPos).distanceTo(L.latLng(p.lat, p.lng));
-        if (dist < nearest) nearest = dist;
-        if (dist < 100 || p.id === forcedPortalId) nearP = p;
+        if (dist < nearest) { nearest = dist; nearestP = p; }
     });
-    const btn = document.getElementById('btn-enter-portal');
-    const dist = document.getElementById('distance-info');
-    if (btn) btn.style.display = nearP ? 'block' : 'none';
-    if (dist) dist.innerText = (nearest === Infinity) ? "NEARBY: NO_PORTALS" : `NEARBY: ${Math.round(nearest)}m TO_RIFT`;
+
+    const statusText = document.getElementById('distance-info');
+    if (statusText) statusText.innerText = (nearest === Infinity) ? "NEARBY: NO_PORTALS" : `NEARBY: ${Math.round(nearest)}m TO_RIFT`;
+
+    if (nearestP && (nearest < ENCOUNTER_RANGE || forcedPortalId === nearestP.id)) {
+        if (lastEncounterId !== nearestP.id || forcedPortalId) {
+            lastEncounterId = nearestP.id;
+            forcedPortalId = null;
+            
+            // Trigger Visual Encounter
+            const mapStatus = document.getElementById('map-status');
+            if (mapStatus) mapStatus.innerHTML = `<span style="color: var(--accent-red); animation: pulse 1s infinite;">[!] RIFT_DETECTED: ${nearestP.name}</span>`;
+            
+            setTimeout(() => {
+                if (activeScreen === 'dashboard') startCombat();
+            }, 2000);
+        }
+    } else {
+        lastEncounterId = null;
+    }
 }
 
 function stopTracking() { if (watchId) navigator.geolocation.clearWatch(watchId); }
