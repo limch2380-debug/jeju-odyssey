@@ -9,6 +9,9 @@ let forcedPortalId = null;
 let lastEncounterId = null;
 let activeScreen = 'main';
 let currentMissionPortal = null;
+let activeMissionPortalId = null; // Currently accepted and tracking walk distance
+let pendingConfirmationPortalId = null; // Portal waiting for confirmation
+let ignoredPortalIds = new Set(); // Portals ignored in current vicinity
 
 // SUPABASE CONNECTION
 const SUPABASE_URL = "https://icggdzxzifbhegvdwzdc.supabase.co";
@@ -120,12 +123,13 @@ function startTracking() {
         watchId = navigator.geolocation.watchPosition((pos) => {
             const newPos = [pos.coords.latitude, pos.coords.longitude];
             
-            // Calculate distance for encounter logic
-            if (currentMissionPortal) {
-                const step = L.latLng(currentUserPos).distanceTo(L.latLng(newPos));
-                walkAccumulator += step;
-            } else {
-                walkAccumulator = 0;
+            // Calculate movement for walkAccumulator
+            const distMoved = L.latLng(lastWalkPos).distanceTo(newPos);
+            if (distMoved > 2 && activeMissionPortalId) { // Min 2m movement
+                walkAccumulator += distMoved;
+                lastWalkPos = newPos;
+            } else if (!activeMissionPortalId) {
+                lastWalkPos = newPos; // Keep anchor updated even if not tracking
             }
 
             currentUserPos = newPos;
@@ -164,43 +168,91 @@ async function checkProximity() {
     portals.forEach(p => {
         const dist = L.latLng(currentUserPos).distanceTo(L.latLng(p.lat, p.lng));
         if (dist < nearestDist) nearestDist = dist;
-        if (dist < (p.radius || 100)) insidePortal = p;
+        if (dist < (p.radius || 100)) {
+            insidePortal = p;
+        } else {
+            // If we move away from an ignored portal, reset it
+            if (ignoredPortalIds.has(p.id) && dist > (p.radius || 100) * 1.5) {
+                ignoredPortalIds.delete(p.id);
+            }
+            // If we move away from the active portal, cancel the mission
+            if (activeMissionPortalId === p.id && dist > (p.radius || 100)) {
+                activeMissionPortalId = null;
+                walkAccumulator = 0;
+            }
+        }
     });
 
+    // Update Distance UI
     const statusText = document.getElementById('distance-info');
     if (statusText) statusText.innerText = (nearestDist === Infinity) ? "주변 신호: 없음" : `근처 신호: ${Math.round(nearestDist)}m 거리`;
 
     const missionOverlay = document.getElementById('mission-overlay');
+    const confirmModal = document.getElementById('portal-confirm-modal');
+
     if (insidePortal) {
         currentMissionPortal = insidePortal;
-        missionOverlay.style.display = 'block';
-        document.getElementById('mission-title').innerText = insidePortal.name;
-        document.getElementById('mission-desc').innerText = insidePortal.mission_text || "이 지역을 조사하십시오.";
         
-        const targetDist = insidePortal.spawn_distance_requirement || 20;
-        document.getElementById('mission-walk-dist').innerText = Math.floor(walkAccumulator);
-        document.getElementById('mission-target-dist').innerText = targetDist;
-        document.getElementById('mission-xp-bar').style.width = `${Math.min(100, (walkAccumulator / targetDist) * 100)}%`;
-
-        // Trigger Combat Roll
-        if (walkAccumulator >= targetDist || forcedPortalId === insidePortal.id) {
-            walkAccumulator = 0;
-            forcedPortalId = null;
-            const roll = Math.random();
-            const chance = insidePortal.spawn_chance || 0.5;
+        // Handle Step 1: Confirmation
+        if (activeMissionPortalId === insidePortal.id) {
+            // Already accepted and tracking
+            missionOverlay.style.display = 'block';
+            confirmModal.style.display = 'none';
             
-            if (roll < chance) {
-                document.getElementById('map-status').innerHTML = `<span style="color: var(--accent-red); animation: pulse 1s infinite;">[!] 적 개체 감지: 전투 시작</span>`;
-                setTimeout(() => { if (activeScreen === 'dashboard') startCombat(insidePortal.target_monster_name); }, 1500);
-            } else {
-                document.getElementById('map-status').innerText = "조사 완료: 이상 없음";
+            document.getElementById('mission-title').innerText = insidePortal.name;
+            document.getElementById('mission-desc').innerText = insidePortal.mission_text || "이 지역을 조사하십시오.";
+            
+            const targetDist = insidePortal.spawn_distance_requirement || 20;
+            document.getElementById('mission-walk-dist').innerText = Math.floor(walkAccumulator);
+            document.getElementById('mission-target-dist').innerText = targetDist;
+            document.getElementById('mission-xp-bar').style.width = `${Math.min(100, (walkAccumulator / targetDist) * 100)}%`;
+
+            // Encounter Check
+            if (walkAccumulator >= targetDist) {
+                walkAccumulator = 0;
+                const roll = Math.random();
+                const chance = insidePortal.spawn_chance || 0.5;
+                
+                if (roll < chance) {
+                    document.getElementById('map-status').innerHTML = `<span style="color: var(--accent-red); animation: pulse 1s infinite;">[!] 경보: 적 개체 발견!</span>`;
+                    setTimeout(() => { if (activeScreen === 'dashboard') startCombat(insidePortal.target_monster_name); }, 1500);
+                } else {
+                    document.getElementById('map-status').innerText = "이상 없음. 조사가 계속됩니다.";
+                }
             }
+        } else if (!ignoredPortalIds.has(insidePortal.id) && pendingConfirmationPortalId !== insidePortal.id) {
+            // Within radius, not active, not ignored -> Show Modal
+            pendingConfirmationPortalId = insidePortal.id;
+            document.getElementById('confirm-portal-name').innerText = insidePortal.name;
+            confirmModal.style.display = 'flex';
+            missionOverlay.style.display = 'none';
         }
     } else {
+        // Reset everything if NOT inside any portal
         currentMissionPortal = null;
-        walkAccumulator = 0;
+        pendingConfirmationPortalId = null;
+        confirmModal.style.display = 'none';
         missionOverlay.style.display = 'none';
-        document.getElementById('map-status').innerText = "시스템 온라인 // GPS 연결됨";
+        document.getElementById('map-status').innerText = "시스템 온라인 // 신호 분석 중";
+    }
+}
+
+function acceptMission() {
+    if (currentMissionPortal) {
+        activeMissionPortalId = currentMissionPortal.id;
+        pendingConfirmationPortalId = null;
+        walkAccumulator = 0;
+        lastWalkPos = currentUserPos;
+        document.getElementById('portal-confirm-modal').style.display = 'none';
+        checkProximity();
+    }
+}
+
+function ignoreMission() {
+    if (currentMissionPortal) {
+        ignoredPortalIds.add(currentMissionPortal.id);
+        pendingConfirmationPortalId = null;
+        document.getElementById('portal-confirm-modal').style.display = 'none';
     }
 }
 

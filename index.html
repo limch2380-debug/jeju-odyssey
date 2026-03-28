@@ -45,23 +45,36 @@
             </div>
         </div>
 
-        <!-- DASHBOARD (MAP) -->
         <div id="screen-dashboard" class="screen" style="background: var(--bg-space);">
-            <div class="content-grid">
-                <div class="glass-panel" style="padding: 0; min-height: 300px; border-color: rgba(0,253,236,0.1);">
-                    <div id="map"></div>
+            <div id="map" style="position: absolute; inset: 0; z-index: 1;"></div>
+            
+            <div id="mission-overlay" class="glass-panel" style="display: none; position: absolute; top: 110px; left: 20px; right: 20px; padding: 20px; border-color: var(--primary-gold); z-index: 1000; animation: slideDown 0.5s ease-out;">
+                <div style="font-size: 0.6rem; color: var(--primary-gold); letter-spacing: 2px; margin-bottom: 5px;">활성 미션</div>
+                <h3 id="mission-title" style="font-size: 1.1rem; color: #fff; margin-bottom: 10px;">균열 조사 명령</h3>
+                <p id="mission-desc" style="font-size: 0.75rem; color: var(--text-dim); line-height: 1.4;">이 지역에서 발생하는 에너지 변칙 현상을 조사하십시오.</p>
+                <div id="mission-progress-container" style="margin-top: 15px;">
+                    <div style="font-size: 0.5rem; color: var(--secondary-cyan); margin-bottom: 5px;">조사 게이지: <span id="mission-walk-dist">0</span>m / <span id="mission-target-dist">20</span>m</div>
+                    <div class="hp-bar-outer" style="height: 4px; border-color: rgba(255,255,255,0.1);">
+                        <div class="hp-bar-inner" id="mission-xp-bar" style="width: 0%; background: var(--secondary-cyan);"></div>
+                    </div>
                 </div>
-                <div class="glass-panel">
-                    <div style="flex: 1;">
-                        <h2 style="font-family: 'Space Grotesk'; font-size: 0.75rem; letter-spacing: 3px; color: var(--primary-gold); margin-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 10px;">미션 스트림</h2>
-                        <div id="coords-display" style="font-family: 'Space Grotesk'; font-size: 0.85rem; color: var(--text-dim); margin-bottom: 20px;">좌표: 스캔 중...</div>
-                        <div id="distance-info" style="font-family: 'Space Grotesk'; font-size: 0.75rem; color: var(--secondary-cyan); margin-bottom: 20px;">근처 신호: 없음</div>
-                        <p style="font-size: 0.95rem; line-height: 1.7; opacity: 0.8;">현재 위치에서 비정상적인 차원 변동이 감지되었습니다. 맵에 표시된 징후를 확인하십시오.</p>
-                    </div>
-                    <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 20px;">
-                        <button id="btn-enter-portal" class="btn-primary" style="background: linear-gradient(135deg, var(--secondary-cyan) 0%, #00a89d 100%); display:none;" onclick="startCombat()">차원 진입 (전투)</button>
-                        <button class="btn-nav" style="text-align: center;" onclick="showScreen('main')">복귀하기</button>
-                    </div>
+            </div>
+
+            <div class="hud" style="position: absolute; bottom: 30px; left: 20px; right: 20px; z-index: 1000;">
+                <button class="btn-nav" style="width: 100%; text-align: center; background: rgba(0,0,0,0.5);" onclick="showScreen('main')">시스템 종료 (EXIT_MAP)</button>
+                <div id="map-status" style="margin-top: 15px; font-size: 0.6rem; color: var(--secondary-cyan); text-align: center; letter-spacing: 1px;">SYSTEM_READY // GPS_ACTIVE</div>
+                <div id="distance-info" style="margin-top: 5px; font-size: 0.6rem; color: var(--text-dim); text-align: center;">가까운 균열을 찾는 중...</div>
+            </div>
+        </div>
+
+        <div id="portal-confirm-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:3000; padding:20px; align-items:center; justify-content:center;">
+            <div class="glass-panel" style="max-width:350px; width:100%; padding:30px; text-align:center; border-color: var(--secondary-cyan);">
+                <div style="font-size: 0.6rem; color: var(--secondary-cyan); letter-spacing: 3px; margin-bottom: 15px;">RIFT_DETECTION</div>
+                <h2 id="confirm-portal-name" style="color:#fff; margin-bottom:10px;">차원의 균열 감지</h2>
+                <p style="font-size: 0.8rem; color: var(--text-dim); margin-bottom: 25px; line-height: 1.5;">강한 에너지 반응이 감지되었습니다.<br>조사를 위해 해당 구역에 진입하시겠습니까?</p>
+                <div style="display:flex; gap:10px;">
+                    <button class="btn-primary" style="flex:1; padding:15px; font-size:0.8rem;" onclick="acceptMission()">진입하기</button>
+                    <button class="btn-nav" style="flex:1; padding:15px; font-size:0.8rem; text-align:center;" onclick="ignoreMission()">무시하기</button>
                 </div>
             </div>
         </div>
@@ -101,22 +114,10 @@
                             </div>
                         </div>
 
-                        <div id="mission-overlay" class="glass-panel" style="display: none; position: absolute; top: 110px; left: 20px; right: 20px; padding: 20px; border-color: var(--primary-gold); z-index: 1000; animation: slideDown 0.5s ease-out;">
-                            <div style="font-size: 0.6rem; color: var(--primary-gold); letter-spacing: 2px; margin-bottom: 5px;">활성 미션</div>
-                            <h3 id="mission-title" style="font-size: 1.1rem; color: #fff; margin-bottom: 10px;">균열 조사 명령</h3>
-                            <p id="mission-desc" style="font-size: 0.75rem; color: var(--text-dim); line-height: 1.4;">이 지역에서 발생하는 에너지 변칙 현상을 조사하십시오.</p>
-                            <div id="mission-progress-container" style="margin-top: 15px;">
-                                <div style="font-size: 0.5rem; color: var(--secondary-cyan); margin-bottom: 5px;">조사 게이지: <span id="mission-walk-dist">0</span>m / <span id="mission-target-dist">20</span>m</div>
-                                <div class="hp-bar-outer" style="height: 4px; border-color: rgba(255,255,255,0.1);">
-                                    <div class="hp-bar-inner" id="mission-xp-bar" style="width: 0%; background: var(--secondary-cyan);"></div>
-                                </div>
-                            </div>
                         </div>
-
                         <div class="hud" style="bottom: 30px; left: 20px; right: 20px;">
                             <button class="btn-nav" style="width: 100%; text-align: center; background: rgba(0,0,0,0.5);" onclick="showScreen('main')">지휘부 복구 (종료)</button>
-                            <div id="map-status" style="margin-top: 15px; font-size: 0.6rem; color: var(--secondary-cyan); text-align: center; letter-spacing: 1px;">시스템 온라인 // GPS 연결됨</div>
-                            <div id="distance-info" style="margin-top: 5px; font-size: 0.6rem; color: var(--text-dim); text-align: center;">가까운 균열을 찾는 중...</div>
+                            <div id="map-status-combat" style="margin-top: 15px; font-size: 0.6rem; color: var(--secondary-cyan); text-align: center; letter-spacing: 1px;">전투 중 // ENGAGING_TARGET</div>
                         </div>
                         <button id="btn-auto-battle" onclick="toggleAutoBattle()" class="glass-panel" style="padding: 10px 20px; border-color: var(--secondary-cyan); color: var(--secondary-cyan); cursor: pointer; border-radius: 12px;">자동 전투: 꺼짐</button>
                     </div>
