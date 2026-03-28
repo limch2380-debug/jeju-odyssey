@@ -168,6 +168,22 @@ body {
 
 .btn-nav:hover { background: rgba(255, 255, 255, 0.1); border-color: var(--primary-gold); }
 
+/* Select 요소 글자 가시성 보장 */
+select.btn-nav, .btn-nav select {
+    color: #fff !important;
+    background: rgba(17, 19, 31, 0.9) !important;
+    -webkit-appearance: auto;
+    appearance: auto;
+}
+select.btn-nav option, .set-m-type option {
+    color: #fff !important;
+    background: #1a1c2e !important;
+    padding: 8px;
+}
+input[type="number"].btn-nav {
+    color: #fff !important;
+}
+
 /* Responsive Grid for Dashboard */
 .content-grid {
     flex: 1;

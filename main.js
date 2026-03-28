@@ -181,9 +181,23 @@ function startTracking() {
     
     if ("geolocation" in navigator) {
         watchId = navigator.geolocation.watchPosition((pos) => {
+            // ★ GPS 노이즈 필터: 정확도 30m 초과 무시
+            if (pos.coords.accuracy > 30) {
+                console.log('[GPS] 정확도 낮음, 무시:', Math.round(pos.coords.accuracy), 'm');
+                return;
+            }
             const newPos = [pos.coords.latitude, pos.coords.longitude];
             const distMoved = L.latLng(lastWalkPos).distanceTo(newPos);
-            if (distMoved > 2 && activeMissionPortalId) { walkAccumulator += distMoved; lastWalkPos = newPos; }
+            // ★ 한 번에 30m 이상 점프하면 GPS 오류로 간주
+            if (distMoved > 30) {
+                console.log('[GPS] 비정상 점프 무시:', Math.round(distMoved), 'm');
+                lastWalkPos = newPos;
+                currentUserPos = newPos;
+                if (userMarker) userMarker.setLatLng(currentUserPos);
+                return;
+            }
+            // 최소 3m 이상 이동 시에만 거리 누적
+            if (distMoved > 3 && activeMissionPortalId) { walkAccumulator += distMoved; lastWalkPos = newPos; }
             else if (!activeMissionPortalId) { lastWalkPos = newPos; }
             currentUserPos = newPos;
             if (userMarker) userMarker.setLatLng(currentUserPos);
@@ -191,7 +205,7 @@ function startTracking() {
             if (map && activeScreen === 'dashboard') map.panTo(currentUserPos);
             checkProximity();
             updateDashboardHUD();
-        }, (err) => console.error("GPS_ERROR:", err), { enableHighAccuracy: true, maximumAge: 0 });
+        }, (err) => console.error("GPS_ERROR:", err), { enableHighAccuracy: true, maximumAge: 2000 });
     }
 }
 
@@ -235,16 +249,29 @@ async function checkProximity() {
     proximityRunning = true;
     try {
         const portals = await getPortals();
-        let nearestDist = Infinity, insidePortal = null;
+        const pool = await getMonsterPool();
+        let nearestDist = Infinity;
+        // ★ 반경 안에 있는 모든 포탈 수집
+        let insidePortals = [];
         portals.forEach(p => {
             const dist = L.latLng(currentUserPos).distanceTo(L.latLng(p.lat, p.lng));
             if (dist < nearestDist) nearestDist = dist;
-            if (dist < (p.radius || 100)) insidePortal = p;
-            else {
+            if (dist < (p.radius || 100)) {
+                const names = parsePortalMonsters(p.target_monster_name);
+                const hasBoss = names.some(n => { const m = pool.find(x => x.name === n); return m && m.type === 'boss'; });
+                insidePortals.push({ portal: p, dist, hasBoss });
+            } else {
                 if (ignoredPortalIds.has(p.id) && dist > (p.radius || 100) * 1.5) ignoredPortalIds.delete(p.id);
                 if (activeMissionPortalId === p.id && dist > (p.radius || 100)) { activeMissionPortalId = null; walkAccumulator = 0; autoHuntPortal = null; }
             }
         });
+        // ★ 보스 포탈 우선: 보스 포탈이 있으면 그쪽 우선, 없으면 가장 가까운 포탈
+        insidePortals.sort((a, b) => {
+            if (a.hasBoss !== b.hasBoss) return a.hasBoss ? -1 : 1; // 보스 우선
+            return a.dist - b.dist; // 거리순
+        });
+        const insidePortal = insidePortals.length > 0 ? insidePortals[0].portal : null;
+        
         const statusText = document.getElementById('distance-info');
         if (statusText) statusText.innerText = (nearestDist === Infinity) ? "주변 신호: 없음" : `근처 신호: ${Math.round(nearestDist)}m 거리`;
         const missionOverlay = document.getElementById('mission-overlay');
@@ -253,7 +280,7 @@ async function checkProximity() {
         if (insidePortal) {
             currentMissionPortal = insidePortal;
             
-            // ★ 아직 미션 수락 안 했으면 자동 수락 (확인 모달 스킵)
+            // ★ 자동 수락
             if (activeMissionPortalId !== insidePortal.id && !ignoredPortalIds.has(insidePortal.id)) {
                 activeMissionPortalId = insidePortal.id;
                 autoHuntPortal = insidePortal;
@@ -261,13 +288,13 @@ async function checkProximity() {
                 walkAccumulator = 0;
                 lastWalkPos = currentUserPos;
                 confirmModal.style.display = 'none';
-                // 최초 진입 시 진동 + 알람
                 triggerPortalAlert();
-                document.getElementById('map-status').innerHTML = `<span style="color: var(--secondary-cyan); font-weight:bold;">📍 ${insidePortal.name} 자동 탐사 시작!</span>`;
-                console.log('[AUTO_HUNT] 포탈 자동 진입:', insidePortal.name);
+                const spawnPct = Math.round((insidePortal.spawn_chance ?? 1) * 100);
+                document.getElementById('map-status').innerHTML = `<span style="color: var(--secondary-cyan); font-weight:bold;">📍 ${insidePortal.name} 자동 탐사 (출현율 ${spawnPct}%)</span>`;
+                console.log('[AUTO_HUNT] 포탈 자동 진입:', insidePortal.name, 'spawn_chance:', insidePortal.spawn_chance);
             }
             
-            // 이미 미션 진행 중
+            // 미션 진행 중
             if (activeMissionPortalId === insidePortal.id) {
                 missionOverlay.style.display = 'block';
                 confirmModal.style.display = 'none';
@@ -279,19 +306,31 @@ async function checkProximity() {
                 document.getElementById('mission-xp-bar').style.width = `${Math.min(100, (walkAccumulator / targetDist) * 100)}%`;
 
                 if (walkAccumulator >= targetDist) {
-                    encounterPending = true;
-                    const assignedNames = parsePortalMonsters(insidePortal.target_monster_name);
-                    let monsterToSpawn = null;
-                    if (assignedNames.length > 0) {
-                        monsterToSpawn = assignedNames[Math.floor(Math.random() * assignedNames.length)];
+                    // ★ 인카운터 확률 체크 (spawn_chance: 0.0~1.0)
+                    const chance = insidePortal.spawn_chance ?? 1;
+                    const roll = Math.random();
+                    console.log('[ENCOUNTER] 거리 충족! 확률 체크:', Math.round(chance*100)+'%', 'roll:', roll.toFixed(2));
+                    
+                    if (roll < chance) {
+                        // 확률 통과 → 인카운터 발생
+                        encounterPending = true;
+                        const assignedNames = parsePortalMonsters(insidePortal.target_monster_name);
+                        let monsterToSpawn = null;
+                        if (assignedNames.length > 0) {
+                            monsterToSpawn = assignedNames[Math.floor(Math.random() * assignedNames.length)];
+                        }
+                        triggerPortalAlert();
+                        document.getElementById('map-status').innerHTML = `<span style="color: var(--accent-red); animation: pulse 1s infinite; font-weight:bold;">[!] 적의 기습! 자동전투 진입...</span>`;
+                        missionOverlay.style.display = 'none';
+                        setTimeout(() => { walkAccumulator = 0; encounterPending = false; startCombat(monsterToSpawn, true); }, 1200);
+                        proximityRunning = false;
+                        return;
+                    } else {
+                        // 확률 실패 → 거리 리셋, 다시 걷기
+                        walkAccumulator = 0;
+                        document.getElementById('map-status').innerHTML = `<span style="color: var(--text-dim);">[...] 기척이 사라졌다... 다시 탐색 중 (${Math.round(chance*100)}%)</span>`;
+                        console.log('[ENCOUNTER] 확률 미통과, 거리 리셋');
                     }
-                    console.log('[ENCOUNTER] 게이지 충족! monster:', monsterToSpawn);
-                    triggerPortalAlert();
-                    document.getElementById('map-status').innerHTML = `<span style="color: var(--accent-red); animation: pulse 1s infinite; font-weight:bold;">[!] 적의 기습! 자동전투 진입...</span>`;
-                    missionOverlay.style.display = 'none';
-                    setTimeout(() => { walkAccumulator = 0; encounterPending = false; startCombat(monsterToSpawn, true); }, 1200);
-                    proximityRunning = false;
-                    return;
                 }
             }
         } else {
@@ -649,7 +688,7 @@ function initSettingsMap() {
     setMap.on('click', async (e) => {
         const name = prompt("지역 이름:", `탐사구역_${Math.floor(Math.random()*1000)}`);
         if (name) {
-            await db.from('portals').insert({ id: Date.now(), name, lat: e.latlng.lat, lng: e.latlng.lng, mission_text: "이 지역의 위협 요소를 제거하십시오.", radius: 100, spawn_chance: 1.0, spawn_distance_requirement: 20 });
+            await db.from('portals').insert({ id: Date.now(), name, lat: e.latlng.lat, lng: e.latlng.lng, mission_text: "이 지역의 위협 요소를 제거하십시오.", radius: 100, spawn_chance: 0.5, spawn_distance_requirement: 20 });
             renderSettingsPortalList();
         }
     });
@@ -681,7 +720,7 @@ async function renderSettingsPortalList() {
                     </div>
                     <div style="font-size:0.55rem; color:var(--text-dim); margin-bottom:6px;">${p.mission_text?.substring(0,30) || ''}...</div>
                     <div style="display:flex; flex-wrap:wrap; gap:4px; align-items:center; margin-bottom:4px;">${monsterTags}</div>
-                    <div style="font-size:0.5rem; color:var(--text-dim);">반경 ${p.radius || 100}m | 조사 거리 ${p.spawn_distance_requirement || 20}m</div>
+                    <div style="font-size:0.5rem; color:var(--text-dim);">반경 ${p.radius || 100}m | 조사 ${p.spawn_distance_requirement || 20}m | 출현율 ${Math.round((p.spawn_chance ?? 1) * 100)}%</div>
                 </div>
                 <div style="display:flex; gap:8px; flex-shrink:0; padding-top:5px;">
                     <button class="btn-nav" style="padding:5px 12px; font-size:0.6rem; border-color:var(--secondary-cyan);" onclick="openPortalEditor(${p.id})">EDIT</button>
@@ -716,6 +755,7 @@ async function openPortalEditor(id) {
     document.getElementById('ed-p-mission').value = p.mission_text || "";
     document.getElementById('ed-p-radius').value = p.radius || 100;
     document.getElementById('ed-p-walk').value = p.spawn_distance_requirement || 20;
+    document.getElementById('ed-p-chance').value = Math.round((p.spawn_chance ?? 1) * 100);
     const normalContainer = document.getElementById('ed-normal-monsters');
     const bossContainer = document.getElementById('ed-boss-monsters');
     normalContainer.innerHTML = ''; bossContainer.innerHTML = '';
@@ -743,11 +783,13 @@ function closePortalEditor() { document.getElementById('portal-editor-modal').st
 async function applyPortalEdit() {
     const checks = document.querySelectorAll('.ed-monster-check:checked');
     const selectedNames = Array.from(checks).map(c => c.value);
+    const chancePct = parseInt(document.getElementById('ed-p-chance').value) || 50;
     const data = {
         name: document.getElementById('ed-p-name').value,
         mission_text: document.getElementById('ed-p-mission').value,
         radius: parseInt(document.getElementById('ed-p-radius').value),
         spawn_distance_requirement: parseInt(document.getElementById('ed-p-walk').value),
+        spawn_chance: Math.min(100, Math.max(1, chancePct)) / 100,
         target_monster_name: selectedNames.length > 0 ? JSON.stringify(selectedNames) : null
     };
     await db.from('portals').update(data).eq('id', editingPortalId);
