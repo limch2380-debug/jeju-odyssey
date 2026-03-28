@@ -2,245 +2,197 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Jeju Odyssey - World Map</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제주 오디세이 | 통합 관리 센터 (GOD_MODE)</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&family=Space+Grotesk:wght@300;500;700&display=swap" rel="stylesheet">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Noto+Serif+KR:wght@400;700&display=swap');
-        
-        body, html { height: 100%; margin: 0; background: #000; overflow: hidden; font-family: 'Noto Serif KR', serif; color: white; }
-        #viewport { width: 100vw; height: 100vh; position: relative; overflow: hidden; background: #050505; cursor: crosshair; }
-        #map-container { 
-            position: absolute; width: 4000px; height: 4000px; 
-            background: #0a0a0a url('https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Map_of_Jeju-do_South_Korea.svg/2560px-Map_of_Jeju-do_South_Korea.svg.png') no-repeat center; 
-            background-size: contain; 
-            transition: transform 0.1s ease-out; 
-            transform-origin: 0 0; 
-            border: 2px solid #222;
+        body { background: #050608; overflow-y: auto; display: block; height: auto; padding-bottom: 50px;}
+        .container { max-width: 1000px; margin: 0 auto; padding: 20px; }
+        .admin-section { 
+            background: var(--glass-bg); 
+            border: 1px solid var(--glass-border); 
+            border-radius: 20px; 
+            padding: 30px; 
+            margin-bottom: 30px;
+            backdrop-filter: blur(20px);
         }
-        
-        .marker {
-            position: absolute; width: 40px; height: 40px; border-radius: 50%; border: 3px solid lime; background: rgba(0,255,0,0.2);
-            transform: translate(-50%, -50%); display: flex; align-items: center; justify-content: center; color: white;
-            font-weight: bold; font-size: 0.6rem; text-align: center; white-space: nowrap; pointer-events: auto;
-            text-shadow: 0 0 5px black; z-index: 500;
+        h2 { font-family: 'Space Grotesk'; color: var(--primary-gold); margin-bottom: 25px; letter-spacing: 2px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 15px; }
+        .input-group { margin-bottom: 20px; }
+        label { display: block; font-size: 0.75rem; color: var(--text-dim); margin-bottom: 8px; letter-spacing: 1px; }
+        input, select { 
+            width: 100%; 
+            background: rgba(255,255,255,0.05); 
+            border: 1px solid var(--glass-border); 
+            color: #fff; 
+            padding: 12px 15px; 
+            border-radius: 8px; 
+            font-family: 'Space Grotesk'; 
         }
-        .marker span { position: absolute; bottom: -20px; font-weight: bold; font-size: 1rem; color: gold; background: rgba(0,0,0,0.7); padding: 2px 5px; border-radius: 3px; }
-        
-        #player { position: absolute; width: 60px; height: 60px; z-index: 1000; transform: translate(-50%, -50%); pointer-events: none; }
-        #player::after { content: '🚩'; font-size: 3.5rem; filter: drop-shadow(0 0 10px gold); }
-
-        #ui-wrap { position: fixed; inset: 0; pointer-events: none; z-index: 9000; }
-        .hud-top { position: absolute; top: 20px; left: 20px; background: rgba(0,0,0,0.85); padding: 15px; border: 1px solid gold; color: white; pointer-events: auto; }
-        .btn-panel { position: absolute; bottom: 20px; right: 20px; display: flex; flex-direction: column; gap: 8px; pointer-events: auto; }
-        
-        .btn { background: #222; border: 2px solid gold; color: gold; padding: 15px 30px; cursor: pointer; font-family: 'Cinzel'; font-size: 1rem; min-width: 200px; }
-        .btn.active { background: #8b0000; color: white; border-color: white; }
-
-        #form-box { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #111; border: 3px solid gold; padding: 25px; z-index: 10000; display: none; color: white; width: 340px; pointer-events: auto; }
-        #form-box input { width: 100%; background: #222; color: #fff; border: 1px solid #444; padding: 12px; margin-top: 5px; box-sizing: border-box; }
-
-        #overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.95); z-index: 8500; display: none; flex-direction: column; align-items: center; justify-content: center; pointer-events: auto; }
-        #overlay img { width: 90%; height: 75%; object-fit: contain; border: 2px solid gold; }
-
-        #toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 10px 20px; border-radius: 20px; display: none; z-index: 20000; }
-
-        #story-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.95); z-index: 15000; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; text-align: center; font-family: 'Cinzel'; padding: 20px; }
-        #story-overlay h1 { font-size: 3rem; color: gold; text-shadow: 0 0 20px gold; margin-bottom: 20px; }
-        #story-overlay p { font-size: 1.2rem; max-width: 600px; line-height: 1.6; color: #ccc; margin-bottom: 40px; }
-        .btn-start { background: gold; color: black; border: none; padding: 15px 40px; font-weight: bold; cursor: pointer; font-size: 1.2rem; }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .monster-card { 
+            background: rgba(255,255,255,0.03); 
+            border: 1px solid var(--glass-border); 
+            padding: 20px; 
+            border-radius: 12px; 
+            margin-bottom: 15px;
+        }
+        .save-btn { 
+            background: linear-gradient(135deg, var(--primary-gold) 0%, #b89a00 100%); 
+            color: #000; 
+            border: none; 
+            padding: 15px 30px; 
+            cursor: pointer; 
+            border-radius: 10px; 
+            font-weight: bold; 
+            width: 100%; 
+            font-family: 'Space Grotesk';
+            text-transform: uppercase;
+        }
     </style>
 </head>
-<body id="master-body">
-    <div id="toast">메시지</div>
+<body>
+    <div class="container">
+        <header style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px;">
+            <h1 style="font-family: 'Space Grotesk'; color: var(--primary-gold); font-size: 1.5rem;">AUTHORITY_CENTER // GOD_MODE</h1>
+            <a href="index.html" class="btn-nav">메인 화면으로</a>
+        </header>
 
-    <div id="story-overlay">
-        <h1>JEJU ODYSSEY</h1>
-        <p>제주도 전역에 이계의 포탈이 열리기 시작했습니다. <br>당신은 수호자가 되어 임무를 완수해야 합니다.</p>
-        <button class="btn-start" onclick="startOdyssey()">탐험 시작하기</button>
-    </div>
+        <!-- Player Settings -->
+        <div class="admin-section">
+            <h2>COMMANDER_CORE_STATS</h2>
+            <div class="grid-2">
+                <div class="input-group">
+                    <label>PLAYER_MAX_HP</label>
+                    <input type="number" id="player-hp" value="100">
+                </div>
+                <div class="input-group">
+                    <label>PLAYER_ATTACK_POWER (BASE)</label>
+                    <input type="number" id="player-atk" value="20">
+                </div>
+                <div class="input-group">
+                    <label>PLAYER_DEFENSE (REDUCE %)</label>
+                    <input type="number" id="player-def" value="10">
+                </div>
+                <div class="input-group">
+                    <label>INITIAL_POTIONS</label>
+                    <input type="number" id="player-potions" value="1">
+                </div>
+            </div>
+            <button class="save-btn" onclick="savePlayerSettings()">SAVE_PLAYER_STATS</button>
+        </div>
 
-    <div id="overlay">
-        <h2 id="oz-name" style="color:gold; font-family:'Cinzel';">영역 진입</h2>
-        <img id="oz-img" src="" alt="Region">
-        <div style="display:flex; gap:10px; margin-top:20px; width:90%;">
-            <button class="btn" style="flex:1; background:gold; color:black; font-weight:bold;" onclick="enterBattle()">⚔️ 미션 장소로 진입</button>
-            <button class="btn" style="flex:1; background:#333; min-width:100px;" onclick="closeOver()">닫기</button>
+        <!-- Monster Settings -->
+        <div class="admin-section">
+            <h2>BIOLOGICAL_THREAT_DATABASE</h2>
+            <div id="monster-list">
+                <!-- Monsters will be listed here -->
+            </div>
+            <button class="btn-nav" style="width: 100%; text-align: center; margin-top: 10px;" onclick="saveMonsterPool()">SAVE_MONSTER_DATABASE</button>
+        </div>
+
+        <!-- Loot Settings -->
+        <div class="admin-section">
+            <h2>LOOT_DROP_PROTOCOL</h2>
+            <div class="grid-2">
+                <div class="input-group">
+                    <label>POTION_DROP_CHANCE (0.0 - 1.0)</label>
+                    <input type="number" step="0.1" id="drop-chance" value="0.3">
+                </div>
+                <div class="input-group" style="display: flex; align-items: center; gap: 10px; margin-top: 25px;">
+                    <input type="checkbox" id="fixed-drop" style="width: 20px; height: 20px;">
+                    <label style="margin-bottom: 0;">GUARANTEED_DROP (100%)</label>
+                </div>
+            </div>
+            <button class="save-btn" style="background: linear-gradient(135deg, var(--secondary-cyan) 0%, #00a89d 100%);" onclick="saveLootSettings()">SAVE_LOOT_PROTOCOL</button>
         </div>
     </div>
 
-    <div id="form-box">
-        <h3 style="font-family:'Cinzel'; margin:0 0 15px 0; color:gold;">🚩 편집기</h3>
-        <input type="text" id="fn" placeholder="구역 이름">
-        <div style="display:flex; gap:5px;"><input type="text" id="flat" readonly><input type="text" id="flng" readonly></div>
-        <input type="text" id="fms" placeholder="미션 내용">
-        <label style="color:#aaa; font-size:0.8rem;"><input type="checkbox" id="fpo"> 포탈 활성화</label>
-        <div style="display:flex; gap:10px; margin-top:20px;">
-            <button class="btn" style="flex:2;" onclick="saveM()">저장</button>
-            <button class="btn" style="flex:1; background:#333;" onclick="hideF()">취소</button>
-        </div>
-    </div>
-
-    <div id="viewport">
-        <div id="map-container" onmousedown="mClicked(event)">
-            <div id="player"></div>
-        </div>
-    </div>
-
-    <div id="ui-wrap">
-        <div class="hud-top">
-            <h1 style="font-family:'Cinzel'; font-size:1.1rem; margin:0;">JEJU ODYSSEY v8.1</h1>
-            <div id="gps-st" style="color:yellow; font-size:0.8rem; margin-top:5px;">GPS 감지중...</div>
-            <div id="gps-co" style="font-size:0.7rem; color:#888;">-- / --</div>
-        </div>
-        <div class="btn-panel" id="admin-tools" style="display: none;">
-            <button id="btn-sm" class="btn" onclick="tSim()">🕹️ 시뮬레이션: OFF</button>
-            <button id="btn-ad" class="btn" onclick="tAdm()">🛡️ 배치 모드: OFF</button>
-            <button id="btn-de" class="btn" onclick="tDel()">🗑️ 삭제 모드: OFF</button>
-            <button class="btn" style="background:#555;" onclick="triggerRandPortal()">⚡ 강제 포탈 이벤트</button>
-            <button class="btn" style="background:#444;" onclick="resetD()">⚠️ 전체 초기화</button>
-        </div>
-    </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script>
-        const isAdminSession = window.location.href.includes('admin.html');
-        if (isAdminSession) { document.getElementById('admin-tools').style.display = 'flex'; }
+        // Load Initial State
+        const DEFAULT_MONSTERS = [
+            { name: "고블린 병사 (SOLDIER)", hp: 100, dmg: 8, img: "goblin_soldier_tactical.png" },
+            { name: "고블린 궁수 (ARCHER)", hp: 70, dmg: 12, img: "goblin_archer_cloak.png" },
+            { name: "대왕 고블린 (BOSS)", hp: 250, dmg: 18, img: "great_goblin_boss.png" }
+        ];
 
-        const SB_URL = "https://sdqxdrwjwdcaamezvmyf.supabase.co";
-        const SB_KEY = "sb_publishable_ghjdZA43FNQjZDDMgODH6w_VJsSnMA9";
-        const sb = supabase.createClient(SB_URL, SB_KEY);
+        function initAdmin() {
+            // Player
+            const pStats = JSON.parse(localStorage.getItem('playerSettings') || '{"hp": 100, "atk": 20, "def": 10, "potions": 1}');
+            document.getElementById('player-hp').value = pStats.hp;
+            document.getElementById('player-atk').value = pStats.atk;
+            document.getElementById('player-def').value = pStats.def;
+            document.getElementById('player-potions').value = pStats.potions;
 
-        let map = document.getElementById('map-container');
-        let player = document.getElementById('player');
-        let tx=0, ty=0, px=2000, py=2000, scale=1;
-        let pLat=33.3617, pLng=126.5292;
-        let markers=[], isSim=false, isAdm=false, isDel=false, lZone=null;
+            // Loot
+            const lStats = JSON.parse(localStorage.getItem('lootSettings') || '{"chance": 0.3, "fixed": false}');
+            document.getElementById('drop-chance').value = lStats.chance;
+            document.getElementById('fixed-drop').checked = lStats.fixed;
 
-        function startOdyssey() { document.getElementById('story-overlay').style.display = 'none'; }
-
-        async function loadM() {
-            const { data } = await sb.from('regions').select('*');
-            if (data) { markers = data; markers.forEach(plotM); }
-            checkP();
+            // Monsters
+            renderMonsters();
         }
 
-        function updateP() {
-            px = 2000 + (pLng - 126.5292) * 50000;
-            py = 2000 - (pLat - 33.3617) * 50000;
-            player.style.left = px + 'px';
-            player.style.top = py + 'px';
-            if (!isSim) {
-                tx = -px * scale + window.innerWidth/2;
-                ty = -py * scale + window.innerHeight/2;
-            }
-            map.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
-            document.getElementById('gps-co').innerText = `${pLat.toFixed(5)} / ${pLng.toFixed(5)}`;
-        }
-
-        if ('geolocation' in navigator) {
-            navigator.geolocation.watchPosition(pos => {
-                if (!isSim) {
-                    pLat = pos.coords.latitude;
-                    pLng = pos.coords.longitude;
-                    document.getElementById('gps-st').innerText = "🛰️ 위성 연결됨";
-                    updateP(); checkP();
-                }
-            }, err => {
-                document.getElementById('gps-st').innerText = "❌ GPS 오류: " + err.message;
-            }, { enableHighAccuracy: true });
-        }
-
-        function checkP() {
-            const R=6371e3;
-            let near = null;
-            markers.forEach(m => {
-                const φ1 = pLat * Math.PI/180;
-                const φ2 = m.lat * Math.PI/180;
-                const Δφ = (m.lat-pLat) * Math.PI/180;
-                const Δλ = (m.lng-pLng) * Math.PI/180;
-                const a = Math.sin(Δφ/2)**2 + Math.cos(φ1)*Math.cos(φ2)*Math.sin(Δλ/2)**2;
-                const d = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-                if (d < (m.radius || 50)) near = m;
+        function renderMonsters() {
+            const pool = JSON.parse(localStorage.getItem('monsterPool') || JSON.stringify(DEFAULT_MONSTERS));
+            const list = document.getElementById('monster-list');
+            list.innerHTML = '';
+            
+            pool.forEach((m, i) => {
+                const card = document.createElement('div');
+                card.className = 'monster-card';
+                card.innerHTML = `
+                    <div style="font-weight: bold; margin-bottom: 15px; color: var(--accent-red);">#${i+1} ${m.name}</div>
+                    <div class="grid-2">
+                        <div class="input-group">
+                            <label>HP</label>
+                            <input type="number" class="m-hp" data-index="${i}" value="${m.hp}">
+                        </div>
+                        <div class="input-group">
+                            <label>DAMAGE (ATK)</label>
+                            <input type="number" class="m-dmg" data-index="${i}" value="${m.dmg}">
+                        </div>
+                    </div>
+                `;
+                list.appendChild(card);
             });
-            if (near && lZone !== near.id) { lZone = near.id; openZone(near); }
-            else if (!near) lZone = null;
         }
 
-        function openZone(m) {
-            document.getElementById('oz-name').innerText = m.name + (m.is_portal_open ? " [PORTAL]" : "");
-            document.getElementById('oz-img').src = m.image_url || "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Map_of_Jeju-do_South_Korea.svg/1024px-Map_of_Jeju-do_South_Korea.svg.png";
-            document.getElementById('overlay').style.display = 'flex';
+        function savePlayerSettings() {
+            const stats = {
+                hp: parseInt(document.getElementById('player-hp').value),
+                atk: parseInt(document.getElementById('player-atk').value),
+                def: parseInt(document.getElementById('player-def').value),
+                potions: parseInt(document.getElementById('player-potions').value)
+            };
+            localStorage.setItem('playerSettings', JSON.stringify(stats));
+            alert("COMMANDER_STATS SYNCED.");
         }
 
-        function enterBattle() {
-            const m = markers.find(mark => mark.id === lZone);
-            if (!m) return;
-            const isPortal = m.is_portal_open ? "true" : "false";
-            const adminFlag = isAdminSession ? "&admin=true" : "";
-            location.href = `battle.html?region=${encodeURIComponent(m.name)}&portal=${isPortal}&mission=${encodeURIComponent(m.mission || "")}${adminFlag}`;
+        function saveMonsterPool() {
+            const hps = document.querySelectorAll('.m-hp');
+            const dmgs = document.querySelectorAll('.m-dmg');
+            const pool = JSON.parse(localStorage.getItem('monsterPool') || JSON.stringify(DEFAULT_MONSTERS));
+            
+            hps.forEach((input, i) => {
+                pool[i].hp = parseInt(input.value);
+                pool[i].dmg = parseInt(dmgs[i].value);
+            });
+            
+            localStorage.setItem('monsterPool', JSON.stringify(pool));
+            alert("MONSTER_DATABASE UPDATED.");
         }
 
-        function mClicked(e) {
-            if (!isAdm) return;
-            const rect = map.getBoundingClientRect();
-            const x = (e.clientX - rect.left) / scale;
-            const y = (e.clientY - rect.top) / scale;
-            document.getElementById('flat').value = (33.3617 - (y - 2000) / 50000).toFixed(6);
-            document.getElementById('flng').value = (126.5292 + (x - 2000) / 50000).toFixed(6);
-            document.getElementById('form-box').style.display = 'block';
+        function saveLootSettings() {
+            const stats = {
+                chance: parseFloat(document.getElementById('drop-chance').value),
+                fixed: document.getElementById('fixed-drop').checked
+            };
+            localStorage.setItem('lootSettings', JSON.stringify(stats));
+            alert("LOOT_PROTOCOL SYNCED.");
         }
 
-        async function saveM() {
-            const n = document.getElementById('fn').value;
-            const lat = parseFloat(document.getElementById('flat').value);
-            const lng = parseFloat(document.getElementById('flng').value);
-            const ms = document.getElementById('fms').value;
-            const po = document.getElementById('fpo').checked;
-            if (!n) return;
-            const { data, error } = await sb.from('regions').insert([{ name:n, lat, lng, radius:50, mission:ms, is_portal_open:po }]).select();
-            if (!error && data) { plotM(data[0]); markers.push(data[0]); hideF(); showT("✅ 완료"); }
-        }
-
-        function plotM(m) {
-            const d = document.createElement('div');
-            d.className = 'marker'; d.id = m.id;
-            d.style.left = (2000 + (m.lng - 126.5292) * 50000) + 'px';
-            d.style.top = (2000 - (m.lat - 33.3617) * 50000) + 'px';
-            if (m.is_portal_open) d.style.borderColor = 'cyan';
-            d.innerHTML = `<span>${m.name}</span>`;
-            d.onmousedown = (e) => { e.stopPropagation(); if (isDel) killM(m.id); else if (!isAdm) openZone(m); };
-            map.appendChild(d);
-        }
-
-        async function killM(id) { await sb.from('regions').delete().eq('id', id); document.getElementById(id).remove(); markers=markers.filter(m=>m.id!==id); }
-        function hideF() { document.getElementById('form-box').style.display='none'; }
-        function showT(m) { const t=document.getElementById('toast'); t.innerText=m; t.style.display='block'; setTimeout(()=>t.style.display='none',2000); }
-        function updateUI() {
-            document.getElementById('master-body').className = isDel ? 'del-active' : '';
-            document.getElementById('btn-ad').classList.toggle('active', isAdm);
-            document.getElementById('btn-de').classList.toggle('active', isDel);
-        }
-        function tSim() { isSim = !isSim; document.getElementById('btn-sm').innerText = isSim ? "🕹️ 시뮬 ON" : "🕹️ 시뮬 OFF"; }
-        function tAdm() { isAdm = !isAdm; isDel = false; updateUI(); }
-        function tDel() { isDel = !isDel; isAdm = false; updateUI(); }
-        function closeOver() { document.getElementById('overlay').style.display = 'none'; }
-        async function resetD() { if(confirm("초기화?")) { await sb.from('regions').delete().neq('id','0'); location.reload(); } }
-        async function triggerRandPortal() {
-            if (markers.length === 0) return;
-            const m = markers[Math.floor(Math.random()*markers.length)];
-            await sb.from('regions').update({ is_portal_open: true, mission: "포탈을 닫으세요!" }).eq('id', m.id);
-            location.reload();
-        }
-
-        window.onkeydown = (e) => {
-            if (!isSim) return;
-            const S=0.0005;
-            if (e.key==='ArrowUp') pLat+=S; else if (e.key==='ArrowDown') pLat-=S;
-            else if (e.key==='ArrowLeft') pLng-=S; else if (e.key==='ArrowRight') pLng+=S;
-            updateP(); checkP();
-        };
-
-        updateP(); loadM();
+        initAdmin();
     </script>
 </body>
 </html>

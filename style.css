@@ -1,0 +1,323 @@
+:root {
+    --bg-void: #020305;
+    --bg-space: #0c0e18;
+    --primary-gold: #e9c400;
+    --secondary-cyan: #00fdec;
+    --accent-red: #ff4d4d;
+    --text-primary: #e1e2f0;
+    --text-dim: #9494a3;
+    --glass-bg: rgba(15, 18, 32, 0.85);
+    --glass-border: rgba(255, 255, 255, 0.08);
+    --safe-padding: 30px;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+}
+
+body {
+    background: var(--bg-void);
+    color: var(--text-primary);
+    font-family: 'Inter', sans-serif;
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+}
+
+/* Master App Container */
+.app-wrapper {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: radial-gradient(circle at 50% 50%, #1a1c2e 0%, #020305 100%);
+}
+
+/* Background Stars Effect (Pure CSS) */
+.stars-bg {
+    position: absolute;
+    inset: 0;
+    background-image: radial-gradient(1px 1px at 20px 30px, #eee, rgba(0,0,0,0)),
+                      radial-gradient(1px 1px at 40px 70px, #fff, rgba(0,0,0,0)),
+                      radial-gradient(1.5px 1.5px at 50px 160px, #ddd, rgba(0,0,0,0)),
+                      radial-gradient(1px 1px at 90px 40px, #fff, rgba(0,0,0,0));
+    background-repeat: repeat;
+    background-size: 200px 200px;
+    opacity: 0.3;
+}
+
+.screen {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    transform: scale(1.02);
+    transition: all 0.5s cubic-bezier(0.2, 0, 0.2, 1);
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+}
+
+.screen.active {
+    opacity: 1;
+    transform: scale(1);
+    pointer-events: all;
+    z-index: 10;
+}
+
+/* HUD Header */
+.hud-fixed {
+    position: absolute;
+    top: var(--safe-padding);
+    padding: 0 var(--safe-padding);
+    width: 100%;
+    z-index: 100;
+    display: flex;
+    justify-content: space-between;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 0.65rem;
+    letter-spacing: 2px;
+    color: var(--primary-gold);
+}
+
+/* Main Menu Contents */
+.main-menu-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+    z-index: 20;
+}
+
+.game-title {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: clamp(2.5rem, 8vw, 4.5rem);
+    color: var(--primary-gold);
+    letter-spacing: 8px;
+    text-shadow: 0 0 40px rgba(233,196,0,0.5);
+    margin-bottom: 10px;
+    text-align: center;
+}
+
+.title-sub {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 0.8rem;
+    letter-spacing: 5px;
+    color: rgba(255,255,255,0.4);
+    margin-bottom: 60px;
+}
+
+/* Menu Buttons Container */
+.menu-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    width: min(400px, 90vw);
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, var(--primary-gold) 0%, #b89a00 100%);
+    color: #000;
+    border: none;
+    padding: 22px;
+    border-radius: 18px;
+    font-family: 'Space Grotesk';
+    font-weight: 700;
+    font-size: 1.1rem;
+    text-transform: uppercase;
+    cursor: pointer;
+    box-shadow: 0 10px 40px rgba(233, 196, 0, 0.3);
+    transition: 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-primary::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(255,255,255,0.2);
+    transform: translateX(-100%) skewX(-15deg);
+    transition: 0.5s;
+}
+
+.btn-primary:active { transform: scale(0.95); }
+
+.btn-nav {
+    background: rgba(17, 19, 31, 0.6);
+    border: 1px solid var(--glass-border);
+    color: var(--text-primary);
+    padding: 16px 24px;
+    border-radius: 16px;
+    font-family: 'Space Grotesk';
+    cursor: pointer;
+    text-align: left;
+    transition: 0.3s;
+    backdrop-filter: blur(10px);
+}
+
+.btn-nav:hover { background: rgba(255, 255, 255, 0.1); border-color: var(--primary-gold); }
+
+/* Responsive Grid for Dashboard */
+.content-grid {
+    flex: 1;
+    display: grid;
+    gap: 20px;
+    padding: 100px var(--safe-padding) var(--safe-padding);
+}
+
+@media (orientation: landscape) {
+    .content-grid {
+        grid-template-columns: 1.2fr 0.8fr;
+        grid-template-rows: 1fr;
+    }
+}
+
+@media (orientation: portrait) {
+    .content-grid {
+        grid-template-columns: 1fr;
+        grid-template-rows: 1.5fr 1fr;
+    }
+}
+
+.glass-panel {
+    background: var(--glass-bg);
+    backdrop-filter: blur(25px);
+    border: 1px solid var(--glass-border);
+    border-radius: 24px;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+}
+
+#map { border-radius: 20px; overflow: hidden; height: 100%; background: #000; }
+
+/* Combat Specific Styles */
+.combat-scene {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+    background: radial-gradient(circle at 50% 50%, #1a0a0a 0%, #020305 100%);
+}
+
+.enemy-area {
+    flex: 1.5;
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    gap: 20px;
+    padding-bottom: 40px;
+    position: relative;
+    z-index: 10;
+}
+
+.enemy-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    transition: transform 0.2s;
+    position: relative;
+}
+
+.enemy-img {
+    width: clamp(100px, 20vw, 200px);
+    filter: drop-shadow(0 0 20px rgba(0, 253, 236, 0.2));
+}
+
+.boss-container {
+    transform: translateY(-20px);
+}
+
+.boss-img {
+    width: clamp(180px, 40vw, 400px);
+    filter: drop-shadow(0 0 40px rgba(255, 77, 77, 0.4));
+}
+
+.hp-bar-outer {
+    width: 100px;
+    height: 6px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 3px;
+    margin-top: 10px;
+    overflow: hidden;
+}
+
+.hp-bar-inner {
+    height: 100%;
+    background: var(--accent-red);
+    box-shadow: 0 0 10px var(--accent-red);
+    transition: width 0.3s ease;
+}
+
+.combat-log {
+    background: rgba(0,0,0,0.5);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    padding: 15px;
+    height: 100px;
+    overflow-y: auto;
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    font-family: 'Space Grotesk';
+    margin-bottom: 20px;
+    backdrop-filter: blur(10px);
+}
+
+.log-entry { margin-bottom: 5px; border-left: 2px solid var(--secondary-cyan); padding-left: 10px; }
+.log-entry.enemy { border-left-color: var(--accent-red); }
+
+/* Animation: Portal Pulse */
+.portal-node {
+    width: 20px;
+    height: 20px;
+    background: var(--secondary-cyan);
+    border-radius: 50%;
+    box-shadow: 0 0 20px var(--secondary-cyan);
+    animation: portal-pulse 2s infinite;
+}
+
+@keyframes portal-pulse {
+    0% { transform: scale(1); opacity: 0.8; box-shadow: 0 0 20px var(--secondary-cyan); }
+    50% { transform: scale(1.3); opacity: 0.4; box-shadow: 0 0 40px var(--secondary-cyan); }
+    100% { transform: scale(1); opacity: 0.8; box-shadow: 0 0 20px var(--secondary-cyan); }
+}
+
+.shake {
+    animation: shake-anim 0.4s ease-in-out;
+}
+
+@keyframes shake-anim {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-10px); }
+    75% { transform: translateX(10px); }
+}
+
+.flash-red {
+    animation: flash-red-anim 0.3s ease-in-out;
+}
+
+@keyframes flash-red-anim {
+    0%, 100% { background-color: transparent; }
+    50% { background-color: rgba(255, 0, 0, 0.2); }
+}
+
+.glitch {
+    animation: glitch-anim 0.2s linear infinite;
+}
+
+@keyframes glitch-anim {
+    0% { transform: translate(0) scale(1); }
+    20% { transform: translate(-2px, 2px) scale(1.02); }
+    40% { transform: translate(-2px, -2px) filter(hue-rotate(90deg)); }
+    60% { transform: translate(2px, 2px) scale(0.98); }
+    80% { transform: translate(2px, -2px) filter(invert(0.1)); }
+    100% { transform: translate(0); }
+}
+
