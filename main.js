@@ -3,12 +3,12 @@ let userMarker, accuracyCircle;
 let portalMarkers = [];
 let watchId, isFirstFix = true;
 let currentUserPos = [33.4890, 126.4908];
+let lastWalkPos = [33.4890, 126.4908];
+let walkAccumulator = 0;
 let forcedPortalId = null;
 let lastEncounterId = null;
 let activeScreen = 'main';
-const ENCOUNTER_RANGE = 50;
-let lastEncounteredPortalId = null; // Prevent infinite combat loop
-const PROXIMITY_THRESHOLD = 50; // Combat trigger distance in meters
+let currentMissionPortal = null;
 
 // SUPABASE CONNECTION
 const SUPABASE_URL = "https://icggdzxzifbhegvdwzdc.supabase.co";
@@ -105,7 +105,17 @@ async function loadPortals() {
 function startTracking() {
     if ("geolocation" in navigator) {
         watchId = navigator.geolocation.watchPosition((pos) => {
-            currentUserPos = [pos.coords.latitude, pos.coords.longitude];
+            const newPos = [pos.coords.latitude, pos.coords.longitude];
+            
+            // Calculate distance for encounter logic
+            if (currentMissionPortal) {
+                const step = L.latLng(currentUserPos).distanceTo(L.latLng(newPos));
+                walkAccumulator += step;
+            } else {
+                walkAccumulator = 0;
+            }
+
+            currentUserPos = newPos;
             if (userMarker) userMarker.setLatLng(currentUserPos);
             if (accuracyCircle) { 
                 accuracyCircle.setLatLng(currentUserPos); 
@@ -115,48 +125,85 @@ function startTracking() {
                 map.panTo(currentUserPos);
             }
             checkProximity();
+            updateDashboardHUD();
         }, (err) => console.error("GPS_ERROR:", err), { enableHighAccuracy: true, maximumAge: 0 });
     }
+}
+
+async function updateDashboardHUD() {
+    const stats = await getPlayerSettings();
+    document.getElementById('hud-level').innerText = stats.level || 1;
+    document.getElementById('hud-hp-text').innerText = `${Math.ceil((combatState.playerHP/combatState.playerMaxHP)*100)}%`;
+    document.getElementById('hud-hp-bar').style.width = `${(combatState.playerHP/combatState.playerMaxHP)*100}%`;
+    
+    // XP Bar
+    const xpNeeded = (stats.level || 1) * 100;
+    const xpPercent = Math.min(100, ((stats.xp || 0) / xpNeeded) * 100);
+    document.getElementById('xp-bar').style.width = `${xpPercent}%`;
 }
 
 async function checkProximity() {
     if (activeScreen !== 'dashboard') return;
     const portals = await getPortals();
-    let nearest = Infinity; let nearestP = null;
+    let nearestDist = Infinity;
+    let insidePortal = null;
     
     portals.forEach(p => {
         const dist = L.latLng(currentUserPos).distanceTo(L.latLng(p.lat, p.lng));
-        if (dist < nearest) { nearest = dist; nearestP = p; }
+        if (dist < nearestDist) nearestDist = dist;
+        if (dist < (p.radius || 100)) insidePortal = p;
     });
 
     const statusText = document.getElementById('distance-info');
-    if (statusText) statusText.innerText = (nearest === Infinity) ? "NEARBY: NO_PORTALS" : `NEARBY: ${Math.round(nearest)}m TO_RIFT`;
+    if (statusText) statusText.innerText = (nearestDist === Infinity) ? "주변 신호: 없음" : `근처 신호: ${Math.round(nearestDist)}m 거리`;
 
-    if (nearestP && (nearest < ENCOUNTER_RANGE || forcedPortalId === nearestP.id)) {
-        if (lastEncounterId !== nearestP.id || forcedPortalId) {
-            lastEncounterId = nearestP.id;
+    const missionOverlay = document.getElementById('mission-overlay');
+    if (insidePortal) {
+        currentMissionPortal = insidePortal;
+        missionOverlay.style.display = 'block';
+        document.getElementById('mission-title').innerText = insidePortal.name;
+        document.getElementById('mission-desc').innerText = insidePortal.mission_text || "이 지역을 조사하십시오.";
+        
+        const targetDist = insidePortal.spawn_distance_requirement || 20;
+        document.getElementById('mission-walk-dist').innerText = Math.floor(walkAccumulator);
+        document.getElementById('mission-target-dist').innerText = targetDist;
+        document.getElementById('mission-xp-bar').style.width = `${Math.min(100, (walkAccumulator / targetDist) * 100)}%`;
+
+        // Trigger Combat Roll
+        if (walkAccumulator >= targetDist || forcedPortalId === insidePortal.id) {
+            walkAccumulator = 0;
             forcedPortalId = null;
+            const roll = Math.random();
+            const chance = insidePortal.spawn_chance || 0.5;
             
-            // Trigger Visual Encounter
-            const mapStatus = document.getElementById('map-status');
-            if (mapStatus) mapStatus.innerHTML = `<span style="color: var(--accent-red); animation: pulse 1s infinite;">[!] RIFT_DETECTED: ${nearestP.name}</span>`;
-            
-            setTimeout(() => {
-                if (activeScreen === 'dashboard') startCombat();
-            }, 2000);
+            if (roll < chance) {
+                document.getElementById('map-status').innerHTML = `<span style="color: var(--accent-red); animation: pulse 1s infinite;">[!] 적 개체 감지: 전투 시작</span>`;
+                setTimeout(() => { if (activeScreen === 'dashboard') startCombat(insidePortal.target_monster_name); }, 1500);
+            } else {
+                document.getElementById('map-status').innerText = "조사 완료: 이상 없음";
+            }
         }
     } else {
-        lastEncounterId = null;
+        currentMissionPortal = null;
+        walkAccumulator = 0;
+        missionOverlay.style.display = 'none';
+        document.getElementById('map-status').innerText = "시스템 온라인 // GPS 연결됨";
     }
 }
 
 function stopTracking() { if (watchId) navigator.geolocation.clearWatch(watchId); }
 
 // Combat Controller
-async function startCombat() {
+async function startCombat(forcedMonsterName = null) {
     const playerStats = await getPlayerSettings();
     const monsterPool = await getMonsterPool();
-    const randomMonster = monsterPool[Math.floor(Math.random() * monsterPool.length)];
+    
+    let targetMonster;
+    if (forcedMonsterName) {
+        targetMonster = monsterPool.find(m => m.name === forcedMonsterName) || monsterPool[0];
+    } else {
+        targetMonster = monsterPool[Math.floor(Math.random() * monsterPool.length)];
+    }
     
     combatState = {
         playerHP: playerStats.hp,
@@ -165,9 +212,9 @@ async function startCombat() {
         playerDef: playerStats.def,
         potions: playerStats.potions,
         currentEnemy: { 
-            ...randomMonster, 
-            hp: randomMonster.hp,
-            maxHp: randomMonster.hp 
+            ...targetMonster, 
+            hp: targetMonster.hp,
+            maxHp: targetMonster.hp 
         },
         isGameOver: false,
         isAuto: false
@@ -326,19 +373,37 @@ function executePlayerTurn(action) {
 
 async function handleVictory() {
     playSound('victory');
-    renderLog("TARGET_DESTROYED! 전투에서 승리했습니다.", "player");
+    renderLog("전투 승리! 적 개체를 소탕했습니다.", "player");
     combatState.isGameOver = true;
     document.getElementById('enemy-img-main').style.opacity = "0";
     
-    // Drop Logic
+    // Rewards
+    let stats = await getPlayerSettings();
+    const xpGain = 30 + Math.floor(Math.random() * 20);
+    stats.xp = (stats.xp || 0) + xpGain;
+    renderLog(`전술 경험치 +${xpGain} 획득.`, "player");
+
+    // Level Up
+    const xpNeeded = stats.level * 100;
+    if (stats.xp >= xpNeeded) {
+        stats.level++;
+        stats.xp -= xpNeeded;
+        stats.hp += 20; // Bonus HP on level up
+        stats.atk += 5;  // Bonus ATK on level up
+        renderLog(`시스템 업그레이드! LEVEL ${stats.level} 달성!`, "player");
+    }
+
+    // Potion Drop
     const settings = await getLootSettings();
     const isDrop = settings.fixed || Math.random() < settings.chance;
-    
     if (isDrop) {
-        combatState.potions++;
-        await db.from('player_state').update({ potions: combatState.potions }).eq('id', 'singleton');
-        renderLog("몬스터가 나노봇 포션을 드랍했습니다! [획득]", "player");
+        stats.potions++;
+        renderLog("나노봇 포션을 획득했습니다.", "player");
     }
+
+    await db.from('player_state').update(stats).eq('id', 'singleton');
+    updateDashboardHUD();
+}
 
     setTimeout(() => {
         showScreen('dashboard');
@@ -428,9 +493,18 @@ function initSettingsMap() {
     setMap = L.map('set-map', { zoomControl: true }).setView(currentUserPos, 13);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(setMap);
     setMap.on('click', async (e) => {
-        const name = prompt("포탈 이름을 입력하세요:", `균열_${Math.floor(Math.random()*1000)}`);
+        const name = prompt("지역 이름을 입력하세요:", `탐사구역_${Math.floor(Math.random()*1000)}`);
         if (name) {
-            await db.from('portals').insert({ id: Date.now(), name, lat: e.latlng.lat, lng: e.latlng.lng });
+            await db.from('portals').insert({ 
+                id: Date.now(), 
+                name, 
+                lat: e.latlng.lat, 
+                lng: e.latlng.lng,
+                mission_text: "이 지역의 위협 요소를 제거하십시오.",
+                radius: 100,
+                spawn_chance: 0.5,
+                spawn_distance_requirement: 20
+            });
             renderSettingsPortalList();
         }
     });
@@ -441,7 +515,6 @@ async function renderSettingsPortalList() {
     const container = document.getElementById('set-portal-list');
     container.innerHTML = '';
     
-    // Clear map markers
     setMap.eachLayer((layer) => { if (layer instanceof L.Marker) setMap.removeLayer(layer); });
 
     portals.forEach(p => {
@@ -449,15 +522,67 @@ async function renderSettingsPortalList() {
         item.className = 'glass-panel';
         item.style.marginBottom = '10px';
         item.style.padding = '10px 15px';
-        item.style.flexDirection = 'row';
+        item.style.display = 'flex';
         item.style.justifyContent = 'space-between';
+        item.style.alignItems = 'center';
         item.innerHTML = `
-            <div style="font-size: 0.75rem;">${p.name}</div>
-            <button class="btn-nav" style="padding: 5px 10px; font-size: 0.6rem; color: var(--accent-red); border-color: var(--accent-red);" onclick="deletePortalInSettings(${p.id})">DELETE</button>
+            <div>
+                <div style="font-size: 0.75rem; color:#fff;">${p.name}</div>
+                <div style="font-size: 0.6rem; color:var(--text-dim);">${p.mission_text?.substring(0,20)}...</div>
+            </div>
+            <div style="display:flex; gap:10px;">
+                <button class="btn-nav" style="padding: 5px 10px; font-size: 0.6rem; border-color: var(--secondary-cyan);" onclick="openPortalEditor(${p.id})">EDIT</button>
+                <button class="btn-nav" style="padding: 5px 10px; font-size: 0.6rem; color: var(--accent-red); border-color: var(--accent-red);" onclick="deletePortalInSettings(${p.id})">DEL</button>
+            </div>
         `;
         container.appendChild(item);
         L.marker([p.lat, p.lng]).addTo(setMap).bindPopup(p.name);
     });
+}
+
+// Portal Editor Logic
+let editingPortalId = null;
+async function openPortalEditor(id) {
+    editingPortalId = id;
+    const portals = await getPortals();
+    const p = portals.find(x => x.id == id);
+    const monsters = await getMonsterPool();
+    
+    document.getElementById('ed-p-name').value = p.name;
+    document.getElementById('ed-p-mission').value = p.mission_text || "";
+    document.getElementById('ed-p-radius').value = p.radius || 100;
+    document.getElementById('ed-p-chance').value = (p.spawn_chance || 0.5) * 100;
+    document.getElementById('ed-p-walk').value = p.spawn_distance_requirement || 20;
+    
+    const select = document.getElementById('ed-p-monster');
+    select.innerHTML = '<option value="">랜덤 출현</option>';
+    monsters.forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m.name;
+        opt.innerText = m.name;
+        if (p.target_monster_name === m.name) opt.selected = true;
+        select.appendChild(opt);
+    });
+    
+    document.getElementById('portal-editor-modal').style.display = 'block';
+}
+
+function closePortalEditor() {
+    document.getElementById('portal-editor-modal').style.display = 'none';
+}
+
+async function applyPortalEdit() {
+    const data = {
+        name: document.getElementById('ed-p-name').value,
+        mission_text: document.getElementById('ed-p-mission').value,
+        radius: parseInt(document.getElementById('ed-p-radius').value),
+        spawn_chance: parseFloat(document.getElementById('ed-p-chance').value) / 100,
+        spawn_distance_requirement: parseInt(document.getElementById('ed-p-walk').value),
+        target_monster_name: document.getElementById('ed-p-monster').value || null
+    };
+    await db.from('portals').update(data).eq('id', editingPortalId);
+    closePortalEditor();
+    renderSettingsPortalList();
 }
 
 async function deletePortalInSettings(id) {
