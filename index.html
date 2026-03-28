@@ -94,17 +94,8 @@
             </div>
         </div>
 
-        <div id="portal-confirm-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:3000; padding:20px; align-items:center; justify-content:center;">
-            <div class="glass-panel" style="max-width:350px; width:100%; padding:30px; text-align:center; border-color: var(--secondary-cyan);">
-                <div style="font-size: 0.6rem; color: var(--secondary-cyan); letter-spacing: 3px; margin-bottom: 15px;">RIFT_DETECTION</div>
-                <h2 id="confirm-portal-name" style="color:#fff; margin-bottom:10px;">차원의 균열 감지</h2>
-                <p style="font-size: 0.8rem; color: var(--text-dim); margin-bottom: 25px; line-height: 1.5;">강한 에너지 반응이 감지되었습니다.<br>조사를 위해 해당 구역에 진입하시겠습니까?</p>
-                <div style="display:flex; gap:10px;">
-                    <button class="btn-primary" style="flex:1; padding:15px; font-size:0.8rem;" onclick="acceptMission()">진입하기</button>
-                    <button class="btn-nav" style="flex:1; padding:15px; font-size:0.8rem; text-align:center;" onclick="ignoreMission()">무시하기</button>
-                </div>
-            </div>
-        </div>
+        <!-- 포탈 확인 모달 (자동진입으로 대체됨 - 호환성 유지용 숨김) -->
+        <div id="portal-confirm-modal" style="display:none !important;"></div>
 
         <!-- COMBAT SCENE -->
         <div id="screen-combat" class="screen">
