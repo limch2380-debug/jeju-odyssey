@@ -9,20 +9,21 @@ let forcedPortalId = null;
 let lastEncounterId = null;
 let activeScreen = 'main';
 let currentMissionPortal = null;
-let activeMissionPortalId = null; // Currently accepted and tracking walk distance
-let pendingConfirmationPortalId = null; // Portal waiting for confirmation
-let ignoredPortalIds = new Set(); // Portals ignored in current vicinity
+let activeMissionPortalId = null;
+let pendingConfirmationPortalId = null;
+let ignoredPortalIds = new Set();
+let encounterPending = false;
 
 // SUPABASE CONNECTION
 const SUPABASE_URL = "https://icggdzxzifbhegvdwzdc.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImljZ2dkenh6aWZiaGVndmR3emRjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2MzE2NTQsImV4cCI6MjA5MDIwNzY1NH0.ceUvWu-78qaIxJcq490LUCUcwHS4NVCMYzL3YGemWjs";
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// Global Settings with Defaults
+// Global Settings with Defaults — type: "normal" | "boss"
 const DEFAULT_MONSTERS = [
-    { name: "고블린 병사 (SOLDIER)", hp: 100, dmg: 8, img: "goblin_soldier_tactical.png" },
-    { name: "고블린 궁수 (ARCHER)", hp: 70, dmg: 12, img: "goblin_archer_cloak.png" },
-    { name: "대왕 고블린 (BOSS)", hp: 250, dmg: 18, img: "great_goblin_boss.png" }
+    { name: "고블린 병사", hp: 100, dmg: 8, img: "goblin_soldier_tactical.png", type: "normal" },
+    { name: "고블린 궁수", hp: 70, dmg: 12, img: "goblin_archer_cloak.png", type: "normal" },
+    { name: "대왕 고블린", hp: 250, dmg: 18, img: "great_goblin_boss.png", type: "boss" }
 ];
 
 async function getMonsterPool() {
@@ -45,19 +46,14 @@ async function getPortals() {
     return data || [];
 }
 
+// ===== SOUNDS — 칼 전투 사운드 =====
 const SOUNDS = {
-    hit: new Audio('https://assets.mixkit.co/active_storage/sfx/2785/2785-preview.mp3'), // Sharp Metal Hit
-    enemyHit: new Audio('https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3'), // Fast Slash
-    potion: new Audio('https://assets.mixkit.co/active_storage/sfx/1487/1487-preview.mp3'), // Crystal heal
-    victory: new Audio('https://assets.mixkit.co/active_storage/sfx/2019/2019-preview.mp3') // Victory Fanfare
+    hit: new Audio('https://assets.mixkit.co/active_storage/sfx/2788/2788-preview.mp3'),       // Sword slash hit
+    enemyHit: new Audio('https://assets.mixkit.co/active_storage/sfx/2790/2790-preview.mp3'),  // Metal sword impact
+    potion: new Audio('https://assets.mixkit.co/active_storage/sfx/1487/1487-preview.mp3'),    // Crystal heal
+    victory: new Audio('https://assets.mixkit.co/active_storage/sfx/2019/2019-preview.mp3'),   // Victory Fanfare
+    swordSwing: new Audio('https://assets.mixkit.co/active_storage/sfx/2786/2786-preview.mp3') // Sword swing whoosh
 };
-
-// Combat Assets
-const monsterPool = [
-    { name: "고블린 병사 (SOLDIER)", hp: 100, dmg: 8, img: "goblin_soldier_tactical.png" },
-    { name: "고블린 궁수 (ARCHER)", hp: 70, dmg: 12, img: "goblin_archer_cloak.png" },
-    { name: "대왕 고블린 (BOSS)", hp: 250, dmg: 18, img: "great_goblin_boss.png" }
-];
 
 let combatState = { 
     playerHP: 100, 
@@ -68,19 +64,16 @@ let combatState = {
     isAuto: false 
 };
 let autoBattleInterval = null;
+let cachedPlayerStats = null;
+let cachedMonsterPool = null;
 
 // Safe Initialization
 async function initApp() {
     try {
-        const savedPotions = localStorage.getItem('potions');
-        if (savedPotions) combatState.potions = parseInt(savedPotions);
-        
-        // Pre-fetch critical data
         cachedMonsterPool = await getMonsterPool();
         cachedPlayerStats = await getPlayerSettings();
     } catch(e) { console.log("Init sequence data fetch warning:", e); }
     
-    // Initial UI Setup
     updateClock();
     await updateDashboardHUD();
 }
@@ -114,10 +107,20 @@ function initMap() {
 
 async function loadPortals() {
     portalMarkers.forEach(m => map.removeLayer(m));
+    portalMarkers = [];
     const portals = await getPortals();
+    const monsterPool = await getMonsterPool();
+    
     portals.forEach(p => {
-        const portalIcon = L.divIcon({ className: 'portal-marker', html: '<div class="portal-node"></div>', iconSize: [20, 20], iconAnchor: [10, 10] });
-        const marker = L.marker([p.lat, p.lng], { icon: portalIcon }).addTo(map).on('click', () => { forcedPortalId = p.id; checkProximity(); alert(`${p.name} 위치 감지.`); });
+        const isBoss = p.target_monster_name && monsterPool.find(m => m.name === p.target_monster_name && m.type === 'boss');
+        const portalColor = isBoss ? 'var(--accent-red)' : 'var(--secondary-cyan)';
+        const portalIcon = L.divIcon({ 
+            className: 'portal-marker', 
+            html: `<div class="portal-node" style="background: ${portalColor}; box-shadow: 0 0 20px ${portalColor};"></div>`, 
+            iconSize: [20, 20], iconAnchor: [10, 10] 
+        });
+        const marker = L.marker([p.lat, p.lng], { icon: portalIcon }).addTo(map)
+            .on('click', () => { forcedPortalId = p.id; checkProximity(); alert(`${p.name} 위치 감지.`); });
         portalMarkers.push(marker);
     });
 }
@@ -127,13 +130,12 @@ function startTracking() {
         watchId = navigator.geolocation.watchPosition((pos) => {
             const newPos = [pos.coords.latitude, pos.coords.longitude];
             
-            // Calculate movement for walkAccumulator
             const distMoved = L.latLng(lastWalkPos).distanceTo(newPos);
-            if (distMoved > 2 && activeMissionPortalId) { // Min 2m movement
+            if (distMoved > 2 && activeMissionPortalId) {
                 walkAccumulator += distMoved;
                 lastWalkPos = newPos;
             } else if (!activeMissionPortalId) {
-                lastWalkPos = newPos; // Keep anchor updated even if not tracking
+                lastWalkPos = newPos;
             }
 
             currentUserPos = newPos;
@@ -151,26 +153,20 @@ function startTracking() {
     }
 }
 
-let cachedPlayerStats = null;
-let cachedMonsterPool = null;
-
 async function updateDashboardHUD() {
     const stats = await getPlayerSettings();
     cachedPlayerStats = stats;
     
-    // Main Screen HUD
     const mainLevel = document.getElementById('main-level');
     if (mainLevel) mainLevel.innerText = stats.level || 1;
     const hudSpirit = document.getElementById('hud-spirit-cards');
     if (hudSpirit) hudSpirit.innerText = stats.spirit_cards || 0;
     
-    // XP Bar on Main
     const xpNeeded = (stats.level || 1) * 100;
     const xpPercent = Math.min(100, ((stats.xp || 0) / xpNeeded) * 100);
     const mainXpBar = document.getElementById('main-xp-bar');
     if (mainXpBar) mainXpBar.style.width = `${xpPercent}%`;
 
-    // Combat/Dashboard HUD
     const hudLevel = document.getElementById('hud-level');
     if (hudLevel) hudLevel.innerText = stats.level || 1;
     const hpText = document.getElementById('hud-hp-text');
@@ -182,8 +178,16 @@ async function updateDashboardHUD() {
     if (xpBar) xpBar.style.width = `${xpPercent}%`;
 }
 
+// ===== PROXIMITY / ENCOUNTER SYSTEM =====
+let proximityRunning = false;
+
 async function checkProximity() {
     if (activeScreen !== 'dashboard') return;
+    if (encounterPending) return;
+    if (proximityRunning) return;
+    proximityRunning = true;
+    
+    try {
     const portals = await getPortals();
     let nearestDist = Infinity;
     let insidePortal = null;
@@ -194,11 +198,9 @@ async function checkProximity() {
         if (dist < (p.radius || 100)) {
             insidePortal = p;
         } else {
-            // If we move away from an ignored portal, reset it
             if (ignoredPortalIds.has(p.id) && dist > (p.radius || 100) * 1.5) {
                 ignoredPortalIds.delete(p.id);
             }
-            // If we move away from the active portal, cancel the mission
             if (activeMissionPortalId === p.id && dist > (p.radius || 100)) {
                 activeMissionPortalId = null;
                 walkAccumulator = 0;
@@ -206,7 +208,6 @@ async function checkProximity() {
         }
     });
 
-    // Update Distance UI
     const statusText = document.getElementById('distance-info');
     if (statusText) statusText.innerText = (nearestDist === Infinity) ? "주변 신호: 없음" : `근처 신호: ${Math.round(nearestDist)}m 거리`;
 
@@ -216,9 +217,7 @@ async function checkProximity() {
     if (insidePortal) {
         currentMissionPortal = insidePortal;
         
-        // Handle Step 1: Confirmation
         if (activeMissionPortalId === insidePortal.id) {
-            // Already accepted and tracking
             missionOverlay.style.display = 'block';
             confirmModal.style.display = 'none';
             
@@ -230,36 +229,41 @@ async function checkProximity() {
             document.getElementById('mission-target-dist').innerText = targetDist;
             document.getElementById('mission-xp-bar').style.width = `${Math.min(100, (walkAccumulator / targetDist) * 100)}%`;
 
-            // Encounter Check
+            // ★ 게이지 100% → 인카운터 100% 발생
             if (walkAccumulator >= targetDist) {
+                encounterPending = true;
                 const monsterToSpawn = insidePortal.target_monster_name;
-                walkAccumulator = 0;
-                const roll = Math.random();
-                const chance = insidePortal.spawn_chance || 0.5;
                 
-                if (roll < chance) {
-                    document.getElementById('map-status').innerHTML = `<span style="color: var(--accent-red); animation: pulse 1s infinite; font-weight:bold;">[!] 적의 기습! 전투 화면으로 전환합니다...</span>`;
-                    setTimeout(() => { 
-                        if (activeScreen === 'dashboard') startCombat(monsterToSpawn); 
-                    }, 1200);
-                } else {
-                    document.getElementById('map-status').innerText = "이상 없음. 조사가 계속됩니다.";
-                }
+                console.log('[ENCOUNTER] 게이지 충족! 전투 전환. monster:', monsterToSpawn);
+                
+                document.getElementById('map-status').innerHTML = `<span style="color: var(--accent-red); animation: pulse 1s infinite; font-weight:bold;">[!] 적의 기습! 전투 화면으로 전환합니다...</span>`;
+                missionOverlay.style.display = 'none';
+                
+                setTimeout(() => {
+                    walkAccumulator = 0;
+                    activeMissionPortalId = null;
+                    encounterPending = false;
+                    startCombat(monsterToSpawn);
+                }, 1200);
+                
+                proximityRunning = false;
+                return;
             }
         } else if (!ignoredPortalIds.has(insidePortal.id) && pendingConfirmationPortalId !== insidePortal.id) {
-            // Within radius, not active, not ignored -> Show Modal
             pendingConfirmationPortalId = insidePortal.id;
             document.getElementById('confirm-portal-name').innerText = insidePortal.name;
             confirmModal.style.display = 'flex';
             missionOverlay.style.display = 'none';
         }
     } else {
-        // Reset everything if NOT inside any portal
         currentMissionPortal = null;
         pendingConfirmationPortalId = null;
         confirmModal.style.display = 'none';
         missionOverlay.style.display = 'none';
         document.getElementById('map-status').innerText = "시스템 온라인 // 신호 분석 중";
+    }
+    } finally {
+        proximityRunning = false;
     }
 }
 
@@ -284,7 +288,7 @@ function ignoreMission() {
 
 function stopTracking() { if (watchId) navigator.geolocation.clearWatch(watchId); }
 
-// Combat Controller
+// ===== COMBAT CONTROLLER =====
 async function startCombat(forcedMonsterName = null) {
     const playerStats = await getPlayerSettings();
     const monsterPool = await getMonsterPool();
@@ -293,7 +297,10 @@ async function startCombat(forcedMonsterName = null) {
     if (forcedMonsterName) {
         targetMonster = monsterPool.find(m => m.name === forcedMonsterName) || monsterPool[0];
     } else {
-        targetMonster = monsterPool[Math.floor(Math.random() * monsterPool.length)];
+        // 강제 지정이 없으면 일반(normal) 몬스터 중에서 랜덤
+        const normalMonsters = monsterPool.filter(m => m.type !== 'boss');
+        const pool = normalMonsters.length > 0 ? normalMonsters : monsterPool;
+        targetMonster = pool[Math.floor(Math.random() * pool.length)];
     }
     
     combatState = {
@@ -312,14 +319,31 @@ async function startCombat(forcedMonsterName = null) {
     };
 
     document.getElementById('enemy-name-label').innerText = combatState.currentEnemy.name;
-    document.getElementById('enemy-img-main').src = combatState.currentEnemy.img;
+    
+    // 이미지 소스 결정: URL이면 그대로, 아니면 로컬 파일
+    const imgSrc = combatState.currentEnemy.img;
+    document.getElementById('enemy-img-main').src = imgSrc;
     document.getElementById('enemy-img-main').style.opacity = "1";
     document.getElementById('btn-auto-battle').innerText = "AUTO_BATTLE: OFF";
     document.getElementById('btn-auto-battle').style.background = "var(--bg-space)";
     
+    // 보스 여부에 따른 UI
+    const isBoss = combatState.currentEnemy.type === 'boss';
+    const nameLabel = document.getElementById('enemy-name-label');
+    if (isBoss) {
+        nameLabel.style.color = 'var(--primary-gold)';
+        nameLabel.innerText = `⚔ ${combatState.currentEnemy.name} [BOSS]`;
+    } else {
+        nameLabel.style.color = 'var(--accent-red)';
+    }
+    
     stopAutoBattle();
     updateCombatUI();
-    document.getElementById('combat-log').innerHTML = '<div class="log-entry">전장에 진입했습니다. TARGET_ACQUIRED!</div>';
+    
+    const entryMsg = isBoss ? '⚔ 강력한 보스가 나타났다! 전투 태세!' : '전장에 진입했습니다. TARGET_ACQUIRED!';
+    document.getElementById('combat-log').innerHTML = `<div class="log-entry">${entryMsg}</div>`;
+    
+    playSound('swordSwing');
     showScreen('combat');
 }
 
@@ -333,14 +357,12 @@ async function usePotion() {
     combatState.playerHP = Math.min(combatState.playerMaxHP, combatState.playerHP + healAmount);
     combatState.potions--;
     
-    // SAVE TO SUPABASE
     await db.from('player_state').update({ potions: combatState.potions }).eq('id', 'singleton');
     
     playSound('potion');
     renderLog(`나노봇 포션을 사용했습니다! HP +${healAmount}`, "player");
     updateCombatUI();
     
-    // Enemy counter after potion use
     setTimeout(() => {
         combatState.busy = false;
         executeEnemyTurn();
@@ -374,16 +396,14 @@ function executeEnemyTurn() {
     updateActionButtons(false);
     
     const enemy = combatState.currentEnemy;
-    // Calculate damage with player defense
     let rawDMG = Math.floor(Math.random() * 5) + enemy.dmg;
     let reduction = Math.floor(rawDMG * (combatState.playerDef / 100));
     let eDmg = Math.max(1, rawDMG - reduction);
     
     combatState.playerHP = Math.max(0, combatState.playerHP - eDmg);
     
-    // Effect
     triggerShake();
-    playSound('enemyHit');
+    playSound('enemyHit'); // 칼 타격음
     const scene = document.querySelector('.combat-scene');
     scene.classList.add('flash-red', 'glitch');
     setTimeout(() => scene.classList.remove('flash-red', 'glitch'), 300);
@@ -437,19 +457,19 @@ function executePlayerTurn(action) {
     updateActionButtons(false);
 
     let enemy = combatState.currentEnemy;
-    // Base damage from settings
     let dmg = Math.floor(Math.random() * 10) + combatState.playerAtk;
     
     enemy.hp = Math.max(0, enemy.hp - dmg);
     
-    // Effect
-    playSound('hit');
-    // enemy img shake or flash
+    // 칼 전투 사운드
+    playSound('swordSwing');
+    setTimeout(() => playSound('hit'), 150); // 스윙 후 타격
+    
     const enemyImg = document.getElementById('enemy-img-main');
     enemyImg.classList.add('shake');
     setTimeout(() => enemyImg.classList.remove('shake'), 400);
 
-    renderLog(`적에게 ${dmg}의 데미지를 입혔습니다!`, "player");
+    renderLog(`검을 휘둘러 ${dmg}의 데미지를 입혔습니다!`, "player");
     updateCombatUI();
 
     if (enemy.hp <= 0) {
@@ -458,7 +478,7 @@ function executePlayerTurn(action) {
         setTimeout(() => {
             combatState.busy = false;
             executeEnemyTurn();
-        }, 1000); // 1초 간격으로 공방
+        }, 1000);
     }
 }
 
@@ -468,7 +488,6 @@ async function handleVictory() {
     combatState.isGameOver = true;
     document.getElementById('enemy-img-main').style.opacity = "0";
     
-    // Rewards
     let stats = await getPlayerSettings();
     const xpGain = 30 + Math.floor(Math.random() * 20);
     stats.xp = (stats.xp || 0) + xpGain;
@@ -484,12 +503,12 @@ async function handleVictory() {
         renderLog(`시스템 업그레이드! LEVEL ${stats.level} 달성!`, "player");
     }
 
-    // Boss Reward: Spirit Card (100% chance for BOSS/대왕)
-    const isBoss = combatState.currentEnemy.name.includes("BOSS") || combatState.currentEnemy.name.includes("대왕");
+    // ★ 보스 처치 시 정령카드 100% 드랍 (type === 'boss'로 판별)
+    const isBoss = combatState.currentEnemy.type === 'boss';
     if (isBoss) {
         stats.spirit_cards = (stats.spirit_cards || 0) + 1;
-        renderLog("희귀 데이터 획득: [정령 카드]를 확보했습니다!", "player");
-        playSound('victory'); 
+        renderLog("★ 보스 처치! [정령 카드]를 100% 확률로 확보했습니다!", "player");
+        playSound('victory');
     }
 
     // Potion Drop
@@ -508,7 +527,7 @@ async function handleVictory() {
             showScreen('dashboard');
             stopAutoBattle();
         }
-    }, 4000); // 승리 후 4초 대기
+    }, 4000);
 }
 
 function updateCombatUI() {
@@ -534,7 +553,6 @@ function updateCombatUI() {
         potionBtn.disabled = (combatState.potions <= 0);
     }
 
-    // Main HUD sync
     const mainLevel = document.getElementById('main-level');
     if (mainLevel && cachedPlayerStats) mainLevel.innerText = cachedPlayerStats.level || 1;
 }
@@ -558,8 +576,9 @@ setInterval(updateClock, 1000);
 updateClock();
 window.addEventListener('resize', () => { if (map) map.invalidateSize(); if (setMap) setMap.invalidateSize(); });
 
-// Settings Controller (Merged Admin)
+// ===== SETTINGS CONTROLLER (완전 리뉴얼) =====
 let setMap;
+
 async function initSettings() {
     // Player
     const pStats = await getPlayerSettings();
@@ -578,26 +597,168 @@ async function initSettings() {
     renderSettingsPortalList();
 }
 
+// ===== MONSTER LIST — 이름 편집, 이미지 업로드, 타입(일반/보스) 구분 =====
 async function renderSettingsMonsterList() {
     const pool = await getMonsterPool();
     const container = document.getElementById('set-monster-list');
     container.innerHTML = '';
+    
     pool.forEach((m, i) => {
+        const isBoss = m.type === 'boss';
         const item = document.createElement('div');
-        item.className = 'glass-panel';
-        item.style.marginBottom = '10px';
-        item.style.padding = '15px';
+        item.className = 'glass-panel monster-card';
+        item.style.marginBottom = '15px';
+        item.style.padding = '20px';
+        if (isBoss) {
+            item.style.borderLeft = '4px solid var(--primary-gold)';
+            item.style.boxShadow = '0 0 15px rgba(233, 196, 0, 0.1)';
+        }
+        
         item.innerHTML = `
-            <div style="font-size: 0.7rem; color: var(--accent-red); margin-bottom: 10px;">THREAT #${i+1}: ${m.name}</div>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                <input type="number" class="set-m-hp" data-index="${i}" value="${m.hp}" placeholder="HP">
-                <input type="number" class="set-m-dmg" data-index="${i}" value="${m.dmg}" placeholder="ATK">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 0.6rem; padding: 3px 10px; border-radius: 20px; font-weight: 700; letter-spacing: 1px;
+                        background: ${isBoss ? 'rgba(233,196,0,0.2)' : 'rgba(0,253,236,0.15)'}; 
+                        color: ${isBoss ? 'var(--primary-gold)' : 'var(--secondary-cyan)'}; 
+                        border: 1px solid ${isBoss ? 'rgba(233,196,0,0.4)' : 'rgba(0,253,236,0.3)'};">
+                        ${isBoss ? '⚔ BOSS' : '🗡 NORMAL'}
+                    </span>
+                    <span style="font-size: 0.6rem; color: var(--text-dim);">#${i+1}</span>
+                </div>
+                <button class="btn-nav" style="padding: 4px 12px; font-size: 0.55rem; color: var(--accent-red); border-color: var(--accent-red);" 
+                    onclick="deleteMonster(${i})">삭제</button>
+            </div>
+            
+            <div style="display: flex; gap: 15px; align-items: flex-start;">
+                <div style="flex-shrink: 0; text-align: center;">
+                    <img src="${m.img}" style="width: 80px; height: 80px; object-fit: contain; border-radius: 12px; background: rgba(0,0,0,0.4); border: 1px solid var(--glass-border);"
+                        onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 80 80%22><text x=%2240%22 y=%2250%22 text-anchor=%22middle%22 font-size=%2240%22>👾</text></svg>'">
+                    <label class="btn-nav" style="display: block; margin-top: 8px; padding: 5px 10px; font-size: 0.5rem; cursor: pointer; text-align: center; border-color: var(--secondary-cyan); color: var(--secondary-cyan);">
+                        이미지 변경
+                        <input type="file" accept="image/*" style="display:none;" onchange="uploadMonsterImage(${i}, this)">
+                    </label>
+                </div>
+                <div style="flex: 1;">
+                    <div style="margin-bottom: 10px;">
+                        <label style="font-size: 0.55rem; color: var(--text-dim); display: block; margin-bottom: 4px;">몬스터 이름</label>
+                        <input type="text" class="set-m-name btn-nav" data-index="${i}" value="${m.name}" 
+                            style="width: 100%; font-size: 0.8rem; padding: 10px 12px;">
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;">
+                        <div>
+                            <label style="font-size: 0.5rem; color: var(--text-dim);">HP</label>
+                            <input type="number" class="set-m-hp btn-nav" data-index="${i}" value="${m.hp}" style="width: 100%; font-size: 0.75rem;">
+                        </div>
+                        <div>
+                            <label style="font-size: 0.5rem; color: var(--text-dim);">ATK</label>
+                            <input type="number" class="set-m-dmg btn-nav" data-index="${i}" value="${m.dmg}" style="width: 100%; font-size: 0.75rem;">
+                        </div>
+                        <div>
+                            <label style="font-size: 0.5rem; color: var(--text-dim);">타입</label>
+                            <select class="set-m-type btn-nav" data-index="${i}" style="width: 100%; height: 38px; font-size: 0.7rem; 
+                                ${isBoss ? 'border-color: var(--primary-gold); color: var(--primary-gold);' : ''}">
+                                <option value="normal" ${!isBoss ? 'selected' : ''}>일반</option>
+                                <option value="boss" ${isBoss ? 'selected' : ''}>⚔ 보스</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
             </div>
         `;
         container.appendChild(item);
     });
 }
 
+// 이미지 업로드 → Supabase Storage
+async function uploadMonsterImage(index, input) {
+    const file = input.files[0];
+    if (!file) return;
+    
+    const ext = file.name.split('.').pop();
+    const fileName = `monster_${index}_${Date.now()}.${ext}`;
+    
+    // 업로드 진행 표시
+    const card = input.closest('.monster-card');
+    const img = card.querySelector('img');
+    img.style.opacity = '0.3';
+    
+    try {
+        const { data, error } = await db.storage.from('monster-images').upload(fileName, file, {
+            cacheControl: '3600',
+            upsert: true
+        });
+        
+        if (error) {
+            alert('이미지 업로드 실패: ' + error.message);
+            img.style.opacity = '1';
+            return;
+        }
+        
+        // Public URL 가져오기
+        const { data: urlData } = db.storage.from('monster-images').getPublicUrl(fileName);
+        const publicUrl = urlData.publicUrl;
+        
+        // 몬스터 풀 업데이트
+        const pool = await getMonsterPool();
+        pool[index].img = publicUrl;
+        await db.from('game_settings').update({ value: pool }).eq('name', 'monsterPool');
+        
+        img.src = publicUrl;
+        img.style.opacity = '1';
+        
+        console.log('[UPLOAD] 몬스터 이미지 업로드 완료:', publicUrl);
+    } catch(e) {
+        alert('업로드 에러: ' + e.message);
+        img.style.opacity = '1';
+    }
+}
+
+// 몬스터 추가
+async function addMonster(type) {
+    const pool = await getMonsterPool();
+    const newMonster = {
+        name: type === 'boss' ? `새 보스 몬스터` : `새 일반 몬스터`,
+        hp: type === 'boss' ? 200 : 80,
+        dmg: type === 'boss' ? 15 : 8,
+        img: '',
+        type: type
+    };
+    pool.push(newMonster);
+    await db.from('game_settings').update({ value: pool }).eq('name', 'monsterPool');
+    renderSettingsMonsterList();
+}
+
+// 몬스터 삭제
+async function deleteMonster(index) {
+    if (!confirm('이 몬스터를 삭제하시겠습니까?')) return;
+    const pool = await getMonsterPool();
+    pool.splice(index, 1);
+    await db.from('game_settings').update({ value: pool }).eq('name', 'monsterPool');
+    renderSettingsMonsterList();
+}
+
+// 몬스터 풀 저장 (이름, HP, ATK, 타입 모두)
+async function saveMonsterPool() {
+    const names = document.querySelectorAll('.set-m-name');
+    const hps = document.querySelectorAll('.set-m-hp');
+    const dmgs = document.querySelectorAll('.set-m-dmg');
+    const types = document.querySelectorAll('.set-m-type');
+    const pool = await getMonsterPool();
+    
+    names.forEach((input, i) => {
+        pool[i].name = input.value;
+        pool[i].hp = parseInt(hps[i].value);
+        pool[i].dmg = parseInt(dmgs[i].value);
+        pool[i].type = types[i].value;
+    });
+    
+    await db.from('game_settings').update({ value: pool }).eq('name', 'monsterPool');
+    cachedMonsterPool = pool;
+    alert("몬스터 데이터베이스 동기화 완료.");
+    renderSettingsMonsterList();
+}
+
+// ===== PORTAL / MAP MANAGEMENT =====
 function initSettingsMap() {
     if (setMap) return;
     setMap = L.map('set-map', { zoomControl: true }).setView(currentUserPos, 13);
@@ -612,7 +773,7 @@ function initSettingsMap() {
                 lng: e.latlng.lng,
                 mission_text: "이 지역의 위협 요소를 제거하십시오.",
                 radius: 100,
-                spawn_chance: 0.5,
+                spawn_chance: 1.0,
                 spawn_distance_requirement: 20
             });
             renderSettingsPortalList();
@@ -622,34 +783,58 @@ function initSettingsMap() {
 
 async function renderSettingsPortalList() {
     const portals = await getPortals();
+    const monsterPool = await getMonsterPool();
     const container = document.getElementById('set-portal-list');
     container.innerHTML = '';
     
     setMap.eachLayer((layer) => { if (layer instanceof L.Marker) setMap.removeLayer(layer); });
 
     portals.forEach(p => {
-        const isBoss = p.target_monster_name ? true : false;
+        const assignedMonster = p.target_monster_name ? monsterPool.find(m => m.name === p.target_monster_name) : null;
+        const isBoss = assignedMonster && assignedMonster.type === 'boss';
         const item = document.createElement('div');
         item.className = 'glass-panel';
         item.style.marginBottom = '10px';
-        item.style.padding = '10px 15px';
+        item.style.padding = '12px 15px';
         item.style.display = 'flex';
         item.style.justifyContent = 'space-between';
         item.style.alignItems = 'center';
-        if (isBoss) item.style.borderLeft = '4px solid var(--primary-gold)';
+        if (isBoss) {
+            item.style.borderLeft = '4px solid var(--primary-gold)';
+            item.style.background = 'rgba(233, 196, 0, 0.05)';
+        }
+        
+        const monsterLabel = assignedMonster 
+            ? `<span style="color:${isBoss ? 'var(--primary-gold)' : 'var(--secondary-cyan)'}; font-size:0.55rem;">
+                ${isBoss ? '⚔' : '🗡'} ${assignedMonster.name}</span>` 
+            : '<span style="color:var(--text-dim); font-size:0.55rem;">랜덤 일반 몬스터</span>';
         
         item.innerHTML = `
-            <div>
-                <div style="font-size: 0.75rem; color:${isBoss ? 'var(--primary-gold)' : '#fff'}; font-weight:${isBoss ? '700' : '400'};">${p.name} ${isBoss ? '[BOSS]' : ''}</div>
-                <div style="font-size: 0.6rem; color:var(--text-dim);">${p.mission_text?.substring(0,25)}...</div>
+            <div style="flex: 1;">
+                <div style="font-size: 0.75rem; color:${isBoss ? 'var(--primary-gold)' : '#fff'}; font-weight:${isBoss ? '700' : '400'}; margin-bottom: 3px;">
+                    ${p.name} ${isBoss ? '<span style="font-size:0.6rem;">[BOSS ZONE]</span>' : ''}
+                </div>
+                <div style="font-size: 0.55rem; color:var(--text-dim); margin-bottom: 2px;">${p.mission_text?.substring(0,30) || ''}...</div>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    ${monsterLabel}
+                    <span style="font-size:0.5rem; color:var(--text-dim);">반경 ${p.radius || 100}m | 거리 ${p.spawn_distance_requirement || 20}m</span>
+                </div>
             </div>
-            <div style="display:flex; gap:10px;">
+            <div style="display:flex; gap:8px; flex-shrink:0;">
                 <button class="btn-nav" style="padding: 5px 10px; font-size: 0.6rem; border-color: var(--secondary-cyan);" onclick="openPortalEditor(${p.id})">EDIT</button>
                 <button class="btn-nav" style="padding: 5px 10px; font-size: 0.6rem; color: var(--accent-red); border-color: var(--accent-red);" onclick="deletePortalInSettings(${p.id})">DEL</button>
             </div>
         `;
         container.appendChild(item);
-        L.marker([p.lat, p.lng]).addTo(setMap).bindPopup(p.name);
+        
+        // 맵 마커 — 보스 포탈은 빨간색
+        const markerColor = isBoss ? '#ff4d4d' : '#00fdec';
+        const markerIcon = L.divIcon({ 
+            className: 'portal-marker',
+            html: `<div style="width:14px;height:14px;background:${markerColor};border-radius:50%;box-shadow:0 0 10px ${markerColor};border:2px solid rgba(255,255,255,0.3);"></div>`,
+            iconSize: [14, 14], iconAnchor: [7, 7]
+        });
+        L.marker([p.lat, p.lng], { icon: markerIcon }).addTo(setMap).bindPopup(`<b>${p.name}</b><br>${isBoss ? '⚔ BOSS ZONE' : '일반 구역'}`);
     });
 }
 
@@ -664,18 +849,40 @@ async function openPortalEditor(id) {
     document.getElementById('ed-p-name').value = p.name;
     document.getElementById('ed-p-mission').value = p.mission_text || "";
     document.getElementById('ed-p-radius').value = p.radius || 100;
-    document.getElementById('ed-p-chance').value = (p.spawn_chance || 0.5) * 100;
     document.getElementById('ed-p-walk').value = p.spawn_distance_requirement || 20;
     
+    // 몬스터 선택 — 일반/보스 구분 표시
     const select = document.getElementById('ed-p-monster');
-    select.innerHTML = '<option value="">랜덤 출현</option>';
-    monsters.forEach(m => {
-        const opt = document.createElement('option');
-        opt.value = m.name;
-        opt.innerText = m.name;
-        if (p.target_monster_name === m.name) opt.selected = true;
-        select.appendChild(opt);
-    });
+    select.innerHTML = '<option value="">랜덤 일반 몬스터</option>';
+    
+    const normalMonsters = monsters.filter(m => m.type !== 'boss');
+    const bossMonsters = monsters.filter(m => m.type === 'boss');
+    
+    if (normalMonsters.length > 0) {
+        const normalGroup = document.createElement('optgroup');
+        normalGroup.label = '🗡 일반 몬스터';
+        normalMonsters.forEach(m => {
+            const opt = document.createElement('option');
+            opt.value = m.name;
+            opt.innerText = m.name;
+            if (p.target_monster_name === m.name) opt.selected = true;
+            normalGroup.appendChild(opt);
+        });
+        select.appendChild(normalGroup);
+    }
+    
+    if (bossMonsters.length > 0) {
+        const bossGroup = document.createElement('optgroup');
+        bossGroup.label = '⚔ 보스 몬스터';
+        bossMonsters.forEach(m => {
+            const opt = document.createElement('option');
+            opt.value = m.name;
+            opt.innerText = `⚔ ${m.name}`;
+            if (p.target_monster_name === m.name) opt.selected = true;
+            bossGroup.appendChild(opt);
+        });
+        select.appendChild(bossGroup);
+    }
     
     document.getElementById('portal-editor-modal').style.display = 'block';
 }
@@ -689,7 +896,6 @@ async function applyPortalEdit() {
         name: document.getElementById('ed-p-name').value,
         mission_text: document.getElementById('ed-p-mission').value,
         radius: parseInt(document.getElementById('ed-p-radius').value),
-        spawn_chance: parseFloat(document.getElementById('ed-p-chance').value) / 100,
         spawn_distance_requirement: parseInt(document.getElementById('ed-p-walk').value),
         target_monster_name: document.getElementById('ed-p-monster').value || null
     };
@@ -699,7 +905,7 @@ async function applyPortalEdit() {
 }
 
 async function deletePortalInSettings(id) {
-    if (confirm("균열을 봉인하시겠습니까?")) {
+    if (confirm("이 포탈을 삭제하시겠습니까?")) {
         await db.from('portals').delete().eq('id', id);
         renderSettingsPortalList();
     }
@@ -713,19 +919,7 @@ async function savePlayerSettings() {
         potions: parseInt(document.getElementById('set-p-pot').value)
     };
     await db.from('player_state').update(stats).eq('id', 'singleton');
-    alert("COMMANDER_CORE_DATA SYNCED.");
-}
-
-async function saveMonsterPool() {
-    const hps = document.querySelectorAll('.set-m-hp');
-    const dmgs = document.querySelectorAll('.set-m-dmg');
-    const pool = await getMonsterPool();
-    hps.forEach((input, i) => {
-        pool[i].hp = parseInt(input.value);
-        pool[i].dmg = parseInt(dmgs[i].value);
-    });
-    await db.from('game_settings').update({ value: pool }).eq('name', 'monsterPool');
-    alert("BIOLOGICAL_DATABASE UPDATED.");
+    alert("커맨더 데이터 동기화 완료.");
 }
 
 async function saveLootSettings() {
@@ -734,5 +928,5 @@ async function saveLootSettings() {
         fixed: document.getElementById('set-l-fixed').checked
     };
     await db.from('game_settings').update({ value: stats }).eq('name', 'lootSettings');
-    alert("LOOT_PROTOCOL SYNCED.");
+    alert("아이템 드랍 설정 동기화 완료.");
 }

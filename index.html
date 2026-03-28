@@ -24,10 +24,10 @@
         <div id="screen-main" class="screen active">
             <div style="position: absolute; top: 120px; left: var(--safe-padding); z-index: 30; font-family: 'Space Grotesk';">
                 <div style="font-size: 0.6rem; color: var(--primary-gold); letter-spacing: 2px;">COMMANDER_PROFILE</div>
-                <div style="font-size: 1.2rem; font-weight: 700;">LV. <span id="main-level">24</span></div>
+                <div style="font-size: 1.2rem; font-weight: 700;">LV. <span id="main-level">1</span></div>
                 <div style="font-size: 0.65rem; color: var(--secondary-cyan); margin-top: 5px;">정령 카드 보유: <span id="hud-spirit-cards">0</span></div>
                 <div style="width: 150px; height: 4px; background: rgba(255,255,255,0.05); margin-top: 8px; border-radius: 2px;">
-                    <div id="main-xp-bar" style="width: 88%; height: 100%; background: var(--primary-gold); box-shadow: 0 0 10px var(--primary-gold);"></div>
+                    <div id="main-xp-bar" style="width: 0%; height: 100%; background: var(--primary-gold); box-shadow: 0 0 10px var(--primary-gold);"></div>
                 </div>
             </div>
             <div class="main-menu-content">
@@ -80,7 +80,7 @@
             </div>
         </div>
 
-        <!-- COMBAT SCENE (IMPROVED) -->
+        <!-- COMBAT SCENE -->
         <div id="screen-combat" class="screen">
             <div class="combat-scene">
                 <div class="enemy-area">
@@ -124,7 +124,7 @@
                     </div>
 
                     <div class="combat-controls">
-                        <button class="btn-primary" id="btn-attack" onclick="executePlayerTurn('slash')">공격하기 (공격)</button>
+                        <button class="btn-primary" id="btn-attack" onclick="executePlayerTurn('slash')">⚔ 검 공격 (SLASH)</button>
                         <button class="btn-primary" id="btn-potion" style="background: linear-gradient(135deg, var(--secondary-cyan) 0%, #00a89d 100%);" onclick="usePotion()">회복하기 (0)</button>
                         <button class="btn-nav" style="text-align: center;" onclick="showScreen('dashboard'); stopAutoBattle();">후퇴 (퇴각)</button>
                     </div>
@@ -132,6 +132,7 @@
             </div>
         </div>
 
+        <!-- SETTINGS SCREEN (완전 리뉴얼) -->
         <div id="screen-settings" class="screen" style="overflow-y: auto; background: var(--bg-void); padding: 100px 20px 50px;">
             <div style="max-width: 800px; margin: 0 auto;">
                 <h1 style="font-family: 'Space Grotesk'; color: var(--primary-gold); font-size: 1.5rem; margin-bottom: 30px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 15px;">시스템 관리자 메뉴 // SYNC_HUB</h1>
@@ -160,11 +161,32 @@
                     <button class="btn-primary" style="margin-top: 20px; width: 100%; padding: 12px; font-size: 0.8rem;" onclick="savePlayerSettings()">캐릭터 데이터 동기화</button>
                 </div>
 
-                <!-- Monster Database -->
+                <!-- Monster Database (리뉴얼) -->
                 <div class="glass-panel" style="margin-bottom: 20px; padding: 25px;">
-                    <h3 style="color: var(--accent-red); font-size: 0.9rem; margin-bottom: 20px;">몬스터 데이터베이스 (BIOLOGICAL_DB)</h3>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h3 style="color: var(--accent-red); font-size: 0.9rem; margin: 0;">몬스터 데이터베이스 (CREATURE_DB)</h3>
+                    </div>
+                    
+                    <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                        <div class="glass-panel" style="flex:1; padding: 12px; text-align: center; cursor: pointer; border-color: rgba(0,253,236,0.3);" onclick="addMonster('normal')">
+                            <div style="font-size: 0.7rem; color: var(--secondary-cyan);">🗡 일반 몬스터 추가</div>
+                        </div>
+                        <div class="glass-panel" style="flex:1; padding: 12px; text-align: center; cursor: pointer; border-color: rgba(233,196,0,0.3);" onclick="addMonster('boss')">
+                            <div style="font-size: 0.7rem; color: var(--primary-gold);">⚔ 보스 몬스터 추가</div>
+                        </div>
+                    </div>
+                    
                     <div id="set-monster-list"></div>
-                    <button class="btn-primary" style="margin-top: 20px; width: 100%; padding: 12px; font-size: 0.8rem; background: linear-gradient(135deg, var(--accent-red) 0%, #b30000 100%);" onclick="saveMonsterPool()">인카운터 데이터 업데이트</button>
+                    
+                    <button class="btn-primary" style="margin-top: 15px; width: 100%; padding: 12px; font-size: 0.8rem; background: linear-gradient(135deg, var(--accent-red) 0%, #b30000 100%);" onclick="saveMonsterPool()">전체 몬스터 데이터 저장</button>
+                    
+                    <div style="margin-top: 10px; padding: 10px; background: rgba(233,196,0,0.05); border-radius: 8px; border: 1px solid rgba(233,196,0,0.1);">
+                        <div style="font-size: 0.55rem; color: var(--primary-gold); line-height: 1.5;">
+                            💡 <b>보스 몬스터</b>는 포탈에 지정하면 해당 위치에서만 등장합니다.<br>
+                            💡 보스 처치 시 <b>정령 카드 100%</b> 드랍이 보장됩니다.<br>
+                            💡 지정 없는 포탈에서는 <b>일반 몬스터</b>가 랜덤 출현합니다.
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Loot Settings -->
@@ -177,7 +199,7 @@
                         </div>
                         <div style="display: flex; align-items: center; gap: 10px; padding-top: 15px;">
                             <input type="checkbox" id="set-l-fixed" style="width: 20px; height: 20px;">
-                            <label style="margin-bottom: 0;">확정 드랍 보드</label>
+                            <label style="margin-bottom: 0;">확정 드랍 모드</label>
                         </div>
                     </div>
                     <button class="btn-primary" style="margin-top: 20px; width: 100%; padding: 12px; font-size: 0.8rem;" onclick="saveLootSettings()">아이템 설정 동기화</button>
@@ -185,44 +207,56 @@
 
                 <!-- Portal Management -->
                 <div class="glass-panel" style="margin-bottom: 20px; padding: 25px;">
-                    <h3 style="color: var(--secondary-cyan); font-size: 0.9rem; margin-bottom: 20px;">차원 균열 및 미션 관리 (RIFT_MESSAGES)</h3>
+                    <h3 style="color: var(--secondary-cyan); font-size: 0.9rem; margin-bottom: 20px;">차원 균열 및 미션 관리 (RIFT_CONTROL)</h3>
                     <div id="set-map" style="height: 300px; border-radius: 12px; margin-bottom: 20px; border: 1px solid var(--glass-border);"></div>
                     <div id="set-portal-list"></div>
-                    <div style="margin-top: 20px; font-size: 0.7rem; color: var(--text-dim); text-align: center;">[!] 지도를 클릭하여 새로운 미션 지점을 생성하세요.</div>
+                    <div style="margin-top: 15px; padding: 12px; background: rgba(0,253,236,0.03); border-radius: 8px; border: 1px solid rgba(0,253,236,0.1);">
+                        <div style="font-size: 0.55rem; color: var(--secondary-cyan); line-height: 1.5;">
+                            📍 지도를 클릭하여 새 포탈을 생성하세요.<br>
+                            📍 EDIT 버튼으로 <b>보스 몬스터 지정, 반경, 조사 거리</b>를 설정합니다.<br>
+                            📍 <span style="color: var(--accent-red);">빨간 마커</span> = 보스 구역 / <span style="color: var(--secondary-cyan);">파란 마커</span> = 일반 구역
+                        </div>
+                    </div>
                 </div>
 
-                <button class="btn-nav" style="width: 100%; text-align: center; margin-bottom: 50px;" onclick="showScreen('main')">설정 종료 (SAVE_ALL)</button>
+                <button class="btn-nav" style="width: 100%; text-align: center; margin-bottom: 50px;" onclick="showScreen('main')">설정 종료 (EXIT_SETTINGS)</button>
             </div>
         </div>
 
-        <div id="portal-editor-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:2000; padding:20px;">
-            <div class="glass-panel" style="max-width:400px; margin:50px auto; padding:20px;">
-                <h3 style="color:var(--primary-gold); margin-bottom:15px;">지역 정보 설정</h3>
-                <label style="font-size:0.6rem;">지역 이름</label>
-                <input type="text" id="ed-p-name" class="btn-nav" style="width:100%; margin-bottom:10px;">
-                <label style="font-size:0.6rem;">미션 문구</label>
-                <textarea id="ed-p-mission" class="btn-nav" style="width:100%; height:60px; margin-bottom:10px;"></textarea>
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+        <!-- Portal Editor Modal -->
+        <div id="portal-editor-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:2000; padding:20px; overflow-y:auto;">
+            <div class="glass-panel" style="max-width:420px; margin:50px auto; padding:25px;">
+                <h3 style="color:var(--primary-gold); margin-bottom:20px; font-size: 1rem;">⚙ 포탈 상세 설정</h3>
+                
+                <label style="font-size:0.6rem; color: var(--text-dim);">지역 이름</label>
+                <input type="text" id="ed-p-name" class="btn-nav" style="width:100%; margin-bottom:12px;">
+                
+                <label style="font-size:0.6rem; color: var(--text-dim);">미션 문구</label>
+                <textarea id="ed-p-mission" class="btn-nav" style="width:100%; height:60px; margin-bottom:12px;"></textarea>
+                
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom: 15px;">
                     <div>
-                        <label style="font-size:0.6rem;">미션 반경 (m)</label>
-                        <input type="number" id="ed-p-radius" class="btn-nav" style="width:100%;">
+                        <label style="font-size:0.6rem; color: var(--text-dim);">감지 반경 (m)</label>
+                        <input type="number" id="ed-p-radius" class="btn-nav" style="width:100%;" placeholder="100">
                     </div>
                     <div>
-                        <label style="font-size:0.6rem;">인카운터 확률 (%)</label>
-                        <input type="number" id="ed-p-chance" class="btn-nav" style="width:100%;">
-                    </div>
-                    <div>
-                        <label style="font-size:0.6rem;">출현 거리 (m)</label>
-                        <input type="number" id="ed-p-walk" class="btn-nav" style="width:100%;">
-                    </div>
-                    <div>
-                        <label style="font-size:0.6rem; color: var(--primary-gold); display: block; margin-bottom: 5px;">지정 몬스터 / 보스 (SPECIFIED_BOSS)</label>
-                        <select id="ed-p-monster" class="btn-nav" style="width:100%; height:35px; border-color: var(--primary-gold); font-size: 0.75rem;"></select>
+                        <label style="font-size:0.6rem; color: var(--text-dim);">조사 필요 거리 (m)</label>
+                        <input type="number" id="ed-p-walk" class="btn-nav" style="width:100%;" placeholder="20">
                     </div>
                 </div>
-                <div style="display:flex; gap:10px; margin-top:20px;">
-                    <button class="btn-primary" style="flex:1;" onclick="applyPortalEdit()">적용하기</button>
-                    <button class="btn-nav" style="flex:1;" onclick="closePortalEditor()">취소</button>
+                
+                <div style="margin-bottom: 20px; padding: 15px; background: rgba(233,196,0,0.05); border-radius: 12px; border: 1px solid rgba(233,196,0,0.15);">
+                    <label style="font-size: 0.65rem; color: var(--primary-gold); display: block; margin-bottom: 8px; font-weight: 700;">⚔ 출현 몬스터 지정</label>
+                    <select id="ed-p-monster" class="btn-nav" style="width:100%; height:40px; border-color: var(--primary-gold); font-size: 0.75rem;"></select>
+                    <div style="font-size: 0.5rem; color: var(--text-dim); margin-top: 8px; line-height: 1.4;">
+                        보스 몬스터를 선택하면 이 위치가 <span style="color: var(--primary-gold);">보스 존</span>이 됩니다.<br>
+                        '랜덤'을 선택하면 일반 몬스터가 무작위로 출현합니다.
+                    </div>
+                </div>
+                
+                <div style="display:flex; gap:10px;">
+                    <button class="btn-primary" style="flex:1; padding: 14px;" onclick="applyPortalEdit()">적용하기</button>
+                    <button class="btn-nav" style="flex:1; text-align: center;" onclick="closePortalEditor()">취소</button>
                 </div>
             </div>
         </div>
