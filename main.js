@@ -403,12 +403,13 @@ async function handleVictory() {
 
     await db.from('player_state').update(stats).eq('id', 'singleton');
     updateDashboardHUD();
-}
 
     setTimeout(() => {
-        showScreen('dashboard');
-        stopAutoBattle();
-    }, 2000);
+        if (combatState.isGameOver) {
+            showScreen('dashboard');
+            stopAutoBattle();
+        }
+    }, 3000);
 }
 
 function updateCombatUI() {
