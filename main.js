@@ -153,8 +153,21 @@ async function loadPortals() {
     portals.forEach(p => {
         const names = parsePortalMonsters(p.target_monster_name);
         const hasBoss = names.some(n => { const m = pool.find(x => x.name === n); return m && m.type === 'boss'; });
-        const color = hasBoss ? 'var(--accent-red)' : 'var(--secondary-cyan)';
-        const icon = L.divIcon({ className: 'portal-marker', html: `<div class="portal-node" style="background:${color};box-shadow:0 0 20px ${color};"></div>`, iconSize: [20, 20], iconAnchor: [10, 10] });
+        const hexColor = hasBoss ? '#ff4d4d' : '#00fdec';
+        const cssColor = hasBoss ? 'var(--accent-red)' : 'var(--secondary-cyan)';
+        // 반경 원 표시
+        const radiusCircle = L.circle([p.lat, p.lng], {
+            radius: p.radius || 100,
+            color: hexColor,
+            weight: 1.5,
+            opacity: 0.5,
+            fillColor: hexColor,
+            fillOpacity: 0.08,
+            dashArray: '6, 4'
+        }).addTo(map);
+        portalMarkers.push(radiusCircle);
+        // 포탈 마커
+        const icon = L.divIcon({ className: 'portal-marker', html: `<div class="portal-node" style="background:${cssColor};box-shadow:0 0 20px ${cssColor};"></div>`, iconSize: [20, 20], iconAnchor: [10, 10] });
         const marker = L.marker([p.lat, p.lng], { icon: icon }).addTo(map).on('click', () => { forcedPortalId = p.id; checkProximity(); });
         portalMarkers.push(marker);
     });
@@ -622,7 +635,7 @@ async function renderSettingsPortalList() {
     const pool = await getMonsterPool();
     const container = document.getElementById('set-portal-list');
     container.innerHTML = '';
-    setMap.eachLayer((layer) => { if (layer instanceof L.Marker) setMap.removeLayer(layer); });
+    setMap.eachLayer((layer) => { if (layer instanceof L.Marker || layer instanceof L.Circle) setMap.removeLayer(layer); });
     portals.forEach(p => {
         const assignedNames = parsePortalMonsters(p.target_monster_name);
         const hasBoss = assignedNames.some(n => { const m = pool.find(x => x.name === n); return m && m.type === 'boss'; });
@@ -652,8 +665,18 @@ async function renderSettingsPortalList() {
             </div>`;
         container.appendChild(item);
         const mc = hasBoss ? '#ff4d4d' : '#00fdec';
+        // 설정 맵에도 반경 원 표시
+        L.circle([p.lat, p.lng], {
+            radius: p.radius || 100,
+            color: mc,
+            weight: 1.5,
+            opacity: 0.6,
+            fillColor: mc,
+            fillOpacity: 0.1,
+            dashArray: '6, 4'
+        }).addTo(setMap);
         const mi = L.divIcon({ className: 'portal-marker', html: `<div style="width:14px;height:14px;background:${mc};border-radius:50%;box-shadow:0 0 10px ${mc};border:2px solid rgba(255,255,255,0.3);"></div>`, iconSize: [14,14], iconAnchor: [7,7] });
-        L.marker([p.lat, p.lng], { icon: mi }).addTo(setMap).bindPopup(`<b>${p.name}</b><br>${hasBoss ? '⚔ BOSS ZONE' : '일반 구역'}`);
+        L.marker([p.lat, p.lng], { icon: mi }).addTo(setMap).bindPopup(`<b>${p.name}</b><br>${hasBoss ? '⚔ BOSS ZONE' : '일반 구역'}<br>반경: ${p.radius || 100}m`);
     });
 }
 
