@@ -74,7 +74,11 @@ async function initApp() {
     try {
         const savedPotions = localStorage.getItem('potions');
         if (savedPotions) combatState.potions = parseInt(savedPotions);
-    } catch(e) { console.log("LocalStorage access inhibited."); }
+        
+        // Pre-fetch critical data
+        cachedMonsterPool = await getMonsterPool();
+        cachedPlayerStats = await getPlayerSettings();
+    } catch(e) { console.log("Init sequence data fetch warning:", e); }
     
     // Initial UI Setup
     updateClock();
@@ -147,16 +151,35 @@ function startTracking() {
     }
 }
 
+let cachedPlayerStats = null;
+let cachedMonsterPool = null;
+
 async function updateDashboardHUD() {
     const stats = await getPlayerSettings();
-    document.getElementById('hud-level').innerText = stats.level || 1;
-    document.getElementById('hud-hp-text').innerText = `${Math.ceil((combatState.playerHP/combatState.playerMaxHP)*100)}%`;
-    document.getElementById('hud-hp-bar').style.width = `${(combatState.playerHP/combatState.playerMaxHP)*100}%`;
+    cachedPlayerStats = stats;
     
-    // XP Bar
+    // Main Screen HUD
+    const mainLevel = document.getElementById('main-level');
+    if (mainLevel) mainLevel.innerText = stats.level || 1;
+    const hudSpirit = document.getElementById('hud-spirit-cards');
+    if (hudSpirit) hudSpirit.innerText = stats.spirit_cards || 0;
+    
+    // XP Bar on Main
     const xpNeeded = (stats.level || 1) * 100;
     const xpPercent = Math.min(100, ((stats.xp || 0) / xpNeeded) * 100);
-    document.getElementById('xp-bar').style.width = `${xpPercent}%`;
+    const mainXpBar = document.getElementById('main-xp-bar');
+    if (mainXpBar) mainXpBar.style.width = `${xpPercent}%`;
+
+    // Combat/Dashboard HUD
+    const hudLevel = document.getElementById('hud-level');
+    if (hudLevel) hudLevel.innerText = stats.level || 1;
+    const hpText = document.getElementById('hud-hp-text');
+    if (hpText) hpText.innerText = `${Math.ceil((combatState.playerHP/combatState.playerMaxHP)*100)}%`;
+    const hpBar = document.getElementById('hud-hp-bar');
+    if (hpBar) hpBar.style.width = `${(combatState.playerHP/combatState.playerMaxHP)*100}%`;
+    
+    const xpBar = document.getElementById('xp-bar');
+    if (xpBar) xpBar.style.width = `${xpPercent}%`;
 }
 
 async function checkProximity() {
@@ -209,13 +232,16 @@ async function checkProximity() {
 
             // Encounter Check
             if (walkAccumulator >= targetDist) {
+                const monsterToSpawn = insidePortal.target_monster_name;
                 walkAccumulator = 0;
                 const roll = Math.random();
                 const chance = insidePortal.spawn_chance || 0.5;
                 
                 if (roll < chance) {
-                    document.getElementById('map-status').innerHTML = `<span style="color: var(--accent-red); animation: pulse 1s infinite;">[!] 경보: 적 개체 발견!</span>`;
-                    setTimeout(() => { if (activeScreen === 'dashboard') startCombat(insidePortal.target_monster_name); }, 1500);
+                    document.getElementById('map-status').innerHTML = `<span style="color: var(--accent-red); animation: pulse 1s infinite; font-weight:bold;">[!] 적의 기습! 전투 화면으로 전환합니다...</span>`;
+                    setTimeout(() => { 
+                        if (activeScreen === 'dashboard') startCombat(monsterToSpawn); 
+                    }, 1200);
                 } else {
                     document.getElementById('map-status').innerText = "이상 없음. 조사가 계속됩니다.";
                 }
@@ -449,13 +475,21 @@ async function handleVictory() {
     renderLog(`전술 경험치 +${xpGain} 획득.`, "player");
 
     // Level Up
-    const xpNeeded = stats.level * 100;
+    const xpNeeded = (stats.level || 1) * 100;
     if (stats.xp >= xpNeeded) {
         stats.level++;
         stats.xp -= xpNeeded;
-        stats.hp += 20; // Bonus HP on level up
-        stats.atk += 5;  // Bonus ATK on level up
+        stats.hp += 20; 
+        stats.atk += 5;
         renderLog(`시스템 업그레이드! LEVEL ${stats.level} 달성!`, "player");
+    }
+
+    // Boss Reward: Spirit Card (100% chance for BOSS/대왕)
+    const isBoss = combatState.currentEnemy.name.includes("BOSS") || combatState.currentEnemy.name.includes("대왕");
+    if (isBoss) {
+        stats.spirit_cards = (stats.spirit_cards || 0) + 1;
+        renderLog("희귀 데이터 획득: [정령 카드]를 확보했습니다!", "player");
+        playSound('victory'); 
     }
 
     // Potion Drop
@@ -474,7 +508,7 @@ async function handleVictory() {
             showScreen('dashboard');
             stopAutoBattle();
         }
-    }, 3000);
+    }, 4000); // 승리 후 4초 대기
 }
 
 function updateCombatUI() {
@@ -584,6 +618,7 @@ async function renderSettingsPortalList() {
     setMap.eachLayer((layer) => { if (layer instanceof L.Marker) setMap.removeLayer(layer); });
 
     portals.forEach(p => {
+        const isBoss = p.target_monster_name ? true : false;
         const item = document.createElement('div');
         item.className = 'glass-panel';
         item.style.marginBottom = '10px';
@@ -591,10 +626,12 @@ async function renderSettingsPortalList() {
         item.style.display = 'flex';
         item.style.justifyContent = 'space-between';
         item.style.alignItems = 'center';
+        if (isBoss) item.style.borderLeft = '4px solid var(--primary-gold)';
+        
         item.innerHTML = `
             <div>
-                <div style="font-size: 0.75rem; color:#fff;">${p.name}</div>
-                <div style="font-size: 0.6rem; color:var(--text-dim);">${p.mission_text?.substring(0,20)}...</div>
+                <div style="font-size: 0.75rem; color:${isBoss ? 'var(--primary-gold)' : '#fff'}; font-weight:${isBoss ? '700' : '400'};">${p.name} ${isBoss ? '[BOSS]' : ''}</div>
+                <div style="font-size: 0.6rem; color:var(--text-dim);">${p.mission_text?.substring(0,25)}...</div>
             </div>
             <div style="display:flex; gap:10px;">
                 <button class="btn-nav" style="padding: 5px 10px; font-size: 0.6rem; border-color: var(--secondary-cyan);" onclick="openPortalEditor(${p.id})">EDIT</button>
