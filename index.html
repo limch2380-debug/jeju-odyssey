@@ -13,8 +13,75 @@
 </head>
 <body>
     <div id="app-container">
+        <!-- LOGIN / LANDING SCREEN -->
+        <div id="screen-login" class="screen active" style="background: linear-gradient(180deg, #0a0c1a 0%, #101221 40%, #0d1025 100%); overflow-y: auto;">
+            <!-- 파티클 배경 -->
+            <canvas id="particle-canvas" style="position:absolute; inset:0; z-index:0; pointer-events:none;"></canvas>
+            
+            <div style="position:relative; z-index:1; padding: 30px 20px; min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+                <!-- 로고 -->
+                <div style="text-align:center; margin-bottom:30px;">
+                    <div style="font-size:0.75rem; letter-spacing:6px; color:var(--secondary-cyan); font-family:'Space Grotesk'; margin-bottom:8px; text-shadow:0 0 20px rgba(0,253,236,0.3);">DIMENSION RIFT</div>
+                    <h1 style="font-size:2.2rem; font-weight:900; background:linear-gradient(135deg, #ffe16f, #e9c400, #ff9500); -webkit-background-clip:text; -webkit-text-fill-color:transparent; margin:0; line-height:1.1; text-shadow:none; filter:drop-shadow(0 0 30px rgba(233,196,0,0.3));">제주 오디세이</h1>
+                    <div style="font-size:0.7rem; color:rgba(225,225,246,0.5); font-family:'Space Grotesk'; letter-spacing:3px; margin-top:6px;">JEJU ODYSSEY — CARD BATTLE RPG</div>
+                </div>
+
+                <!-- 게임 설명 카드들 -->
+                <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:10px; max-width:380px; width:100%; margin-bottom:30px;">
+                    <div style="background:rgba(29,31,45,0.6); backdrop-filter:blur(12px); border:1px solid rgba(0,253,236,0.12); border-radius:14px; padding:16px 8px; text-align:center;">
+                        <div style="font-size:1.5rem; margin-bottom:6px;">🗺</div>
+                        <div style="font-size:0.7rem; color:var(--secondary-cyan); font-weight:700;">위치기반</div>
+                        <div style="font-size:0.55rem; color:rgba(225,225,246,0.4); margin-top:3px;">GPS 탐사</div>
+                    </div>
+                    <div style="background:rgba(29,31,45,0.6); backdrop-filter:blur(12px); border:1px solid rgba(233,196,0,0.12); border-radius:14px; padding:16px 8px; text-align:center;">
+                        <div style="font-size:1.5rem; margin-bottom:6px;">⚔</div>
+                        <div style="font-size:0.7rem; color:var(--primary-gold); font-weight:700;">카드 배틀</div>
+                        <div style="font-size:0.55rem; color:rgba(225,225,246,0.4); margin-top:3px;">자동 전투</div>
+                    </div>
+                    <div style="background:rgba(29,31,45,0.6); backdrop-filter:blur(12px); border:1px solid rgba(255,77,77,0.12); border-radius:14px; padding:16px 8px; text-align:center;">
+                        <div style="font-size:1.5rem; margin-bottom:6px;">🎴</div>
+                        <div style="font-size:0.7rem; color:var(--accent-red); font-weight:700;">카드 수집</div>
+                        <div style="font-size:0.55rem; color:rgba(225,225,246,0.4); margin-top:3px;">합성 & 강화</div>
+                    </div>
+                </div>
+
+                <!-- 게임 소개 텍스트 -->
+                <div style="max-width:380px; width:100%; text-align:center; margin-bottom:30px;">
+                    <p style="font-size:0.75rem; color:rgba(208,198,172,0.7); line-height:1.6; margin:0;">
+                        제주도 곳곳에 열린 <span style="color:var(--secondary-cyan);">차원의 균열</span>을 탐험하세요.<br>
+                        몬스터 카드를 수집하고 합성하여<br>
+                        <span style="color:var(--primary-gold);">최강의 덱</span>을 구축하세요.
+                    </p>
+                </div>
+
+                <!-- 로그인 폼 -->
+                <div id="login-form" style="max-width:380px; width:100%; background:rgba(29,31,45,0.5); backdrop-filter:blur(16px); border:1px solid rgba(233,196,0,0.1); border-radius:18px; padding:28px 24px;">
+                    <div style="text-align:center; margin-bottom:20px;">
+                        <div style="font-size:0.95rem; color:var(--primary-gold); font-weight:700;">모험을 시작하세요</div>
+                        <div style="font-size:0.65rem; color:rgba(225,225,246,0.4); margin-top:4px;">로그인 또는 새 계정 만들기</div>
+                    </div>
+                    <div style="margin-bottom:14px;">
+                        <label style="font-size:0.7rem; color:var(--text-dim); display:block; margin-bottom:5px;">👤 아이디</label>
+                        <input id="login-username" type="text" placeholder="아이디를 입력하세요" style="width:100%; padding:14px 16px; font-size:0.9rem; background:rgba(11,13,27,0.8); border:1px solid rgba(77,70,50,0.3); border-radius:12px; color:#e1e1f6; outline:none; transition:0.3s;" onfocus="this.style.borderColor='rgba(0,253,236,0.4)'" onblur="this.style.borderColor='rgba(77,70,50,0.3)'">
+                    </div>
+                    <div style="margin-bottom:20px;">
+                        <label style="font-size:0.7rem; color:var(--text-dim); display:block; margin-bottom:5px;">🔒 비밀번호</label>
+                        <input id="login-password" type="password" placeholder="비밀번호를 입력하세요" style="width:100%; padding:14px 16px; font-size:0.9rem; background:rgba(11,13,27,0.8); border:1px solid rgba(77,70,50,0.3); border-radius:12px; color:#e1e1f6; outline:none; transition:0.3s;" onfocus="this.style.borderColor='rgba(0,253,236,0.4)'" onblur="this.style.borderColor='rgba(77,70,50,0.3)'" onkeydown="if(event.key==='Enter')doLogin()">
+                    </div>
+                    <button onclick="doLogin()" style="width:100%; padding:16px; font-size:0.95rem; font-weight:700; border:none; border-radius:12px; background:linear-gradient(135deg, #e9c400, #ff9500); color:#3a3000; cursor:pointer; text-shadow:0 1px 2px rgba(0,0,0,0.1); transition:0.3s; letter-spacing:1px;">로그인</button>
+                    <button onclick="doRegister()" style="width:100%; padding:14px; font-size:0.85rem; font-weight:600; border:1px solid rgba(0,253,236,0.25); border-radius:12px; background:transparent; color:var(--secondary-cyan); cursor:pointer; margin-top:10px; transition:0.3s; letter-spacing:1px;">회원가입</button>
+                    <div id="login-message" style="text-align:center; margin-top:14px; font-size:0.75rem; color:var(--accent-red); min-height:20px;"></div>
+                </div>
+
+                <!-- 버전 -->
+                <div style="margin-top:30px; text-align:center;">
+                    <div style="font-size:0.55rem; color:rgba(225,225,246,0.2); font-family:'Space Grotesk'; letter-spacing:3px;">v1.0 // Built with Supabase</div>
+                </div>
+            </div>
+        </div>
+
         <!-- MAIN MENU -->
-        <div id="screen-main" class="screen active">
+        <div id="screen-main" class="screen">
             <div class="top-bar">
                 <span id="system-time" style="font-family: 'Space Grotesk'; font-size: 0.7rem; color: var(--text-dim); letter-spacing: 2px;"></span>
             </div>
@@ -46,9 +113,12 @@
                     <div><div style="font-size: 0.9rem; font-weight: 700; color: var(--secondary-cyan);" id="hunt-potions">0</div><div style="font-size: 0.4rem; color: var(--text-dim);">포션</div></div>
                 </div>
             </div>
-            <div style="position: absolute; bottom: 15px; left: 30px;">
+            <div style="position: absolute; bottom: 15px; left: 30px; right: 30px; display:flex; justify-content:space-between;">
                 <div onclick="startCombat(null,false)" class="glass-panel" style="padding: 6px 12px; border-radius: 10px; border-color: rgba(255,77,77,0.3); cursor:pointer; display: inline-block;">
                     <span style="font-family:'Space Grotesk'; font-size:0.5rem; color:var(--accent-red); letter-spacing:2px;">TEST</span>
+                </div>
+                <div onclick="doLogout()" class="glass-panel" style="padding: 6px 12px; border-radius: 10px; border-color: rgba(255,255,255,0.1); cursor:pointer; display: inline-block;">
+                    <span style="font-family:'Space Grotesk'; font-size:0.5rem; color:var(--text-dim); letter-spacing:2px;">🚪 로그아웃</span>
                 </div>
             </div>
         </div>

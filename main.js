@@ -67,7 +67,8 @@ async function getMonsterPool() {
     return data ? data.value : DEFAULT_MONSTERS;
 }
 async function getPlayerSettings() {
-    const { data } = await db.from('player_state').select('*').eq('id', 'singleton').single();
+    const uid = currentUserId || 'singleton';
+    const { data } = await db.from('player_state').select('*').eq('id', uid).single();
     return data || {"hp": 100, "atk": 20, "def": 10, "potions": 1};
 }
 async function getLootSettings() {
@@ -113,21 +114,128 @@ let combatState = { playerHP: 100, playerMaxHP: 100, potions: 1, currentEnemy: n
 let autoBattleInterval = null;
 let cachedPlayerStats = null;
 let cachedMonsterPool = null;
+let currentUserId = null; // 로그인된 유저 ID
 
-async function initApp() {
+// ===== 파티클 배경 =====
+function initParticles() {
+    const canvas = document.getElementById('particle-canvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    const particles = [];
+    for (let i = 0; i < 50; i++) {
+        particles.push({
+            x: Math.random() * canvas.width,
+            y: Math.random() * canvas.height,
+            size: Math.random() * 2 + 0.5,
+            speedY: Math.random() * 0.3 + 0.1,
+            alpha: Math.random() * 0.5 + 0.1,
+            color: Math.random() > 0.5 ? '0,253,236' : '233,196,0'
+        });
+    }
+    function animate() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        particles.forEach(p => {
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(${p.color},${p.alpha})`;
+            ctx.fill();
+            p.y -= p.speedY;
+            if (p.y < -10) { p.y = canvas.height + 10; p.x = Math.random() * canvas.width; }
+        });
+        requestAnimationFrame(animate);
+    }
+    animate();
+}
+
+// ===== 비밀번호 해싱 (간단한 SHA-256) =====
+async function hashPassword(password) {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(password + 'jeju_odyssey_salt_2026');
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// ===== 회원가입 =====
+async function doRegister() {
+    const username = document.getElementById('login-username').value.trim();
+    const password = document.getElementById('login-password').value.trim();
+    const msgEl = document.getElementById('login-message');
+    if (!username || !password) { msgEl.innerText = '아이디와 비밀번호를 입력하세요.'; msgEl.style.color = 'var(--accent-red)'; return; }
+    if (username.length < 2) { msgEl.innerText = '아이디는 2자 이상이어야 합니다.'; msgEl.style.color = 'var(--accent-red)'; return; }
+    if (password.length < 4) { msgEl.innerText = '비밀번호는 4자 이상이어야 합니다.'; msgEl.style.color = 'var(--accent-red)'; return; }
+    
+    msgEl.innerText = '계정 생성 중...'; msgEl.style.color = 'var(--secondary-cyan)';
+    const hash = await hashPassword(password);
+    
+    // 중복 체크
+    const { data: existing } = await db.from('users').select('id').eq('username', username).single();
+    if (existing) { msgEl.innerText = '이미 사용 중인 아이디입니다.'; msgEl.style.color = 'var(--accent-red)'; return; }
+    
+    // 유저 생성
+    const { data: newUser, error } = await db.from('users').insert({ username, password_hash: hash, display_name: username }).select().single();
+    if (error) { msgEl.innerText = '회원가입 실패: ' + error.message; msgEl.style.color = 'var(--accent-red)'; return; }
+    
+    // 플레이어 데이터 생성 (빈 인벤토리)
+    await db.from('player_state').insert({ id: newUser.id, user_id: newUser.id, hp: 100, atk: 20, def: 10, potions: 1, xp: 0, level: 1, inventory: [], selected_card: -1 });
+    
+    msgEl.innerText = '✅ 회원가입 완료! 로그인해주세요.'; msgEl.style.color = 'var(--secondary-cyan)';
+}
+
+// ===== 로그인 =====
+async function doLogin() {
+    const username = document.getElementById('login-username').value.trim();
+    const password = document.getElementById('login-password').value.trim();
+    const msgEl = document.getElementById('login-message');
+    if (!username || !password) { msgEl.innerText = '아이디와 비밀번호를 입력하세요.'; msgEl.style.color = 'var(--accent-red)'; return; }
+    
+    msgEl.innerText = '로그인 중...'; msgEl.style.color = 'var(--secondary-cyan)';
+    const hash = await hashPassword(password);
+    
+    const { data: user } = await db.from('users').select('*').eq('username', username).eq('password_hash', hash).single();
+    if (!user) { msgEl.innerText = '아이디 또는 비밀번호가 올바르지 않습니다.'; msgEl.style.color = 'var(--accent-red)'; return; }
+    
+    // 로그인 성공
+    currentUserId = user.id;
+    await db.from('users').update({ last_login: new Date().toISOString() }).eq('id', user.id);
+    
+    // 유저 데이터 로드
+    await initAppForUser();
+}
+
+// ===== 유저별 앱 초기화 =====
+async function initAppForUser() {
     try {
         cachedMonsterPool = await getMonsterPool();
         cachedPlayerStats = await getPlayerSettings();
-        // 첫 시작 시 고블린 카드 1장 지급
         const inv = await getInventory();
-        if (inv.length === 0) {
-            await addCardToInventory('goblin_soldier');
-            console.log('[CARD] 초기 고블린 카드 지급');
-        }
         await updateSelectedCardDisplay();
-    } catch(e) { console.log("Init warning:", e); }
+        updateClock();
+        updateHuntLogUI();
+        
+        // 카드가 없으면 인벤토리로 (카드 뽑기)
+        if (inv.length === 0) {
+            showScreen('inventory');
+        } else {
+            showScreen('main');
+        }
+    } catch(e) { console.log("Init warning:", e); showScreen('main'); }
+}
+
+// ===== 로그아웃 =====
+function doLogout() {
+    currentUserId = null;
+    cachedPlayerStats = null;
+    huntLog = { kills: 0, bossKills: 0, potions: 0, cardsGot: 0 };
+    showScreen('login');
+}
+
+// 기존 initApp은 파티클만 초기화
+function initApp() {
+    initParticles();
     updateClock();
-    updateHuntLogUI();
 }
 initApp();
 
@@ -499,7 +607,7 @@ async function usePotion() {
     const heal = Math.floor(combatState.playerMaxHP * 0.5);
     combatState.playerHP = Math.min(combatState.playerMaxHP, combatState.playerHP + heal);
     combatState.potions--;
-    await db.from('player_state').update({ potions: combatState.potions }).eq('id', 'singleton');
+    await db.from('player_state').update({ potions: combatState.potions }).eq('id', currentUserId||'singleton');
     playSound('potion'); renderLog(`포션! HP +${heal}`, 'player'); updateCombatUI();
     setTimeout(() => { combatState.busy = false; }, 800);
 }
@@ -621,7 +729,7 @@ async function handleVictory() {
         huntLog.potions++;
         renderLog('포션 드랍!', 'player');
     }
-    await db.from('player_state').update(stats).eq('id','singleton');
+    await db.from('player_state').update(stats).eq('id', currentUserId||'singleton');
     updateDashboardHUD();
     updateHuntLogUI();
     
@@ -906,7 +1014,7 @@ async function deletePortalInSettings(id) {
 }
 async function savePlayerSettings() {
     const stats = { hp: parseInt(document.getElementById('set-p-hp').value), atk: parseInt(document.getElementById('set-p-atk').value), def: parseInt(document.getElementById('set-p-def').value), potions: parseInt(document.getElementById('set-p-pot').value) };
-    await db.from('player_state').update(stats).eq('id', 'singleton');
+    await db.from('player_state').update(stats).eq('id', currentUserId||'singleton');
     alert("커맨더 데이터 동기화 완료.");
 }
 async function saveLootSettings() {

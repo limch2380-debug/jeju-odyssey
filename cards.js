@@ -49,15 +49,24 @@ async function getDropSettings() {
     return data ? data.value : {potionDrop:30};
 }
 async function getInventory() {
-    const {data} = await db.from('player_state').select('*').eq('id','singleton').single();
+    const uid = currentUserId || 'singleton';
+    const {data} = await db.from('player_state').select('*').eq('id', uid).single();
     return data?.inventory || [];
 }
-async function saveInventory(inv) { await db.from('player_state').update({inventory:inv}).eq('id','singleton'); }
+async function saveInventory(inv) {
+    const uid = currentUserId || 'singleton';
+    await db.from('player_state').update({inventory:inv}).eq('id', uid);
+}
 async function getSelectedIdx() {
-    const {data} = await db.from('player_state').select('selected_card').eq('id','singleton').single();
+    const uid = currentUserId || 'singleton';
+    const {data} = await db.from('player_state').select('selected_card').eq('id', uid).single();
     return data?.selected_card ?? -1;
 }
-async function setSelectedIdx(idx) { selectedCardIdx=idx; await db.from('player_state').update({selected_card:idx}).eq('id','singleton'); }
+async function setSelectedIdx(idx) {
+    const uid = currentUserId || 'singleton';
+    selectedCardIdx=idx;
+    await db.from('player_state').update({selected_card:idx}).eq('id', uid);
+}
 
 // Random in range
 function randRange(min,max) { return Math.floor(Math.random()*(max-min+1))+min; }
