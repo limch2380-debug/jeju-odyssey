@@ -232,6 +232,10 @@ async function initAppForUser() {
         const settingsBtn = document.getElementById('btn-settings');
         if (settingsBtn) settingsBtn.style.display = window.isAdmin ? 'block' : 'none';
         
+        // 실시간 동기화 시작
+        startHeartbeat();
+        startSettingsSync();
+        
         // 카드가 없으면 인벤토리로 (카드 뽑기)
         if (inv.length === 0) {
             showScreen('inventory');
@@ -247,6 +251,7 @@ function doLogout() {
     window.isAdmin = false;
     cachedPlayerStats = null;
     huntLog = { kills: 0, bossKills: 0, potions: 0, cardsGot: 0 };
+    stopHeartbeat();
     showScreen('login');
 }
 
@@ -279,7 +284,7 @@ function showScreen(screenId) {
     if (screenId === 'dashboard') {
         setTimeout(() => { initMap(); startTracking(); loadPortals(); if (map) { map.invalidateSize(); map.setView(currentUserPos, 17); } }, 100);
     } else if (screenId === 'settings') {
-        setTimeout(() => { initSettings(); renderCardEditor(); loadDropSettingsUI(); }, 100);
+        setTimeout(() => { initSettings(); renderCardEditor(); loadDropSettingsUI(); loadAdminUserList(); }, 100);
     } else if (screenId === 'inventory') {
         renderInventory();
     } else if (screenId === 'collection') {
@@ -1071,4 +1076,96 @@ async function saveLootSettings() {
     const s = { chance: parseFloat(document.getElementById('set-l-chance').value), fixed: document.getElementById('set-l-fixed').checked };
     await db.from('game_settings').update({ value: s }).eq('name', 'lootSettings');
     alert("아이템 드랍 설정 저장 완료.");
+}
+
+// ===== 실시간 Heart Beat & 설정 동기화 =====
+let heartbeatInterval = null;
+let settingsSyncInterval = null;
+
+function startHeartbeat() {
+    if (heartbeatInterval) clearInterval(heartbeatInterval);
+    heartbeatInterval = setInterval(async () => {
+        if (!currentUserId) return;
+        try {
+            await db.from('users').update({ last_active: new Date().toISOString() }).eq('id', currentUserId);
+        } catch(e) { console.log('[HB] err:', e); }
+    }, 30000);
+    if (currentUserId) {
+        db.from('users').update({ last_active: new Date().toISOString() }).eq('id', currentUserId);
+    }
+}
+
+function startSettingsSync() {
+    if (settingsSyncInterval) clearInterval(settingsSyncInterval);
+    settingsSyncInterval = setInterval(async () => {
+        if (!currentUserId) return;
+        try {
+            cachedMonsterPool = await getMonsterPool();
+            cachedPlayerStats = await getPlayerSettings();
+        } catch(e) { console.log('[SYNC] err:', e); }
+    }, 30000);
+}
+
+function stopHeartbeat() {
+    if (heartbeatInterval) { clearInterval(heartbeatInterval); heartbeatInterval = null; }
+    if (settingsSyncInterval) { clearInterval(settingsSyncInterval); settingsSyncInterval = null; }
+}
+
+// ===== 관리자: 유저 관리 =====
+async function loadAdminUserList() {
+    if (!window.isAdmin) return;
+    try {
+        const { data: users } = await db.from('users').select('*').order('last_active', { ascending: false });
+        if (!users) return;
+        const now = new Date();
+        const threshold = 2 * 60 * 1000;
+        let activeCount = 0, adminCount = 0;
+        const listEl = document.getElementById('admin-user-list');
+        listEl.innerHTML = '';
+        users.forEach(u => {
+            const la = new Date(u.last_active || u.last_login || u.created_at);
+            const diff = now - la;
+            const active = diff < threshold;
+            if (active) activeCount++;
+            if (u.is_admin) adminCount++;
+            const tStr = active ? '접속 중' : fmtDiff(diff) + ' 전';
+            const dot = active ? '🟢' : '⚫';
+            const div = document.createElement('div');
+            div.className = 'glass-panel';
+            div.style.cssText = `padding:12px;margin-bottom:8px;border-color:${active?'rgba(0,255,100,0.2)':'rgba(255,255,255,0.05)'};`;
+            div.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;">
+                <div>
+                    <div style="font-size:0.8rem;color:${u.is_admin?'var(--primary-gold)':'#e1e1f6'};font-weight:700;">${dot} ${u.username} ${u.is_admin?'👑':''}</div>
+                    <div style="font-size:0.55rem;color:var(--text-dim);margin-top:3px;">${tStr} | 가입: ${new Date(u.created_at).toLocaleDateString('ko-KR')}</div>
+                </div>
+                ${!u.is_admin?`<button onclick="adminDeleteUser('${u.id}','${u.username}')" style="padding:6px 10px;font-size:0.55rem;background:rgba(255,50,50,0.15);border:1px solid rgba(255,50,50,0.3);border-radius:8px;color:var(--accent-red);cursor:pointer;">🗑 삭제</button>`:`<span style="font-size:0.5rem;color:var(--primary-gold);">ADMIN</span>`}
+            </div>`;
+            listEl.appendChild(div);
+        });
+        document.getElementById('admin-total-users').innerText = users.length;
+        document.getElementById('admin-active-users').innerText = activeCount;
+        document.getElementById('admin-admin-users').innerText = adminCount;
+    } catch(e) { console.error('[ADMIN] err:', e); }
+}
+
+function fmtDiff(ms) {
+    const s = Math.floor(ms/1000);
+    if (s<60) return s+'초';
+    const m = Math.floor(s/60);
+    if (m<60) return m+'분';
+    const h = Math.floor(m/60);
+    if (h<24) return h+'시간';
+    return Math.floor(h/24)+'일';
+}
+
+async function adminDeleteUser(uid, uname) {
+    if (!window.isAdmin) return;
+    if (!confirm(`⚠ "${uname}" 계정을 정말 삭제하시겠습니까?\n\n모든 데이터가 삭제됩니다.`)) return;
+    if (!confirm(`최종 확인: "${uname}" 삭제`)) return;
+    try {
+        await db.from('player_state').delete().eq('id', uid);
+        await db.from('users').delete().eq('id', uid);
+        alert(`✅ "${uname}" 삭제 완료`);
+        loadAdminUserList();
+    } catch(e) { alert('삭제 실패: ' + e.message); }
 }

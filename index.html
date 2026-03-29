@@ -301,6 +301,29 @@
                     <div id="set-portal-list"></div>
                 </div>
 
+                <!-- 유저 관리 (관리자 전용) -->
+                <div class="glass-panel" style="margin-bottom: 20px; padding: 25px; border-color: rgba(255,77,77,0.2);">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                        <h3 style="color: var(--accent-red); font-size: 0.9rem;">👥 유저 관리</h3>
+                        <button class="btn-nav" style="padding:6px 12px; font-size:0.6rem;" onclick="loadAdminUserList()">🔄 새로고침</button>
+                    </div>
+                    <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:10px; margin-bottom:15px;">
+                        <div class="glass-panel" style="padding:12px; text-align:center; border-color:rgba(0,253,236,0.2);">
+                            <div id="admin-total-users" style="font-size:1.2rem; font-weight:700; color:var(--secondary-cyan);">0</div>
+                            <div style="font-size:0.5rem; color:var(--text-dim);">전체 유저</div>
+                        </div>
+                        <div class="glass-panel" style="padding:12px; text-align:center; border-color:rgba(0,255,100,0.2);">
+                            <div id="admin-active-users" style="font-size:1.2rem; font-weight:700; color:#00ff64;">0</div>
+                            <div style="font-size:0.5rem; color:var(--text-dim);">접속 중</div>
+                        </div>
+                        <div class="glass-panel" style="padding:12px; text-align:center; border-color:rgba(233,196,0,0.2);">
+                            <div id="admin-admin-users" style="font-size:1.2rem; font-weight:700; color:var(--primary-gold);">0</div>
+                            <div style="font-size:0.5rem; color:var(--text-dim);">관리자</div>
+                        </div>
+                    </div>
+                    <div id="admin-user-list" style="max-height:300px; overflow-y:auto;"></div>
+                </div>
+
                 <button class="btn-nav" style="width:100%; text-align:center; margin-bottom:50px;" onclick="showScreen('main')">설정 종료</button>
             </div>
         </div>
