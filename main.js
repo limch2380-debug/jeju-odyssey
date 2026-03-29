@@ -392,6 +392,8 @@ async function checkProximity() {
     if (encounterPending || proximityRunning) return;
     proximityRunning = true;
     try {
+        // ★ 전투 중이면 포탈 체크 스킵
+        if (activeScreen === 'combat') { proximityRunning = false; return; }
         const portals = await getPortals();
         const pool = await getMonsterPool();
         let nearestDist = Infinity;
@@ -625,16 +627,25 @@ function startAutoCombat() {
         if (!combatState.isGameOver && !combatState.busy) executePlayerTurn();
         else if (combatState.isGameOver) { clearInterval(autoBattleInterval); autoBattleInterval=null; }
     }, 1200);
+    // ★ 안전장치: busy가 3초 이상 지속되면 강제 해제
+    setInterval(() => {
+        if (combatState.busy && !combatState.isGameOver) {
+            combatState.busy = false;
+            console.log('[COMBAT] busy 강제 해제');
+        }
+    }, 3000);
 }
 
 async function usePotion() {
     if (combatState.isGameOver || combatState.busy || combatState.potions <= 0) return;
     combatState.busy = true;
-    const heal = Math.floor(combatState.playerMaxHP * 0.5);
-    combatState.playerHP = Math.min(combatState.playerMaxHP, combatState.playerHP + heal);
-    combatState.potions--;
-    await db.from('player_state').update({ potions: combatState.potions }).eq('id', currentUserId||'singleton');
-    playSound('potion'); renderLog(`포션! HP +${heal}`, 'player'); updateCombatUI();
+    try {
+        const heal = Math.floor(combatState.playerMaxHP * 0.5);
+        combatState.playerHP = Math.min(combatState.playerMaxHP, combatState.playerHP + heal);
+        combatState.potions--;
+        await db.from('player_state').update({ potions: combatState.potions }).eq('id', currentUserId||'singleton');
+        playSound('potion'); renderLog(`포션! HP +${heal}`, 'player'); updateCombatUI();
+    } catch(e) { console.error('[POTION] error:', e); }
     setTimeout(() => { combatState.busy = false; }, 800);
 }
 function updateActionButtons(enabled) {
@@ -708,8 +719,12 @@ function executePlayerTurn() {
     if(img) { img.classList.add('shake'); setTimeout(() => img.classList.remove('shake'), 400); }
     renderLog(`${combatState.cardName} 공격! ${dmg} 대미지${healAmt?` (+${healAmt} 흡혈)`:''}`, 'player');
     updateCombatUI();
-    if (enemy.hp <= 0) handleVictory();
-    else setTimeout(() => { combatState.busy = false; executeEnemyTurn(); }, 1000);
+    if (enemy.hp <= 0) {
+        combatState.busy = false;
+        handleVictory();
+    } else {
+        setTimeout(() => { combatState.busy = false; executeEnemyTurn(); }, 1000);
+    }
 }
 function applySkill(skill, dmg, label) {
     if (skill==='double_attack') {
@@ -729,6 +744,7 @@ function applySkill(skill, dmg, label) {
 async function handleVictory() {
     playSound('victory'); renderLog('전투 승리!', 'player');
     combatState.isGameOver = true;
+    combatState.busy = false;
     stopAutoBattle();
     const eImg = document.getElementById('enemy-img-main');
     if(eImg) eImg.style.opacity = '0';
@@ -738,28 +754,32 @@ async function handleVictory() {
     const isBoss = combatState.currentEnemy.type === 'boss';
     if (isBoss) huntLog.bossKills++;
     
-    // 카드 드랍 (등급별)
-    const droppedCards = await rollCardDrop(combatState.currentEnemy.name, isBoss);
-    droppedCards.forEach(d => {
-        huntLog.cardsGot++;
-        renderLog(`🃏 [${rarityLabel(d.rarity)}] ${d.name} 카드 획득!`, 'player');
-        playSound('victory');
-    });
-    if (droppedCards.length === 0) renderLog('카드 드랍 없음', 'enemy');
-    
-    // 포션 드랍
-    const dropS = await getDropSettings();
-    let stats = await getPlayerSettings();
-    if (Math.random() * 100 < (dropS.potionDrop||30)) {
-        stats.potions = (stats.potions||0) + 1;
-        huntLog.potions++;
-        renderLog('포션 드랍!', 'player');
+    try {
+        // 카드 드랍 (등급별)
+        const droppedCards = await rollCardDrop(combatState.currentEnemy.name, isBoss);
+        droppedCards.forEach(d => {
+            huntLog.cardsGot++;
+            renderLog(`🃏 [${rarityLabel(d.rarity)}] ${d.name} 카드 획득!`, 'player');
+            playSound('victory');
+        });
+        if (droppedCards.length === 0) renderLog('카드 드랍 없음', 'enemy');
+        
+        // 포션 드랍
+        const dropS = await getDropSettings();
+        let stats = await getPlayerSettings();
+        if (Math.random() * 100 < (dropS.potionDrop||30)) {
+            stats.potions = (stats.potions||0) + 1;
+            huntLog.potions++;
+            renderLog('포션 드랍!', 'player');
+        }
+        await db.from('player_state').update(stats).eq('id', currentUserId||'singleton');
+    } catch(e) {
+        console.error('[VICTORY] DB error:', e);
+        renderLog('데이터 저장 오류 (자동 복구)', 'enemy');
     }
-    await db.from('player_state').update(stats).eq('id', currentUserId||'singleton');
     updateDashboardHUD();
     updateHuntLogUI();
     
-    // 자동전투 종료 후 포탈 반경 내면 재사냥
     stopAutoBattle();
     
     setTimeout(async () => { 
@@ -768,21 +788,19 @@ async function handleVictory() {
         
         // ★ 아직 포탈 반경 안에 있으면 자동으로 다시 사냥 시작
         if (autoHuntPortal) {
-            const dist = L.latLng(currentUserPos).distanceTo(L.latLng(autoHuntPortal.lat, autoHuntPortal.lng));
-            if (dist < (autoHuntPortal.radius || 100)) {
-                // 아직 반경 안 → 조사 거리 리셋하고 다시 사냥 시작
-                activeMissionPortalId = autoHuntPortal.id;
-                walkAccumulator = 0;
-                lastWalkPos = currentUserPos;
-                renderLog(`📍 ${autoHuntPortal.name} 구역 내 재탐사 시작...`, 'player');
-                document.getElementById('map-status').innerHTML = `<span style="color: var(--secondary-cyan); font-weight:bold;">🔄 ${autoHuntPortal.name} 재탐사 중... ${(autoHuntPortal.spawn_distance_requirement||20)}m 이동 필요</span>`;
-                console.log('[AUTO_HUNT] 포탈 반경 내 재사냥 시작');
-            } else {
-                // 반경 밖으로 나감
-                document.getElementById('map-status').innerHTML = `<span style="color: var(--text-dim);">[!] 구역 이탈. 자동사냥 종료.</span>`;
-                autoHuntPortal = null;
-                activeMissionPortalId = null;
-            }
+            try {
+                const dist = L.latLng(currentUserPos).distanceTo(L.latLng(autoHuntPortal.lat, autoHuntPortal.lng));
+                if (dist < (autoHuntPortal.radius || 100)) {
+                    activeMissionPortalId = autoHuntPortal.id;
+                    walkAccumulator = 0;
+                    lastWalkPos = currentUserPos;
+                    document.getElementById('map-status').innerHTML = `<span style="color: var(--secondary-cyan); font-weight:bold;">🔄 ${autoHuntPortal.name} 재탐사 중...</span>`;
+                } else {
+                    document.getElementById('map-status').innerHTML = `<span style="color: var(--text-dim);">[!] 구역 이탈. 자동사냥 종료.</span>`;
+                    autoHuntPortal = null;
+                    activeMissionPortalId = null;
+                }
+            } catch(e) { console.error('[POST_COMBAT] error:', e); }
         }
     }, 2000);
 }
