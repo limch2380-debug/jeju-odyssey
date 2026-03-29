@@ -201,6 +201,18 @@ async function doLogin() {
     currentUserId = user.id;
     await db.from('users').update({ last_login: new Date().toISOString() }).eq('id', user.id);
     
+    // 기억하기 체크 시 localStorage 저장
+    const remember = document.getElementById('login-remember')?.checked;
+    if (remember) {
+        localStorage.setItem('jeju_saved_user', username);
+        localStorage.setItem('jeju_saved_pass', password);
+        localStorage.setItem('jeju_remember', 'true');
+    } else {
+        localStorage.removeItem('jeju_saved_user');
+        localStorage.removeItem('jeju_saved_pass');
+        localStorage.removeItem('jeju_remember');
+    }
+    
     // 유저 데이터 로드
     await initAppForUser();
 }
@@ -232,10 +244,24 @@ function doLogout() {
     showScreen('login');
 }
 
-// 기존 initApp은 파티클만 초기화
+// 기존 initApp은 파티클만 초기화 + 저장된 로그인 정보 복원
 function initApp() {
     initParticles();
     updateClock();
+    // 저장된 로그인 정보 자동 채우기
+    const savedUser = localStorage.getItem('jeju_saved_user');
+    const savedPass = localStorage.getItem('jeju_saved_pass');
+    const savedRemember = localStorage.getItem('jeju_remember');
+    if (savedUser && savedPass && savedRemember === 'true') {
+        const uEl = document.getElementById('login-username');
+        const pEl = document.getElementById('login-password');
+        const rEl = document.getElementById('login-remember');
+        if (uEl) uEl.value = savedUser;
+        if (pEl) pEl.value = savedPass;
+        if (rEl) rEl.checked = true;
+        // 자동 로그인
+        doLogin();
+    }
 }
 initApp();
 

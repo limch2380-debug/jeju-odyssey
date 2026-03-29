@@ -68,6 +68,10 @@
                         <label style="font-size:0.7rem; color:var(--text-dim); display:block; margin-bottom:5px;">🔒 비밀번호</label>
                         <input id="login-password" type="password" placeholder="비밀번호를 입력하세요" style="width:100%; padding:14px 16px; font-size:0.9rem; background:rgba(11,13,27,0.8); border:1px solid rgba(77,70,50,0.3); border-radius:12px; color:#e1e1f6; outline:none; transition:0.3s;" onfocus="this.style.borderColor='rgba(0,253,236,0.4)'" onblur="this.style.borderColor='rgba(77,70,50,0.3)'" onkeydown="if(event.key==='Enter')doLogin()">
                     </div>
+                    <div style="margin-bottom:16px; display:flex; align-items:center; gap:8px;">
+                        <input id="login-remember" type="checkbox" style="width:18px; height:18px; accent-color:#e9c400; cursor:pointer;">
+                        <label for="login-remember" style="font-size:0.75rem; color:var(--text-dim); cursor:pointer;">아이디/비밀번호 기억하기</label>
+                    </div>
                     <button onclick="doLogin()" style="width:100%; padding:16px; font-size:0.95rem; font-weight:700; border:none; border-radius:12px; background:linear-gradient(135deg, #e9c400, #ff9500); color:#3a3000; cursor:pointer; text-shadow:0 1px 2px rgba(0,0,0,0.1); transition:0.3s; letter-spacing:1px;">로그인</button>
                     <button onclick="doRegister()" style="width:100%; padding:14px; font-size:0.85rem; font-weight:600; border:1px solid rgba(0,253,236,0.25); border-radius:12px; background:transparent; color:var(--secondary-cyan); cursor:pointer; margin-top:10px; transition:0.3s; letter-spacing:1px;">회원가입</button>
                     <div id="login-message" style="text-align:center; margin-top:14px; font-size:0.75rem; color:var(--accent-red); min-height:20px;"></div>
