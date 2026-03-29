@@ -392,13 +392,18 @@ async function startCombat(forcedMonsterName = null, autoStart = false) {
         const p = normals.length > 0 ? normals : pool;
         targetMonster = p[Math.floor(Math.random() * p.length)];
     }
+    // 몬스터 스탯 랜덤 생성
+    const randBetween = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+    const mHp = randBetween(targetMonster.hpMin || targetMonster.hp || 100, targetMonster.hpMax || targetMonster.hp || 100);
+    const mAtk = randBetween(targetMonster.atkMin || targetMonster.dmg || 10, targetMonster.atkMax || targetMonster.dmg || 10);
+    const mDef = randBetween(targetMonster.defMin || 0, targetMonster.defMax || 0);
     combatState = {
         playerHP: card.hp, playerMaxHP: card.hp,
         playerAtk: card.atk, playerDef: card.def,
         skill1: card.skill1||'none', skill1Chance: card.skill1Chance||0,
         skill2: card.skill2||'none', skill2Chance: card.skill2Chance||0,
         potions: playerData.potions || 1,
-        currentEnemy: { ...targetMonster, hp: targetMonster.hp, maxHp: targetMonster.hp },
+        currentEnemy: { ...targetMonster, hp: mHp, maxHp: mHp, dmg: mAtk, def: mDef },
         isGameOver: false, busy: false,
         cardName: card.name, cardImg: card.img, cardRarity: card.rarity||'common'
     };
@@ -619,45 +624,46 @@ async function renderSettingsMonsterList() {
         const isBoss = m.type === 'boss';
         const item = document.createElement('div');
         item.className = 'glass-panel monster-card';
-        item.style.cssText = `margin-bottom:15px; padding:20px; ${isBoss ? 'border-left:4px solid var(--primary-gold); box-shadow:0 0 15px rgba(233,196,0,0.1);' : ''}`;
+        item.style.cssText = `margin-bottom:15px; padding:20px; ${isBoss ? 'border-left:4px solid var(--primary-gold); box-shadow:0 0 15px rgba(233,196,0,0.1);' : 'border-left:4px solid var(--secondary-cyan);'}`;
         item.innerHTML = `
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
                 <div style="display:flex; align-items:center; gap:10px;">
-                    <span style="font-size:0.6rem; padding:3px 10px; border-radius:20px; font-weight:700; letter-spacing:1px;
+                    <span style="font-size:0.8rem; padding:4px 12px; border-radius:20px; font-weight:700;
                         background:${isBoss ? 'rgba(233,196,0,0.2)' : 'rgba(0,253,236,0.15)'}; 
                         color:${isBoss ? 'var(--primary-gold)' : 'var(--secondary-cyan)'}; 
                         border:1px solid ${isBoss ? 'rgba(233,196,0,0.4)' : 'rgba(0,253,236,0.3)'};">
                         ${isBoss ? '⚔ BOSS' : '🗡 NORMAL'}
                     </span>
-                    <span style="font-size:0.6rem; color:var(--text-dim);">#${i+1}</span>
+                    <span style="font-size:0.75rem; color:var(--text-dim);">#${i+1}</span>
                 </div>
-                <button class="btn-nav" style="padding:4px 12px; font-size:0.55rem; color:var(--accent-red); border-color:var(--accent-red);" onclick="deleteMonster(${i})">삭제</button>
+                <button class="btn-nav" style="padding:6px 14px; font-size:0.75rem; color:var(--accent-red); border-color:var(--accent-red);" onclick="deleteMonster(${i})">삭제</button>
             </div>
             <div style="display:flex; gap:15px; align-items:flex-start;">
                 <div style="flex-shrink:0; text-align:center;">
                     <img src="${m.img}" style="width:80px; height:80px; object-fit:contain; border-radius:12px; background:rgba(0,0,0,0.4); border:1px solid var(--glass-border);"
                         onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 80 80%22><text x=%2240%22 y=%2250%22 text-anchor=%22middle%22 font-size=%2240%22>👾</text></svg>'">
-                    <label class="btn-nav" style="display:block; margin-top:8px; padding:5px 10px; font-size:0.5rem; cursor:pointer; text-align:center; border-color:var(--secondary-cyan); color:var(--secondary-cyan);">
+                    <label class="btn-nav" style="display:block; margin-top:8px; padding:6px 10px; font-size:0.7rem; cursor:pointer; text-align:center; border-color:var(--secondary-cyan); color:var(--secondary-cyan);">
                         이미지 변경
                         <input type="file" accept="image/*" style="display:none;" onchange="uploadMonsterImage(${i}, this)">
                     </label>
                 </div>
                 <div style="flex:1;">
                     <div style="margin-bottom:10px;">
-                        <label style="font-size:0.55rem; color:var(--text-dim); display:block; margin-bottom:4px;">몬스터 이름</label>
-                        <input type="text" class="set-m-name btn-nav" data-index="${i}" value="${m.name}" style="width:100%; font-size:0.8rem; padding:10px 12px;">
+                        <label>몬스터 이름</label>
+                        <input type="text" class="set-m-name btn-nav" data-index="${i}" value="${m.name}" style="width:100%;">
                     </div>
-                    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px;">
-                        <div><label style="font-size:0.5rem; color:var(--text-dim);">HP</label>
-                            <input type="number" class="set-m-hp btn-nav" data-index="${i}" value="${m.hp}" style="width:100%; font-size:0.75rem;"></div>
-                        <div><label style="font-size:0.5rem; color:var(--text-dim);">ATK</label>
-                            <input type="number" class="set-m-dmg btn-nav" data-index="${i}" value="${m.dmg}" style="width:100%; font-size:0.75rem;"></div>
-                        <div><label style="font-size:0.5rem; color:var(--text-dim);">타입</label>
-                            <select class="set-m-type btn-nav" data-index="${i}" style="width:100%; height:38px; font-size:0.7rem; color:#fff !important; background:rgba(17,19,31,0.8) !important;">
-                                <option value="normal" style="color:#fff; background:#1a1c2e;" ${!isBoss ? 'selected' : ''}>🗡 일반</option>
-                                <option value="boss" style="color:#e9c400; background:#1a1c2e;" ${isBoss ? 'selected' : ''}>⚔ 보스</option>
-                            </select>
-                        </div>
+                    <div style="font-size:0.8rem; color:var(--secondary-cyan); margin-bottom:6px; font-weight:700;">📊 능력치 범위 (최소 ~ 최대)</div>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
+                        <div><label>HP min</label><input type="number" class="set-m-hpmin btn-nav" data-index="${i}" value="${m.hpMin||m.hp||100}" style="width:100%;"></div>
+                        <div><label>HP max</label><input type="number" class="set-m-hpmax btn-nav" data-index="${i}" value="${m.hpMax||m.hp||100}" style="width:100%;"></div>
+                    </div>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
+                        <div><label>ATK min</label><input type="number" class="set-m-atkmin btn-nav" data-index="${i}" value="${m.atkMin||m.dmg||10}" style="width:100%;"></div>
+                        <div><label>ATK max</label><input type="number" class="set-m-atkmax btn-nav" data-index="${i}" value="${m.atkMax||m.dmg||10}" style="width:100%;"></div>
+                    </div>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                        <div><label>DEF min</label><input type="number" class="set-m-defmin btn-nav" data-index="${i}" value="${m.defMin||0}" style="width:100%;"></div>
+                        <div><label>DEF max</label><input type="number" class="set-m-defmax btn-nav" data-index="${i}" value="${m.defMax||0}" style="width:100%;"></div>
                     </div>
                 </div>
             </div>
@@ -685,7 +691,13 @@ async function uploadMonsterImage(index, input) {
 
 async function addMonster(type) {
     const pool = await getMonsterPool();
-    pool.push({ name: type === 'boss' ? '새 보스 몬스터' : '새 일반 몬스터', hp: type === 'boss' ? 200 : 80, dmg: type === 'boss' ? 15 : 8, img: '', type });
+    pool.push({
+        name: type === 'boss' ? '새 보스 몬스터' : '새 일반 몬스터',
+        hpMin: type === 'boss' ? 200 : 80, hpMax: type === 'boss' ? 300 : 120,
+        atkMin: type === 'boss' ? 15 : 8, atkMax: type === 'boss' ? 25 : 14,
+        defMin: type === 'boss' ? 5 : 0, defMax: type === 'boss' ? 10 : 3,
+        img: '', type
+    });
     await db.from('game_settings').update({ value: pool }).eq('name', 'monsterPool');
     renderSettingsMonsterList();
 }
@@ -697,11 +709,19 @@ async function deleteMonster(i) {
 }
 async function saveMonsterPool() {
     const names = document.querySelectorAll('.set-m-name');
-    const hps = document.querySelectorAll('.set-m-hp');
-    const dmgs = document.querySelectorAll('.set-m-dmg');
-    const types = document.querySelectorAll('.set-m-type');
     const pool = await getMonsterPool();
-    names.forEach((input, i) => { pool[i].name = input.value; pool[i].hp = parseInt(hps[i].value); pool[i].dmg = parseInt(dmgs[i].value); pool[i].type = types[i].value; });
+    names.forEach((input, i) => {
+        pool[i].name = input.value;
+        pool[i].hpMin = parseInt(document.querySelectorAll('.set-m-hpmin')[i]?.value)||0;
+        pool[i].hpMax = parseInt(document.querySelectorAll('.set-m-hpmax')[i]?.value)||0;
+        pool[i].atkMin = parseInt(document.querySelectorAll('.set-m-atkmin')[i]?.value)||0;
+        pool[i].atkMax = parseInt(document.querySelectorAll('.set-m-atkmax')[i]?.value)||0;
+        pool[i].defMin = parseInt(document.querySelectorAll('.set-m-defmin')[i]?.value)||0;
+        pool[i].defMax = parseInt(document.querySelectorAll('.set-m-defmax')[i]?.value)||0;
+        // hp, dmg 호환: 전투에서 랜덤 생성 시 사용
+        pool[i].hp = pool[i].hpMax;
+        pool[i].dmg = pool[i].atkMax;
+    });
     await db.from('game_settings').update({ value: pool }).eq('name', 'monsterPool');
     cachedMonsterPool = pool;
     alert("몬스터 데이터 저장 완료!"); renderSettingsMonsterList();

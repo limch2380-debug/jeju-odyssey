@@ -245,7 +245,14 @@ async function renderCollection() {
 
 // ===== 카드 에디터 UI =====
 async function renderCardEditor() {
-            el.innerHTML += `<div class="glass-panel" style="margin-bottom:16px;padding:18px;border-left:4px solid ${t.templateId.includes('great')?'var(--primary-gold)':'var(--secondary-cyan)'}">
+    const templates = await getCardTemplates();
+    const el = document.getElementById('card-editor-list');
+    if(!el) return;
+    el.innerHTML = '';
+    const skillOpts = Object.entries(SKILLS).map(([k,v])=>`<option value="${k}">${v.icon} ${v.name}</option>`).join('');
+    templates.forEach((t,i) => {
+        const dr = t.dropRates || {normal:{common:30,magic:5,rare:1,unique:0},boss:{common:0,magic:15,rare:10,unique:5}};
+        el.innerHTML += `<div class="glass-panel" style="margin-bottom:16px;padding:18px;border-left:4px solid ${t.templateId.includes('great')?'var(--primary-gold)':'var(--secondary-cyan)'}">
             <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
                 <div style="position:relative;">
                     <img src="${t.img}" class="ce-img" data-i="${i}" style="width:60px;height:74px;object-fit:cover;border-radius:8px;cursor:pointer;" onerror="this.src='goblin_card.png'" onclick="document.getElementById('ce-file-${i}').click()">

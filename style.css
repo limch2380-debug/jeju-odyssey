@@ -358,39 +358,29 @@ input[type="number"].btn-nav {
     box-shadow: 0 10px 30px rgba(0,0,0,0.5), inset 0 0 20px rgba(255, 215, 0, 0.1);
 }
 
-/* ===== 설정/인벤토리/도감 컨테이너 제한 ===== */
-#screen-settings > div,
-#screen-inventory > div,
-#screen-collection > div {
-    max-width: 520px;
-    margin: 0 auto;
-    width: 100%;
+/* ===== 반응형 컨테이너 (모바일=풀, PC=적절 너비) ===== */
+#screen-settings,
+#screen-inventory,
+#screen-collection {
+    overflow-y: auto;
 }
 
 /* 카드 에디터 및 설정 입력 확대 */
-#card-editor-list .glass-panel {
-    padding: 18px !important;
-}
-#card-editor-list label {
-    font-size: 0.7rem !important;
+#card-editor-list label,
+#set-monster-list label {
+    font-size: 0.8rem !important;
     color: var(--text-dim);
     display: block;
     margin-bottom: 3px;
 }
 #card-editor-list input[type="number"],
 #card-editor-list input[type="text"],
-#card-editor-list select {
-    font-size: 0.85rem !important;
+#card-editor-list select,
+#set-monster-list input[type="number"],
+#set-monster-list input[type="text"],
+#set-monster-list select {
+    font-size: 0.9rem !important;
     padding: 10px !important;
-}
-#card-editor-list .ce-name {
-    font-size: 1rem !important;
-}
-
-/* 인벤토리 그리드 중앙 정렬 */
-#inventory-grid {
-    max-width: 520px;
-    margin: 0 auto;
 }
 
 /* HP바 넓이 보정 */
@@ -403,16 +393,29 @@ input[type="number"].btn-nav {
     overflow: hidden;
 }
 
-/* 전투 화면 중앙 정렬 */
-.combat-scene {
-    max-width: 520px;
-    margin: 0 auto;
-    width: 100%;
-}
-
 /* 로그 가독성 */
 .log-entry {
-    font-size: 0.75rem;
+    font-size: 0.8rem;
     margin-bottom: 6px;
     padding: 4px 10px;
+}
+
+/* 데스크톱: 중앙 컨테이너 제한 */
+@media (min-width: 768px) {
+    #screen-settings > div,
+    #screen-inventory > div,
+    #screen-collection > div {
+        max-width: 640px;
+        margin: 0 auto;
+        width: 100%;
+    }
+    .combat-scene {
+        max-width: 640px;
+        margin: 0 auto;
+        width: 100%;
+    }
+    #inventory-grid {
+        max-width: 640px;
+        margin: 0 auto;
+    }
 }
