@@ -373,9 +373,8 @@ function ignoreMission() {
 }
 function stopTracking() { if (watchId) navigator.geolocation.clearWatch(watchId); }
 
-// ===== COMBAT — 카드 기반 전투 =====
+// ===== COMBAT — 완전 자동 전투 =====
 async function startCombat(forcedMonsterName = null, autoStart = false) {
-    // 카드 확인
     const inv = await getInventory();
     selectedCardIdx = await getSelectedIdx();
     if (selectedCardIdx < 0 || selectedCardIdx >= inv.length) {
@@ -383,9 +382,7 @@ async function startCombat(forcedMonsterName = null, autoStart = false) {
         showScreen('main'); return;
     }
     const card = inv[selectedCardIdx];
-    const ec = getCardEffective(card);
     const playerData = await getPlayerSettings();
-    
     const pool = await getMonsterPool();
     let targetMonster;
     if (forcedMonsterName) {
@@ -396,62 +393,68 @@ async function startCombat(forcedMonsterName = null, autoStart = false) {
         targetMonster = p[Math.floor(Math.random() * p.length)];
     }
     combatState = {
-        playerHP: ec.hp, playerMaxHP: ec.hp,
-        playerAtk: ec.atk, playerDef: ec.def,
-        playerSkill: card.skill, playerSkillChance: card.skillChance || 20,
-        playerSkillEnabled: card.skillEnabled !== false,
+        playerHP: card.hp, playerMaxHP: card.hp,
+        playerAtk: card.atk, playerDef: card.def,
+        skill1: card.skill1||'none', skill1Chance: card.skill1Chance||0,
+        skill2: card.skill2||'none', skill2Chance: card.skill2Chance||0,
         potions: playerData.potions || 1,
         currentEnemy: { ...targetMonster, hp: targetMonster.hp, maxHp: targetMonster.hp },
-        isGameOver: false, isAuto: false, busy: false,
-        cardName: card.name, cardLevel: card.level || 1
+        isGameOver: false, busy: false,
+        cardName: card.name, cardImg: card.img, cardRarity: card.rarity||'common'
     };
+    // UI 업데이트 - 적
     document.getElementById('enemy-name-label').innerText = combatState.currentEnemy.name;
     document.getElementById('enemy-img-main').src = combatState.currentEnemy.img;
     document.getElementById('enemy-img-main').style.opacity = '1';
-    document.getElementById('btn-auto-battle').innerText = 'AUTO: OFF';
-    document.getElementById('btn-auto-battle').style.background = 'var(--bg-space)';
     const isBoss = combatState.currentEnemy.type === 'boss';
     const nameLabel = document.getElementById('enemy-name-label');
     if (isBoss) { nameLabel.style.color = 'var(--primary-gold)'; nameLabel.innerText = `⚔ ${combatState.currentEnemy.name} [BOSS]`; }
     else { nameLabel.style.color = 'var(--accent-red)'; }
-    // 카드 정보 표시
-    const ccn = document.getElementById('combat-card-name'); if(ccn) ccn.innerText = card.name;
-    const ccl = document.getElementById('combat-card-lv'); if(ccl) ccl.innerText = `Lv.${card.level||1}`;
-    const ccs = document.getElementById('combat-card-skill'); if(ccs) ccs.innerText = `${SKILLS[card.skill]?.icon||''} ${SKILLS[card.skill]?.name||''} ${card.skillChance}%`;
-    stopAutoBattle(); updateCombatUI();
-    document.getElementById('combat-log').innerHTML = `<div class="log-entry">${card.name}(Lv.${card.level||1})${isBoss ? ' vs ⚔ BOSS!' : ' 전투 개시!'}</div>`;
+    // UI - 내 카드
+    const pn = document.getElementById('player-card-name'); if(pn) pn.innerText = card.name;
+    const pr = document.getElementById('player-card-rarity'); if(pr) { pr.innerText = `[${rarityLabel(card.rarity)}]`; pr.style.color = rarityColor(card.rarity); }
+    const pi = document.getElementById('player-card-img'); if(pi) { pi.src = card.img; pi.style.borderColor = rarityColor(card.rarity); }
+    updateCombatUI();
+    document.getElementById('combat-log').innerHTML = `<div class="log-entry">${card.name} [${rarityLabel(card.rarity)}] ${isBoss ? 'vs ⚔ BOSS!' : '전투 개시!'}</div>`;
     playSound('swordSwing'); showScreen('combat');
-    if (autoStart) {
-        setTimeout(() => { toggleAutoBattle(); renderLog('🤖 자동전투 활성화!', 'player'); }, 800);
-    }
+    // 항상 자동전투 시작
+    setTimeout(() => startAutoCombat(), 800);
+}
+function startAutoCombat() {
+    if (autoBattleInterval) clearInterval(autoBattleInterval);
+    autoBattleInterval = setInterval(() => {
+        if (!combatState.isGameOver && !combatState.busy) executePlayerTurn();
+        else if (combatState.isGameOver) { clearInterval(autoBattleInterval); autoBattleInterval=null; }
+    }, 1200);
 }
 
 async function usePotion() {
     if (combatState.isGameOver || combatState.busy || combatState.potions <= 0) return;
-    combatState.busy = true; updateActionButtons(false);
+    combatState.busy = true;
     const heal = Math.floor(combatState.playerMaxHP * 0.5);
     combatState.playerHP = Math.min(combatState.playerMaxHP, combatState.playerHP + heal);
     combatState.potions--;
     await db.from('player_state').update({ potions: combatState.potions }).eq('id', 'singleton');
-    playSound('potion'); renderLog(`나노봇 포션! HP +${heal}`, "player"); updateCombatUI();
-    setTimeout(() => { combatState.busy = false; executeEnemyTurn(); }, 1000);
+    playSound('potion'); renderLog(`포션! HP +${heal}`, 'player'); updateCombatUI();
+    setTimeout(() => { combatState.busy = false; }, 800);
 }
 function updateActionButtons(enabled) {
-    const a = document.getElementById('btn-attack'), p = document.getElementById('btn-potion');
-    if (a) a.disabled = !enabled; if (p) p.disabled = !enabled || combatState.potions <= 0;
+    const p = document.getElementById('btn-potion');
+    if (p) p.disabled = !enabled || combatState.potions <= 0;
 }
 function playSound(name) { if (SOUNDS[name]) { SOUNDS[name].currentTime = 0; SOUNDS[name].play().catch(() => {}); } }
 function triggerShake() { const s = document.querySelector('.combat-scene'); if(s) { s.classList.add('shake'); setTimeout(() => s.classList.remove('shake'), 400); } }
 
 function executeEnemyTurn() {
     if (combatState.isGameOver) return;
-    combatState.busy = true; updateActionButtons(false);
+    combatState.busy = true;
     const enemy = combatState.currentEnemy;
     let raw = Math.floor(Math.random() * 5) + enemy.dmg;
-    // 회피 기술 체크 (활성화된 경우만)
-    if (combatState.playerSkillEnabled && combatState.playerSkill === 'dodge' && Math.random() * 100 < combatState.playerSkillChance) {
-        renderLog(`💨 ${combatState.cardName} 회피 성공!`, 'player');
-        setTimeout(() => { combatState.busy = false; updateActionButtons(true); }, 500);
+    // 회피 체크 (skill1 or skill2)
+    const dodgeChance = (combatState.skill1==='dodge'?combatState.skill1Chance:0) + (combatState.skill2==='dodge'?combatState.skill2Chance:0);
+    if (dodgeChance > 0 && Math.random()*100 < dodgeChance) {
+        renderLog(`💨 ${combatState.cardName} 회피!`, 'player');
+        setTimeout(() => { combatState.busy = false; }, 500);
         updateCombatUI(); return;
     }
     let dmg = Math.max(1, raw - Math.floor(raw * (combatState.playerDef / 100)));
@@ -459,71 +462,75 @@ function executeEnemyTurn() {
     triggerShake(); playSound('enemyHit');
     const scene = document.querySelector('.combat-scene');
     if(scene) { scene.classList.add('flash-red','glitch'); setTimeout(() => scene.classList.remove('flash-red','glitch'), 300); }
-    renderLog(`${enemy.name}의 공격! ${dmg} 대미지.`, 'enemy');
+    renderLog(`${enemy.name} 공격! ${dmg} 대미지`, 'enemy');
     if (combatState.playerHP <= 0) {
         renderLog('카드 파괴! 후퇴.', 'enemy');
-        combatState.isGameOver = true; stopAutoBattle();
+        combatState.isGameOver = true;
+        if (autoBattleInterval) { clearInterval(autoBattleInterval); autoBattleInterval=null; }
         if ('vibrate' in navigator) navigator.vibrate([500, 200, 500]);
         setTimeout(() => { showScreen('dashboard'); }, 2000);
     } else {
-        if (combatState.isAuto && combatState.potions > 0 && (combatState.playerHP/combatState.playerMaxHP) < 0.3) {
+        // 자동 포션 (HP 30% 이하)
+        if (combatState.potions > 0 && (combatState.playerHP/combatState.playerMaxHP) < 0.3) {
             setTimeout(() => { usePotion(); }, 500);
         } else {
-            setTimeout(() => { combatState.busy = false; updateActionButtons(true); }, 500);
+            setTimeout(() => { combatState.busy = false; }, 500);
         }
     }
     updateCombatUI();
 }
 
-function toggleAutoBattle() {
-    combatState.isAuto = !combatState.isAuto;
-    const btn = document.getElementById('btn-auto-battle');
-    if (combatState.isAuto) { 
-        btn.innerText = "AUTO: ON"; 
-        btn.style.background = "rgba(0,253,236,0.2)";
-        btn.style.color = "var(--secondary-cyan)";
-        autoBattleInterval = setInterval(() => { 
-            if (!combatState.isGameOver && !combatState.busy) executePlayerTurn(); 
-            else if (combatState.isGameOver) stopAutoBattle(); 
-        }, 1200);
-    } else stopAutoBattle();
-}
 function stopAutoBattle() {
-    combatState.isAuto = false;
-    const btn = document.getElementById('btn-auto-battle');
-    if (btn) { btn.innerText = "AUTO: OFF"; btn.style.background = "var(--bg-space)"; btn.style.color = ""; }
     if (autoBattleInterval) clearInterval(autoBattleInterval); autoBattleInterval = null;
 }
 
 function executePlayerTurn() {
     if (combatState.isGameOver || combatState.busy) return;
-    combatState.busy = true; updateActionButtons(false);
+    combatState.busy = true;
     let enemy = combatState.currentEnemy;
     let dmg = Math.floor(Math.random() * 10) + combatState.playerAtk;
-    let skillUsed = false;
-    // 고유기술 확률 체크 (활성화된 경우만)
-    if (combatState.playerSkillEnabled && Math.random() * 100 < combatState.playerSkillChance) {
-        if (combatState.playerSkill === 'double_attack') {
-            const dmg2 = Math.floor(Math.random() * 8) + combatState.playerAtk;
-            dmg += dmg2; skillUsed = true;
-            renderLog(`⚔ 이중 어택! 추가 ${dmg2} 대미지!`, 'player');
-        } else if (combatState.playerSkill === 'magic_attack') {
-            dmg = Math.floor(dmg * 1.5); skillUsed = true; // 방어 무시 보너스
-            renderLog('🔮 마법 공격! 방어 무시!', 'player');
-        }
+    let healAmt = 0;
+    // 기술1 체크
+    if (combatState.skill1!=='none' && Math.random()*100 < combatState.skill1Chance) {
+        dmg = applySkill(combatState.skill1, dmg, 'skill1');
+    }
+    // 기술2 체크
+    if (combatState.skill2!=='none' && Math.random()*100 < combatState.skill2Chance) {
+        dmg = applySkill(combatState.skill2, dmg, 'skill2');
     }
     enemy.hp = Math.max(0, enemy.hp - dmg);
+    // 흡혈 처리
+    if ((combatState.skill1==='drain'||combatState.skill2==='drain') && dmg > 0) {
+        healAmt = Math.floor(dmg*0.3);
+        combatState.playerHP = Math.min(combatState.playerMaxHP, combatState.playerHP + healAmt);
+    }
     playSound('swordSwing'); setTimeout(() => playSound('hit'), 150);
     const img = document.getElementById('enemy-img-main');
     if(img) { img.classList.add('shake'); setTimeout(() => img.classList.remove('shake'), 400); }
-    renderLog(`${combatState.cardName}의 공격! ${dmg} 대미지!`, 'player'); updateCombatUI();
+    renderLog(`${combatState.cardName} 공격! ${dmg} 대미지${healAmt?` (+${healAmt} 흡혈)`:''}`, 'player');
+    updateCombatUI();
     if (enemy.hp <= 0) handleVictory();
     else setTimeout(() => { combatState.busy = false; executeEnemyTurn(); }, 1000);
+}
+function applySkill(skill, dmg, label) {
+    if (skill==='double_attack') {
+        const d2 = Math.floor(Math.random()*8)+combatState.playerAtk;
+        renderLog(`⚔ 이중 어택! +${d2}`, 'player');
+        return dmg+d2;
+    } else if (skill==='magic_attack') {
+        renderLog('🔮 마법 공격! 방어무시', 'player');
+        return Math.floor(dmg*1.5);
+    } else if (skill==='critical') {
+        renderLog('💥 크리티컬! 2배', 'player');
+        return dmg*2;
+    }
+    return dmg;
 }
 
 async function handleVictory() {
     playSound('victory'); renderLog('전투 승리!', 'player');
     combatState.isGameOver = true;
+    stopAutoBattle();
     const eImg = document.getElementById('enemy-img-main');
     if(eImg) eImg.style.opacity = '0';
     if ('vibrate' in navigator) navigator.vibrate([100, 50, 100, 50, 200]);
@@ -532,33 +539,17 @@ async function handleVictory() {
     const isBoss = combatState.currentEnemy.type === 'boss';
     if (isBoss) huntLog.bossKills++;
     
-    // 카드 드랍
-    const dropS = await getDropSettings();
-    const templates = await getCardTemplates();
-    const enemyName = combatState.currentEnemy.name;
-    const matchT = templates.find(t => t.name === enemyName);
-    
-    if (isBoss) {
-        // 보스 → 희귀 카드 드랍
-        if (Math.random() * 100 < (dropS.bossCardDrop||100)) {
-            if (matchT) {
-                const added = await addCardToInventory(matchT.templateId);
-                if (added) { huntLog.cardsGot++; renderLog(`★ 희귀 카드 [${enemyName}] 획득!`, 'player'); playSound('victory'); }
-                else renderLog('인벤토리 가득! 카드 획득 불가.', 'enemy');
-            }
-        }
-    } else {
-        // 일반 → 카드 드랍 확률
-        if (Math.random() * 100 < (dropS.cardDrop||30)) {
-            if (matchT) {
-                const added = await addCardToInventory(matchT.templateId);
-                if (added) { huntLog.cardsGot++; renderLog(`🃏 카드 [${enemyName}] 드랍!`, 'player'); }
-                else renderLog('인벤토리 가득!', 'enemy');
-            }
-        }
-    }
+    // 카드 드랍 (등급별)
+    const droppedCards = await rollCardDrop(combatState.currentEnemy.name, isBoss);
+    droppedCards.forEach(d => {
+        huntLog.cardsGot++;
+        renderLog(`🃏 [${rarityLabel(d.rarity)}] ${d.name} 카드 획득!`, 'player');
+        playSound('victory');
+    });
+    if (droppedCards.length === 0) renderLog('카드 드랍 없음', 'enemy');
     
     // 포션 드랍
+    const dropS = await getDropSettings();
     let stats = await getPlayerSettings();
     if (Math.random() * 100 < (dropS.potionDrop||30)) {
         stats.potions = (stats.potions||0) + 1;
@@ -599,12 +590,13 @@ async function handleVictory() {
 
 function updateCombatUI() {
     const e = combatState.currentEnemy; if (!e) return;
-    const eb = document.getElementById('enemy-hp-bar'); if (eb) eb.style.width = (e.hp/e.maxHp*100)+"%";
-    const pb = document.getElementById('hud-hp-bar'); const pp = combatState.playerHP/combatState.playerMaxHP*100;
-    if (pb) pb.style.width = pp+"%";
-    const ht = document.getElementById('hud-hp-text'); if (ht) ht.innerText = Math.round(pp)+"%";
-    const pot = document.getElementById('btn-potion'); if (pot) { pot.innerText = `HEAL (${combatState.potions})`; pot.disabled = combatState.potions <= 0; }
-    const ml = document.getElementById('main-level'); if (ml && cachedPlayerStats) ml.innerText = cachedPlayerStats.level || 1;
+    const ePct = Math.max(0,e.hp/e.maxHp*100);
+    const eb = document.getElementById('enemy-hp-bar'); if (eb) eb.style.width = ePct+'%';
+    const eht = document.getElementById('enemy-hp-text'); if (eht) eht.innerText = `${e.hp}/${e.maxHp} (${Math.round(ePct)}%)`;
+    const pPct = Math.max(0,combatState.playerHP/combatState.playerMaxHP*100);
+    const pb = document.getElementById('player-hp-bar'); if (pb) pb.style.width = pPct+'%';
+    const pht = document.getElementById('player-hp-text'); if (pht) pht.innerText = `${combatState.playerHP}/${combatState.playerMaxHP} (${Math.round(pPct)}%)`;
+    const pot = document.getElementById('btn-potion'); if (pot) { pot.innerText = `💊 HEAL (${combatState.potions})`; pot.disabled = combatState.potions <= 0; }
 }
 function renderLog(msg, type) { const log = document.getElementById('combat-log'); if(!log) return; const e = document.createElement('div'); e.className = `log-entry ${type}`; e.innerText = msg; log.prepend(e); }
 function updateClock() { const t = document.getElementById('system-time'); if (t) { const n = new Date(); t.innerText = n.toTimeString().split(' ')[0] + " // " + n.toLocaleDateString('ko-KR'); } }
