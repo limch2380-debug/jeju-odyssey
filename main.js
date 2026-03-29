@@ -199,6 +199,7 @@ async function doLogin() {
     
     // 로그인 성공
     currentUserId = user.id;
+    window.isAdmin = user.is_admin || false;
     await db.from('users').update({ last_login: new Date().toISOString() }).eq('id', user.id);
     
     // 기억하기 체크 시 localStorage 저장
@@ -227,6 +228,10 @@ async function initAppForUser() {
         updateClock();
         updateHuntLogUI();
         
+        // 관리자 여부에 따라 설정 버튼 표시/숨김
+        const settingsBtn = document.getElementById('btn-settings');
+        if (settingsBtn) settingsBtn.style.display = window.isAdmin ? 'block' : 'none';
+        
         // 카드가 없으면 인벤토리로 (카드 뽑기)
         if (inv.length === 0) {
             showScreen('inventory');
@@ -239,6 +244,7 @@ async function initAppForUser() {
 // ===== 로그아웃 =====
 function doLogout() {
     currentUserId = null;
+    window.isAdmin = false;
     cachedPlayerStats = null;
     huntLog = { kills: 0, bossKills: 0, potions: 0, cardsGot: 0 };
     showScreen('login');

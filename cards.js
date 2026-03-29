@@ -218,22 +218,20 @@ async function fuseCards() {
     const rule = FUSION_RULES[rarity];
     inv[a].fusionCount = (inv[a].fusionCount||0) + 1;
     if (inv[a].fusionCount >= rule.need) {
-        // 등급 업!
+        // 등급 업! → 새 등급의 랜덤 능력치로 재생성
         const templates = await getCardTemplates();
         const t = templates.find(x=>x.templateId===inv[a].templateId);
         if (t) {
             const newRarity = rule.next;
             const upgraded = generateCard(t, newRarity);
-            upgraded.id = inv[a].id; // keep ID
+            upgraded.id = inv[a].id; // 카드 ID 유지
+            upgraded.fusionCount = 0; // 합성 횟수 리셋
             inv[a] = upgraded;
-            alert(`🎉 ${upgraded.name} [${rarityLabel(newRarity)}] 등급으로 승급!`);
+            alert(`🎉 ${upgraded.name} [${rarityLabel(newRarity)}] 등급 승급!\n\n새 능력치:\nHP: ${upgraded.hp}  ATK: ${upgraded.atk}  DEF: ${upgraded.def}`);
         }
     } else {
-        // 능력치 소폭 증가
-        inv[a].hp += Math.floor(inv[b].hp * 0.1);
-        inv[a].atk += Math.floor(inv[b].atk * 0.1);
-        inv[a].def += Math.floor(inv[b].def * 0.1);
-        alert(`합성 완료! (${inv[a].fusionCount}/${rule.need}) 능력치 소폭 증가`);
+        // 능력치 변화 없이 합성 횟수만 증가
+        alert(`합성 완료! (${inv[a].fusionCount}/${rule.need})\n다음 등급까지 ${rule.need - inv[a].fusionCount}회 남음`);
     }
     inv.splice(b, 1);
     if (selectedCardIdx===b) { selectedCardIdx=-1; await setSelectedIdx(-1); }
