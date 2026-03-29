@@ -125,7 +125,7 @@ async function deleteCard(cardId) {
     await saveInventory(inv);
 }
 
-async function selectCard(idx) { await setSelectedIdx(idx); updateSelectedCardDisplay(); }
+async function selectCard(idx) { await setSelectedIdx(idx); await updateSelectedCardDisplay(); renderInventory(); }
 
 async function updateSelectedCardDisplay() {
     const inv = await getInventory();
@@ -174,8 +174,6 @@ async function renderInventory() {
     if (drawPanel) drawPanel.style.display = inv.length === 0 ? 'block' : 'none';
     const grid = document.getElementById('inventory-grid');
     grid.innerHTML = '';
-    fusionBaseIdx = -1;
-    fusionMaterialIdx = -1;
     updateFusionUI(inv);
     inv.forEach((c,i) => {
         const sel = i===selectedCardIdx;
