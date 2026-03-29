@@ -155,17 +155,17 @@ async function renderInventory() {
         const rule = FUSION_RULES[c.rarity];
         const div = document.createElement('div');
         div.className = 'glass-panel';
-        div.style.cssText = `padding:12px;text-align:center;border-color:${sel?rc:rb};${sel?`background:${RARITIES[c.rarity]?.bg};box-shadow:0 0 15px ${rb};`:''}cursor:pointer;position:relative;`;
-        div.innerHTML = `${sel?'<div style="position:absolute;top:6px;right:8px;font-size:0.45rem;color:'+rc+';font-weight:700;">전투중</div>':''}
-            <img src="${c.img}" style="width:55px;height:68px;object-fit:cover;border-radius:6px;border:2px solid ${rc};margin-bottom:5px;" onerror="this.src='goblin_card.png'">
-            <div style="font-size:0.6rem;color:${rc};font-weight:700;">${c.name}</div>
-            <div style="font-size:0.42rem;color:var(--text-dim);">[${rarityLabel(c.rarity)}] 합성: ${c.fusionCount||0}/${rule.need}</div>
-            <div style="font-size:0.38rem;color:var(--text-dim);margin-top:3px;">HP:${c.hp} ATK:${c.atk} DEF:${c.def}</div>
-            <div style="font-size:0.38rem;color:var(--secondary-cyan);">${sk1}${sk2}</div>
-            <div style="display:flex;gap:3px;margin-top:6px;">
-                <button class="btn-primary" style="flex:1;padding:5px;font-size:0.45rem;" onclick="event.stopPropagation();selectCard(${i})">전투</button>
-                <button class="btn-nav" style="flex:1;padding:5px;font-size:0.45rem;text-align:center;${fused?'background:rgba(233,196,0,0.2);':''}" onclick="event.stopPropagation();toggleFusion(${i})">합성</button>
-                <button class="btn-nav" style="padding:5px 6px;font-size:0.45rem;color:var(--accent-red);border-color:var(--accent-red);text-align:center;" onclick="event.stopPropagation();confirmDeleteCard(${c.id})">✕</button>
+        div.style.cssText = `padding:14px;text-align:center;border-color:${sel?rc:rb};${sel?`background:${RARITIES[c.rarity]?.bg};box-shadow:0 0 15px ${rb};`:''}cursor:pointer;position:relative;`;
+        div.innerHTML = `${sel?'<div style="position:absolute;top:8px;right:10px;font-size:0.7rem;color:'+rc+';font-weight:700;">전투중</div>':''}
+            <img src="${c.img}" style="width:65px;height:80px;object-fit:cover;border-radius:8px;border:2px solid ${rc};margin-bottom:6px;" onerror="this.src='goblin_card.png'">
+            <div style="font-size:0.9rem;color:${rc};font-weight:700;">${c.name}</div>
+            <div style="font-size:0.7rem;color:var(--text-dim);">[${rarityLabel(c.rarity)}] 합성: ${c.fusionCount||0}/${rule.need}</div>
+            <div style="font-size:0.7rem;color:var(--text-dim);margin-top:4px;">HP:${c.hp} ATK:${c.atk} DEF:${c.def}</div>
+            <div style="font-size:0.7rem;color:var(--secondary-cyan);">${sk1}${sk2}</div>
+            <div style="display:flex;gap:4px;margin-top:8px;">
+                <button class="btn-primary" style="flex:1;padding:8px;font-size:0.75rem;" onclick="event.stopPropagation();selectCard(${i})">전투</button>
+                <button class="btn-nav" style="flex:1;padding:8px;font-size:0.75rem;text-align:center;${fused?'background:rgba(233,196,0,0.2);':''}" onclick="event.stopPropagation();toggleFusion(${i})">합성</button>
+                <button class="btn-nav" style="padding:8px 10px;font-size:0.75rem;color:var(--accent-red);border-color:var(--accent-red);text-align:center;" onclick="event.stopPropagation();confirmDeleteCard(${c.id})">✕</button>
             </div>`;
         grid.appendChild(div);
     });
@@ -234,73 +234,66 @@ async function renderCollection() {
         const div = document.createElement('div');
         div.className = 'glass-panel';
         const rc = has ? rarityColor(best.rarity) : '#666';
-        div.style.cssText = `padding:14px;text-align:center;${has?'':'opacity:0.4;'}border-color:${rc};`;
-        div.innerHTML = `<img src="${t.img}" style="width:65px;height:80px;object-fit:cover;border-radius:8px;border:2px solid ${rc};margin-bottom:6px;${has?'':'filter:grayscale(1);'}" onerror="this.src='goblin_card.png'">
-            <div style="font-size:0.65rem;color:${rc};font-weight:700;">${t.name}</div>
-            <div style="font-size:0.4rem;color:var(--text-dim);">HP:${t.hpMin}~${t.hpMax} ATK:${t.atkMin}~${t.atkMax}</div>
-            ${has?`<div style="font-size:0.42rem;color:var(--primary-gold);margin-top:4px;">보유 ${owned.length}장 | 최고 [${rarityLabel(best.rarity)}]</div>`:'<div style="font-size:0.42rem;color:var(--text-dim);margin-top:4px;">미발견</div>'}`;
+        div.style.cssText = `padding:16px;text-align:center;${has?'':'opacity:0.4;'}border-color:${rc};`;
+        div.innerHTML = `<img src="${t.img}" style="width:75px;height:90px;object-fit:cover;border-radius:8px;border:2px solid ${rc};margin-bottom:8px;${has?'':'filter:grayscale(1);'}" onerror="this.src='goblin_card.png'">
+            <div style="font-size:0.85rem;color:${rc};font-weight:700;">${t.name}</div>
+            <div style="font-size:0.7rem;color:var(--text-dim);margin-top:4px;">HP:${t.hpMin}~${t.hpMax} ATK:${t.atkMin}~${t.atkMax}</div>
+            ${has?`<div style="font-size:0.7rem;color:var(--primary-gold);margin-top:4px;">보유 ${owned.length}장 | 최고 [${rarityLabel(best.rarity)}]</div>`:'<div style="font-size:0.7rem;color:var(--text-dim);margin-top:4px;">미발견</div>'}`;
         grid.appendChild(div);
     });
 }
 
 // ===== 카드 에디터 UI =====
 async function renderCardEditor() {
-    const templates = await getCardTemplates();
-    const el = document.getElementById('card-editor-list');
-    if(!el) return;
-    el.innerHTML = '';
-    const skillOpts = Object.entries(SKILLS).map(([k,v])=>`<option value="${k}">${v.icon} ${v.name}</option>`).join('');
-    templates.forEach((t,i) => {
-        const dr = t.dropRates || {normal:{common:30,magic:5,rare:1,unique:0},boss:{common:0,magic:15,rare:10,unique:5}};
-        el.innerHTML += `<div class="glass-panel" style="margin-bottom:12px;padding:14px;border-left:4px solid ${t.templateId.includes('great')?'var(--primary-gold)':'var(--secondary-cyan)'};">
-            <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+            el.innerHTML += `<div class="glass-panel" style="margin-bottom:16px;padding:18px;border-left:4px solid ${t.templateId.includes('great')?'var(--primary-gold)':'var(--secondary-cyan)'}">
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
                 <div style="position:relative;">
-                    <img src="${t.img}" class="ce-img" data-i="${i}" style="width:50px;height:62px;object-fit:cover;border-radius:6px;cursor:pointer;" onerror="this.src='goblin_card.png'" onclick="document.getElementById('ce-file-${i}').click()">
+                    <img src="${t.img}" class="ce-img" data-i="${i}" style="width:60px;height:74px;object-fit:cover;border-radius:8px;cursor:pointer;" onerror="this.src='goblin_card.png'" onclick="document.getElementById('ce-file-${i}').click()">
                     <input type="file" id="ce-file-${i}" accept="image/*" style="display:none;" onchange="handleCardImgUpload(${i},this)">
-                    <div style="font-size:0.35rem;color:var(--text-dim);text-align:center;">클릭 변경</div>
+                    <div style="font-size:0.65rem;color:var(--text-dim);text-align:center;margin-top:4px;">클릭 변경</div>
                 </div>
-                <div style="flex:1;"><input class="ce-name btn-nav" style="width:100%;padding:8px;font-size:0.7rem;" value="${t.name}" data-i="${i}"></div>
+                <div style="flex:1;"><input class="ce-name btn-nav" style="width:100%;padding:10px;font-size:1rem;" value="${t.name}" data-i="${i}"></div>
             </div>
-            <div style="font-size:0.45rem;color:var(--secondary-cyan);margin-bottom:6px;font-weight:700;">능력치 범위 (최소 ~ 최대)</div>
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:8px;">
-                <div><label style="font-size:0.4rem;color:var(--text-dim);">HP min</label><input type="number" class="ce-hpmin btn-nav" style="width:100%;padding:5px;font-size:0.65rem;" value="${t.hpMin}" data-i="${i}"></div>
-                <div><label style="font-size:0.4rem;color:var(--text-dim);">HP max</label><input type="number" class="ce-hpmax btn-nav" style="width:100%;padding:5px;font-size:0.65rem;" value="${t.hpMax}" data-i="${i}"></div>
-                <div><label style="font-size:0.4rem;color:var(--text-dim);">ATK min</label><input type="number" class="ce-atkmin btn-nav" style="width:100%;padding:5px;font-size:0.65rem;" value="${t.atkMin}" data-i="${i}"></div>
+            <div style="font-size:0.8rem;color:var(--secondary-cyan);margin-bottom:8px;font-weight:700;">📊 능력치 범위 (최소 ~ 최대)</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px;">
+                <div><label>HP min</label><input type="number" class="ce-hpmin btn-nav" style="width:100%;" value="${t.hpMin}" data-i="${i}"></div>
+                <div><label>HP max</label><input type="number" class="ce-hpmax btn-nav" style="width:100%;" value="${t.hpMax}" data-i="${i}"></div>
+                <div><label>ATK min</label><input type="number" class="ce-atkmin btn-nav" style="width:100%;" value="${t.atkMin}" data-i="${i}"></div>
             </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:8px;">
-                <div><label style="font-size:0.4rem;color:var(--text-dim);">ATK max</label><input type="number" class="ce-atkmax btn-nav" style="width:100%;padding:5px;font-size:0.65rem;" value="${t.atkMax}" data-i="${i}"></div>
-                <div><label style="font-size:0.4rem;color:var(--text-dim);">DEF min</label><input type="number" class="ce-defmin btn-nav" style="width:100%;padding:5px;font-size:0.65rem;" value="${t.defMin}" data-i="${i}"></div>
-                <div><label style="font-size:0.4rem;color:var(--text-dim);">DEF max</label><input type="number" class="ce-defmax btn-nav" style="width:100%;padding:5px;font-size:0.65rem;" value="${t.defMax}" data-i="${i}"></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px;">
+                <div><label>ATK max</label><input type="number" class="ce-atkmax btn-nav" style="width:100%;" value="${t.atkMax}" data-i="${i}"></div>
+                <div><label>DEF min</label><input type="number" class="ce-defmin btn-nav" style="width:100%;" value="${t.defMin}" data-i="${i}"></div>
+                <div><label>DEF max</label><input type="number" class="ce-defmax btn-nav" style="width:100%;" value="${t.defMax}" data-i="${i}"></div>
             </div>
-            <div style="font-size:0.45rem;color:var(--primary-gold);margin:8px 0 6px;font-weight:700;">고유기술 (레어/유니크 전용)</div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px;">
-                <div><label style="font-size:0.4rem;color:var(--text-dim);">기술1</label><select class="ce-sk1 btn-nav" style="width:100%;padding:5px;" data-i="${i}">${skillOpts.replace(`value="${t.skill1}"`,`value="${t.skill1}" selected`)}</select></div>
-                <div><label style="font-size:0.4rem;color:var(--text-dim);">확률 min~max%</label>
-                    <div style="display:flex;gap:4px;"><input type="number" class="ce-s1min btn-nav" style="width:50%;padding:5px;font-size:0.6rem;" value="${t.skill1ChanceMin||0}" data-i="${i}"><input type="number" class="ce-s1max btn-nav" style="width:50%;padding:5px;font-size:0.6rem;" value="${t.skill1ChanceMax||0}" data-i="${i}"></div></div>
+            <div style="font-size:0.8rem;color:var(--primary-gold);margin:10px 0 8px;font-weight:700;">⚔ 고유기술 (레어/유니크 전용)</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+                <div><label>기술1</label><select class="ce-sk1 btn-nav" style="width:100%;" data-i="${i}">${skillOpts.replace(`value="${t.skill1}"`,`value="${t.skill1}" selected`)}</select></div>
+                <div><label>확률 min~max%</label>
+                    <div style="display:flex;gap:4px;"><input type="number" class="ce-s1min btn-nav" style="width:50%;" value="${t.skill1ChanceMin||0}" data-i="${i}"><input type="number" class="ce-s1max btn-nav" style="width:50%;" value="${t.skill1ChanceMax||0}" data-i="${i}"></div></div>
             </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px;">
-                <div><label style="font-size:0.4rem;color:var(--text-dim);">기술2</label><select class="ce-sk2 btn-nav" style="width:100%;padding:5px;" data-i="${i}">${skillOpts.replace(`value="${t.skill2||'none'}"`,`value="${t.skill2||'none'}" selected`)}</select></div>
-                <div><label style="font-size:0.4rem;color:var(--text-dim);">확률 min~max%</label>
-                    <div style="display:flex;gap:4px;"><input type="number" class="ce-s2min btn-nav" style="width:50%;padding:5px;font-size:0.6rem;" value="${t.skill2ChanceMin||0}" data-i="${i}"><input type="number" class="ce-s2max btn-nav" style="width:50%;padding:5px;font-size:0.6rem;" value="${t.skill2ChanceMax||0}" data-i="${i}"></div></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+                <div><label>기술2</label><select class="ce-sk2 btn-nav" style="width:100%;" data-i="${i}">${skillOpts.replace(`value="${t.skill2||'none'}"`,`value="${t.skill2||'none'}" selected`)}</select></div>
+                <div><label>확률 min~max%</label>
+                    <div style="display:flex;gap:4px;"><input type="number" class="ce-s2min btn-nav" style="width:50%;" value="${t.skill2ChanceMin||0}" data-i="${i}"><input type="number" class="ce-s2max btn-nav" style="width:50%;" value="${t.skill2ChanceMax||0}" data-i="${i}"></div></div>
             </div>
-            <div style="font-size:0.45rem;color:var(--accent-red);margin:8px 0 6px;font-weight:700;">드랍률 (%) — 일반몬스터 / 보스몬스터</div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-                <div style="padding:8px;background:rgba(0,253,236,0.03);border-radius:8px;border:1px solid rgba(0,253,236,0.1);">
-                    <div style="font-size:0.4rem;color:var(--secondary-cyan);margin-bottom:4px;">일반 몬스터 처치 시</div>
-                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;">
-                        <div><label style="font-size:0.35rem;color:#fff;">일반</label><input type="number" class="ce-dr-nc btn-nav" style="width:100%;padding:3px;font-size:0.55rem;" value="${dr.normal?.common||0}" data-i="${i}"></div>
-                        <div><label style="font-size:0.35rem;color:#4488ff;">매직</label><input type="number" class="ce-dr-nm btn-nav" style="width:100%;padding:3px;font-size:0.55rem;" value="${dr.normal?.magic||0}" data-i="${i}"></div>
-                        <div><label style="font-size:0.35rem;color:#ffdd00;">레어</label><input type="number" class="ce-dr-nr btn-nav" style="width:100%;padding:3px;font-size:0.55rem;" value="${dr.normal?.rare||0}" data-i="${i}"></div>
-                        <div><label style="font-size:0.35rem;color:#ffa500;">유니크</label><input type="number" class="ce-dr-nu btn-nav" style="width:100%;padding:3px;font-size:0.55rem;" value="${dr.normal?.unique||0}" data-i="${i}"></div>
+            <div style="font-size:0.8rem;color:var(--accent-red);margin:10px 0 8px;font-weight:700;">🎲 드랍률 (%) — 일반 / 보스</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                <div style="padding:10px;background:rgba(0,253,236,0.03);border-radius:10px;border:1px solid rgba(0,253,236,0.1);">
+                    <div style="font-size:0.75rem;color:var(--secondary-cyan);margin-bottom:6px;font-weight:700;">일반 몬스터</div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+                        <div><label style="color:#fff;">일반</label><input type="number" class="ce-dr-nc btn-nav" style="width:100%;" value="${dr.normal?.common||0}" data-i="${i}"></div>
+                        <div><label style="color:#4488ff;">매직</label><input type="number" class="ce-dr-nm btn-nav" style="width:100%;" value="${dr.normal?.magic||0}" data-i="${i}"></div>
+                        <div><label style="color:#ffdd00;">레어</label><input type="number" class="ce-dr-nr btn-nav" style="width:100%;" value="${dr.normal?.rare||0}" data-i="${i}"></div>
+                        <div><label style="color:#ffa500;">유니크</label><input type="number" class="ce-dr-nu btn-nav" style="width:100%;" value="${dr.normal?.unique||0}" data-i="${i}"></div>
                     </div>
                 </div>
-                <div style="padding:8px;background:rgba(233,196,0,0.03);border-radius:8px;border:1px solid rgba(233,196,0,0.1);">
-                    <div style="font-size:0.4rem;color:var(--primary-gold);margin-bottom:4px;">보스 몬스터 처치 시</div>
-                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;">
-                        <div><label style="font-size:0.35rem;color:#fff;">일반</label><input type="number" class="ce-dr-bc btn-nav" style="width:100%;padding:3px;font-size:0.55rem;" value="${dr.boss?.common||0}" data-i="${i}"></div>
-                        <div><label style="font-size:0.35rem;color:#4488ff;">매직</label><input type="number" class="ce-dr-bm btn-nav" style="width:100%;padding:3px;font-size:0.55rem;" value="${dr.boss?.magic||0}" data-i="${i}"></div>
-                        <div><label style="font-size:0.35rem;color:#ffdd00;">레어</label><input type="number" class="ce-dr-br btn-nav" style="width:100%;padding:3px;font-size:0.55rem;" value="${dr.boss?.rare||0}" data-i="${i}"></div>
-                        <div><label style="font-size:0.35rem;color:#ffa500;">유니크</label><input type="number" class="ce-dr-bu btn-nav" style="width:100%;padding:3px;font-size:0.55rem;" value="${dr.boss?.unique||0}" data-i="${i}"></div>
+                <div style="padding:10px;background:rgba(233,196,0,0.03);border-radius:10px;border:1px solid rgba(233,196,0,0.1);">
+                    <div style="font-size:0.75rem;color:var(--primary-gold);margin-bottom:6px;font-weight:700;">보스 몬스터</div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+                        <div><label style="color:#fff;">일반</label><input type="number" class="ce-dr-bc btn-nav" style="width:100%;" value="${dr.boss?.common||0}" data-i="${i}"></div>
+                        <div><label style="color:#4488ff;">매직</label><input type="number" class="ce-dr-bm btn-nav" style="width:100%;" value="${dr.boss?.magic||0}" data-i="${i}"></div>
+                        <div><label style="color:#ffdd00;">레어</label><input type="number" class="ce-dr-br btn-nav" style="width:100%;" value="${dr.boss?.rare||0}" data-i="${i}"></div>
+                        <div><label style="color:#ffa500;">유니크</label><input type="number" class="ce-dr-bu btn-nav" style="width:100%;" value="${dr.boss?.unique||0}" data-i="${i}"></div>
                     </div>
                 </div>
             </div>
