@@ -119,8 +119,19 @@
             </div>
         </div>
 
-        <!-- 포탈 확인 모달 (자동진입으로 숨김) -->
-        <div id="portal-confirm-modal" style="display:none !important;"></div>
+        <!-- 포탈 진입/이탈 확인 모달 -->
+        <div id="portal-confirm-modal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; z-index:999; background:rgba(0,0,0,0.7); backdrop-filter:blur(8px); display:none; align-items:center; justify-content:center;">
+            <div class="glass-panel" style="margin:20px; padding:24px; border-radius:18px; max-width:380px; width:100%; text-align:center;">
+                <div id="portal-modal-icon" style="font-size:2rem; margin-bottom:10px;">⚡</div>
+                <div id="portal-modal-title" style="font-size:1rem; color:var(--primary-gold); font-weight:700; margin-bottom:8px;">차원 균열 감지</div>
+                <div id="portal-modal-desc" style="font-size:0.8rem; color:var(--text-dim); margin-bottom:6px;"></div>
+                <div id="portal-modal-mission" style="font-size:0.75rem; color:var(--secondary-cyan); margin-bottom:16px;"></div>
+                <div style="display:flex; gap:10px;">
+                    <button id="portal-modal-cancel" class="btn-nav" style="flex:1; padding:14px; font-size:0.85rem; text-align:center;" onclick="rejectPortalAction()">취소</button>
+                    <button id="portal-modal-confirm" class="btn-primary" style="flex:1; padding:14px; font-size:0.85rem;" onclick="confirmPortalAction()">진입하기</button>
+                </div>
+            </div>
+        </div>
 
         <!-- MISSION OVERLAY -->
         <div id="mission-overlay" style="display:none; position:fixed; bottom:80px; left:15px; right:15px; z-index:20;">
