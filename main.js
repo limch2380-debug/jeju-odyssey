@@ -270,8 +270,6 @@ function initApp() {
         if (uEl) uEl.value = savedUser;
         if (pEl) pEl.value = savedPass;
         if (rEl) rEl.checked = true;
-        // 자동 로그인
-        doLogin();
     }
 }
 initApp();
