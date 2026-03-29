@@ -895,18 +895,23 @@ async function renderSettingsMonsterList() {
 
 async function uploadMonsterImage(index, input) {
     const file = input.files[0]; if (!file) return;
-    const ext = file.name.split('.').pop();
-    const fileName = `monster_${index}_${Date.now()}.${ext}`;
     const card = input.closest('.monster-card');
     const img = card.querySelector('img'); img.style.opacity = '0.3';
     try {
-        const { error } = await db.storage.from('monster-images').upload(fileName, file, { cacheControl: '3600', upsert: true });
+        // 1MB 이하로 자동 리사이즈
+        const dataUrl = await resizeImageFile(file, 1000000);
+        // base64 → Blob 변환
+        const res = await fetch(dataUrl);
+        const blob = await res.blob();
+        const fileName = `monster_${index}_${Date.now()}.webp`;
+        const { error } = await db.storage.from('monster-images').upload(fileName, blob, { contentType: blob.type, cacheControl: '3600', upsert: true });
         if (error) { alert('업로드 실패: ' + error.message); img.style.opacity = '1'; return; }
         const { data: urlData } = db.storage.from('monster-images').getPublicUrl(fileName);
         const pool = await getMonsterPool();
         pool[index].img = urlData.publicUrl;
         await db.from('game_settings').update({ value: pool }).eq('name', 'monsterPool');
         img.src = urlData.publicUrl; img.style.opacity = '1';
+        alert(`✅ 이미지 업로드 완료! (${(blob.size/1024).toFixed(0)}KB)`);
     } catch(e) { alert('에러: ' + e.message); img.style.opacity = '1'; }
 }
 
