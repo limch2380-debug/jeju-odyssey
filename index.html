@@ -281,6 +281,37 @@
                     <button class="btn-primary" style="margin-top:15px; width:100%; padding:12px; font-size:0.8rem;" onclick="saveDropSettings()">드랍 설정 저장</button>
                 </div>
 
+                <!-- 등급별 능력치 배율 -->
+                <div class="glass-panel" style="margin-bottom: 20px; padding: 25px; border-color: rgba(255,165,0,0.2);">
+                    <h3 style="color: var(--primary-gold); font-size: 0.9rem; margin-bottom: 8px;">📊 등급별 능력치 배율</h3>
+                    <div style="font-size:0.55rem; color:var(--text-dim); margin-bottom:15px;">일반(100%) 기준으로 각 등급의 HP/ATK/DEF 배율을 설정합니다.</div>
+                    <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:15px;">
+                        <div style="text-align:center;">
+                            <label style="font-size:0.65rem; color:#ffffff; font-weight:700; display:block; margin-bottom:6px;">일반</label>
+                            <input type="number" id="mult-common" class="btn-nav" style="width:100%; text-align:center; font-weight:700;" value="100" min="50" max="500">
+                            <div style="font-size:0.5rem; color:var(--text-dim); margin-top:3px;">%</div>
+                        </div>
+                        <div style="text-align:center;">
+                            <label style="font-size:0.65rem; color:#4488ff; font-weight:700; display:block; margin-bottom:6px;">매직</label>
+                            <input type="number" id="mult-magic" class="btn-nav" style="width:100%; text-align:center; font-weight:700; color:#4488ff;" value="115" min="50" max="500">
+                            <div style="font-size:0.5rem; color:var(--text-dim); margin-top:3px;">%</div>
+                        </div>
+                        <div style="text-align:center;">
+                            <label style="font-size:0.65rem; color:#ffdd00; font-weight:700; display:block; margin-bottom:6px;">레어</label>
+                            <input type="number" id="mult-rare" class="btn-nav" style="width:100%; text-align:center; font-weight:700; color:#ffdd00;" value="135" min="50" max="500">
+                            <div style="font-size:0.5rem; color:var(--text-dim); margin-top:3px;">%</div>
+                        </div>
+                        <div style="text-align:center;">
+                            <label style="font-size:0.65rem; color:#ffa500; font-weight:700; display:block; margin-bottom:6px;">유니크</label>
+                            <input type="number" id="mult-unique" class="btn-nav" style="width:100%; text-align:center; font-weight:700; color:#ffa500;" value="160" min="50" max="500">
+                            <div style="font-size:0.5rem; color:var(--text-dim); margin-top:3px;">%</div>
+                        </div>
+                    </div>
+                    <div class="glass-panel" style="padding:10px; margin-bottom:12px; border-color:rgba(0,253,236,0.1);">
+                        <div style="font-size:0.55rem; color:var(--text-dim);">💡 예시: 일반 ATK 20인 카드가 매직(130%)이면 ATK 26</div>
+                    </div>
+                    <button class="btn-primary" style="width:100%; padding:12px; font-size:0.8rem; background:linear-gradient(135deg, #ffa500 0%, #b37300 100%);" onclick="saveRarityMult()">배율 설정 저장</button>
+                </div>
 
 
                 <!-- 몬스터 DB -->
