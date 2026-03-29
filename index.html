@@ -60,6 +60,14 @@
                     <h2 style="color: var(--primary-gold); font-size: 1.1rem;">🃏 카드 인벤토리</h2>
                     <span id="inv-count" style="font-size:0.6rem; color:var(--text-dim);">0 / 10</span>
                 </div>
+
+                <!-- 카드 뽑기 패널 (카드 없을 때 표시) -->
+                <div id="draw-card-panel" class="glass-panel" style="margin-bottom:20px; padding:20px; text-align:center; border-color:rgba(233,196,0,0.3); display:none;">
+                    <div style="font-size:1rem; margin-bottom:8px;">🎴</div>
+                    <div style="font-size:0.9rem; color:var(--primary-gold); font-weight:700; margin-bottom:8px;">시작 카드 뽑기</div>
+                    <div style="font-size:0.75rem; color:var(--text-dim); margin-bottom:15px;">고블린 병사 카드를 랜덤 능력치로 뽑습니다!</div>
+                    <button class="btn-primary" style="width:100%; padding:14px; font-size:0.9rem;" onclick="drawStarterCard()">🎲 카드 뽑기!</button>
+                </div>
                 
                 <div id="inventory-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;"></div>
                 

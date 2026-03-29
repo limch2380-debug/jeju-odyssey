@@ -131,8 +131,21 @@ async function updateSelectedCardDisplay() {
 }
 
 function tryStartAdventure() {
-    if (selectedCardIdx<0) { alert('전투에 사용할 카드를 먼저 선택해주세요!'); return; }
-    showScreen('dashboard');
+    getInventory().then(inv => {
+        if (inv.length === 0) {
+            alert('카드가 없습니다! 인벤토리에서 카드를 먼저 뽑아주세요.');
+            showScreen('inventory');
+            return;
+        }
+        getSelectedIdx().then(idx => {
+            if (idx < 0 || idx >= inv.length) {
+                alert('전투에 사용할 카드를 먼저 선택해주세요!');
+                showScreen('inventory');
+                return;
+            }
+            showScreen('dashboard');
+        });
+    });
 }
 
 // ===== 인벤토리 UI =====
@@ -140,6 +153,9 @@ async function renderInventory() {
     const inv = await getInventory();
     selectedCardIdx = await getSelectedIdx();
     document.getElementById('inv-count').innerText = `${inv.length} / 10`;
+    // 카드 뽑기 패널 표시/숨김
+    const drawPanel = document.getElementById('draw-card-panel');
+    if (drawPanel) drawPanel.style.display = inv.length === 0 ? 'block' : 'none';
     const grid = document.getElementById('inventory-grid');
     grid.innerHTML = '';
     fusionSelections.clear();
@@ -405,4 +421,22 @@ async function rollCardDrop(enemyName, isBoss) {
         }
     }
     return results;
+}
+
+// ===== 시작 카드 뽑기 =====
+async function drawStarterCard() {
+    const inv = await getInventory();
+    if (inv.length >= 10) { alert('인벤토리가 가득 찼습니다!'); return; }
+    const templates = await getCardTemplates();
+    const goblinTemplate = templates.find(t => t.templateId === 'goblin_soldier') || templates[0];
+    if (!goblinTemplate) { alert('카드 템플릿이 없습니다.'); return; }
+    const card = generateCard(goblinTemplate, 'common');
+    inv.push(card);
+    await saveInventory(inv);
+    // 자동 전투 카드 선택
+    await setSelectedIdx(inv.length - 1);
+    // 결과 표시
+    alert(`🎉 카드 획득!\n\n${card.name} [${rarityLabel(card.rarity)}]\n\nHP: ${card.hp}  ATK: ${card.atk}  DEF: ${card.def}\n${card.skill1!=='none'?SKILLS[card.skill1]?.icon+' '+SKILLS[card.skill1]?.name+' '+card.skill1Chance+'%':''}`);
+    renderInventory();
+    updateSelectedCardDisplay();
 }
