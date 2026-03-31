@@ -16,7 +16,7 @@ let encounterPending = false;
 let autoHuntPortal = null; // 현재 자동사냥 중인 포탈 정보
 
 // ===== 세션 사냥 기록 =====
-let huntLog = { kills: 0, bossKills: 0, potions: 0, shardsGot: 0 };
+let huntLog = { kills: 0, bossKills: 0, potions: 0, cardsGot: 0 };
 
 // ===== WAKE LOCK — 백그라운드 유지 =====
 let wakeLock = null;
@@ -245,7 +245,7 @@ function doLogout() {
     currentUserId = null;
     window.isAdmin = false;
     cachedPlayerStats = null;
-    huntLog = { kills: 0, bossKills: 0, potions: 0, shardsGot: 0 };
+    huntLog = { kills: 0, bossKills: 0, potions: 0, cardsGot: 0 };
     stopHeartbeat();
     showScreen('login');
 }
@@ -400,8 +400,6 @@ function startTracking() {
 async function updateDashboardHUD() {
     const inv = await getInventory();
     equippedCardIdx = await getEquippedIdx();
-    const shards = await getShards();
-    const frags = await getFragments();
     const bcn = document.getElementById('battle-card-name');
     if (bcn) {
         if (equippedCardIdx>=0 && equippedCardIdx<inv.length) {
@@ -410,14 +408,7 @@ async function updateDashboardHUD() {
             bcn.innerText = '탐험가';
         }
     }
-    const bcl = document.getElementById('battle-card-lv');
-    if (bcl) bcl.innerText = shards;
 
-    // 조각 현황 표시 (전체 엑조디아 모드로 변경됨)
-    const fragEl = document.getElementById('fragment-status');
-    if (fragEl) {
-        fragEl.innerHTML = `<button onclick="showCombineUI()" style="width:100%;font-size:0.75rem;padding:6px 12px;background:linear-gradient(135deg,var(--primary-gold),#ff8800);border:none;border-radius:8px;color:#000;font-weight:900;cursor:pointer;box-shadow:0 0 10px rgba(255,215,0,0.5);">🛠 엑조디아 카드 공방</button>`;
-    }
     const hpText = document.getElementById('hud-hp-text');
     if (hpText && combatState.playerMaxHP > 0) hpText.innerText = `${Math.ceil((combatState.playerHP/combatState.playerMaxHP)*100)}%`;
     const hpBar = document.getElementById('hud-hp-bar');
@@ -429,7 +420,6 @@ function updateHuntLogUI() {
     if (!el) return;
     const hk = document.getElementById('hunt-kills'); if(hk) hk.innerText = huntLog.kills;
     const hb = document.getElementById('hunt-boss-kills'); if(hb) hb.innerText = huntLog.bossKills;
-    const hc = document.getElementById('hunt-shards'); if(hc) hc.innerText = huntLog.shardsGot;
     const hp = document.getElementById('hunt-potions'); if(hp) hp.innerText = huntLog.potions;
 }
 
@@ -836,49 +826,39 @@ async function handleVictory() {
         const tierDrop = drops[mType] || drops.normal;
         let stats = await getPlayerSettings();
         
-        // [엑조디아 방식] 카드 전용 5조각 드랍 (최대 드랍 제한 없음, 확률 독립 시행)
-        let dropsOccurred = 0;
-        let lastDroppedCardName = null;
-        let lastDroppedPart = null;
+        // 카드 직접 드랍
+        let cardDropped = false;
         
         try {
             const mPool = await getMonsterPool();
-            const monsterIndex = mPool.findIndex(m => m.name === combatState.currentEnemy.name);
-            if (monsterIndex !== -1 && typeof getCardTemplates === 'function') {
-                const templates = await getCardTemplates();
-                for (const t of templates) {
-                    if (!t.drops || !t.rates) continue;
-                    for (let part = 0; part < 5; part++) {
-                        // 관리자가 지정한 드랍 몬스터
-                        if (t.drops[part] === monsterIndex) {
-                            const dropRate = t.rates[part] || 0;
-                            if (Math.random() * 100 < dropRate) {
-                                // 엑조디아 키: frag_{templateId}_{Part 1~5}
-                                const partKey = `frag_${t.templateId}_${part+1}`;
-                                await addFragment(partKey);
-                                dropsOccurred++;
-                                lastDroppedCardName = t.name;
-                                lastDroppedPart = part + 1;
-                                renderLog(`💎 [${t.name}] #${part+1} 획득!`, 'player');
+            const monster = mPool.find(m => m.name === combatState.currentEnemy.name);
+            if (monster && monster.dropCardTemplateId && monster.dropCardRate > 0) {
+                if (Math.random() * 100 < monster.dropCardRate) {
+                    if (typeof getCardTemplates === 'function' && typeof generateCard === 'function' && typeof saveInventory === 'function' && typeof getInventory === 'function') {
+                        const templates = await getCardTemplates();
+                        const t = templates.find(x => x.templateId === monster.dropCardTemplateId);
+                        if (t) {
+                            const inv = await getInventory();
+                            if (inv.length < 10) { // 인벤토리 제한 확인
+                                const card = await generateCard(t);
+                                inv.push(card);
+                                await saveInventory(inv);
+                                cardDropped = true;
+                                huntLog.cardsGot++;
+                                renderLog(`🎴 [${t.name}] 카드 획득!`, 'player');
+                                if (typeof showCardDropPopup === 'function') {
+                                    showCardDropPopup(card);
+                                }
+                            } else {
+                                renderLog(`인벤토리가 가득 차서 카드를 획득하지 못했습니다.`, 'enemy');
                             }
                         }
                     }
                 }
             }
-        } catch(e) { console.error('엑조디아 드랍 오류:', e); }
+        } catch(e) { console.error('카드 드랍 오류:', e); }
 
-        let shardWasDropped = dropsOccurred > 0;
-        if (shardWasDropped) {
-            const currentShards = await getShards();
-            await saveShards(currentShards + dropsOccurred);
-            huntLog.shardsGot += dropsOccurred;
-            // 엑조디아 팝업 띄우기 (여러개 나와도 마지막 1개만)
-            if (lastDroppedCardName !== null && typeof showExodiaShardPopup === 'function') {
-                showExodiaShardPopup(lastDroppedCardName, lastDroppedPart);
-            }
-        }
-        
-        if (!shardWasDropped) {
+        if (!cardDropped) {
             renderLog('드랍 없음', 'enemy');
         }
         
@@ -948,7 +928,13 @@ async function renderSettingsMonsterList() {
     const pool = await getMonsterPool();
     const container = document.getElementById('set-monster-list');
     container.innerHTML = '';
-    const shardKeys = Object.keys(SHARD_FRAGMENTS);
+    
+    let templates = [];
+    try {
+        if (typeof getCardTemplates === 'function') templates = await getCardTemplates();
+    } catch(e) {}
+    const cardOpts = '<option value="">선택 안함</option>' + templates.map(t => `<option value="${t.templateId}">${t.name}</option>`).join('');
+
     pool.forEach((m, i) => {
         const typeInfo = MONSTER_TYPES[m.type] || MONSTER_TYPES.normal;
         const item = document.createElement('div');
@@ -993,12 +979,20 @@ async function renderSettingsMonsterList() {
                         <div><label style="font-size:0.55rem !important;">DEF max</label><input type="number" class="set-m-defmax btn-nav" data-index="${i}" value="${m.defMax||0}" style="width:100%;"></div>
                     </div>
                     <div style="padding:10px; background:rgba(0,0,0,0.3); border-radius:8px; border:1px solid rgba(255,255,255,0.1);">
-                        <div style="font-size:0.6rem; color:var(--primary-gold); font-weight:700; margin-bottom:4px;">💬 전용 조각 드랍 안내</div>
-                        <div style="font-size:0.5rem; color:var(--text-dim); line-height:1.4;">이 몬스터가 드랍하는 엑조디아 방식의 &lt;카드 전용 5조각&gt;은 <b>카드 템플릿 설정</b> 메뉴에서 해당 카드를 생성/수정할 때 지정할 수 있습니다.</div>
+                        <div style="font-size:0.6rem; color:var(--primary-gold); font-weight:700; margin-bottom:4px;">🎴 카드 드랍 설정</div>
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <select class="set-m-card-drop btn-nav" data-index="${i}" style="flex:1; padding:6px; font-size:0.6rem;">${cardOpts}</select>
+                            <input type="number" class="set-m-card-rate btn-nav" data-index="${i}" value="${m.dropCardRate||10}" style="width:60px; text-align:center; padding:6px; font-size:0.6rem;" placeholder="확률%">
+                        </div>
                     </div>
                 </div>
             </div>
         `;
+        // set selected option after innerHTML
+        setTimeout(() => {
+            const select = item.querySelector('.set-m-card-drop');
+            if (select) select.value = m.dropCardTemplateId || "";
+        }, 0);
         container.appendChild(item);
     });
 }
@@ -1042,12 +1036,14 @@ async function addMonster(type) {
     });
     await db.from('game_settings').update({ value: pool }).eq('name', 'monsterPool');
     renderSettingsMonsterList();
+    if(typeof renderCardEditor === 'function') renderCardEditor();
 }
 async function deleteMonster(i) {
     if (!confirm('삭제하시겠습니까?')) return;
     const pool = await getMonsterPool(); pool.splice(i, 1);
     await db.from('game_settings').update({ value: pool }).eq('name', 'monsterPool');
     renderSettingsMonsterList();
+    if(typeof renderCardEditor === 'function') renderCardEditor();
 }
 async function saveMonsterPool() {
     const names = document.querySelectorAll('.set-m-name');
@@ -1063,11 +1059,16 @@ async function saveMonsterPool() {
         // hp, dmg 호환: 전투에서 랜덤 생성 시 사용
         pool[i].hp = pool[i].hpMax;
         pool[i].dmg = pool[i].atkMax;
-        // shardDrops no longer set here - they are pulled dynamically from Card Templates
+        
+        // 카드 드랍 설정
+        pool[i].dropCardTemplateId = document.querySelectorAll('.set-m-card-drop')[i]?.value || "";
+        pool[i].dropCardRate = parseFloat(document.querySelectorAll('.set-m-card-rate')[i]?.value) || 0;
     });
     await db.from('game_settings').update({ value: pool }).eq('name', 'monsterPool');
     cachedMonsterPool = pool;
-    alert("몬스터 데이터 저장 완료!"); renderSettingsMonsterList();
+    alert("몬스터 데이터 저장 완료!"); 
+    renderSettingsMonsterList();
+    if(typeof renderCardEditor === 'function') renderCardEditor();
 }
 
 function initSettingsMap() {
@@ -1346,9 +1347,19 @@ async function adminDeleteUser(uid, uname) {
     if (!confirm(`⚠ "${uname}" 계정을 정말 삭제하시겠습니까?\n\n모든 데이터가 삭제됩니다.`)) return;
     if (!confirm(`최종 확인: "${uname}" 삭제`)) return;
     try {
-        await db.from('player_state').delete().eq('id', uid);
-        await db.from('users').delete().eq('id', uid);
+        const { error: e0 } = await db.from('game_settings').delete().like('name', `%_${uid}`);
+        if(e0 && e0.code !== 'PGRST116') console.error('Settings delete error:', e0);
+
+        const { error: e1 } = await db.from('player_state').delete().eq('id', uid);
+        if (e1) throw e1;
+
+        const { error: e2 } = await db.from('users').delete().eq('id', uid);
+        if (e2) throw e2;
+
         alert(`✅ "${uname}" 삭제 완료`);
         loadAdminUserList();
-    } catch(e) { alert('삭제 실패: ' + e.message); }
+    } catch(e) { 
+        console.error(e);
+        alert('삭제 실패: ' + (e.message || JSON.stringify(e))); 
+    }
 }
