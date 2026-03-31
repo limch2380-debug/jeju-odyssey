@@ -451,7 +451,17 @@ async function renderCardEditor() {
     const el = document.getElementById('card-editor-list');
     if(!el) return;
     el.innerHTML = '';
+
+    // 추가 버튼 상단 배치
+    const addBtn = document.createElement('button');
+    addBtn.className = 'btn-primary';
+    addBtn.style.cssText = 'width:100%; margin-bottom:20px; padding:15px; font-weight:900; background:linear-gradient(135deg,var(--secondary-cyan),#0088ff);';
+    addBtn.innerText = '➕ 새 카드 템플릿 추가';
+    addBtn.onclick = addNewCardTemplate;
+    el.appendChild(addBtn);
+
     const passiveOpts = Object.entries(PASSIVE_SKILLS).map(([k,v])=>`<option value="${k}">${v.icon} ${v.name}</option>`).join('');
+
     templates.forEach((t,i) => {
         const passiveCount = t.passiveCount || 2;
         const pMin = t.passiveMin || 10;
@@ -465,8 +475,12 @@ async function renderCardEditor() {
                 <div style="flex:1;">
                     <input type="text" class="ce-name btn-nav" value="${t.name}" style="width:100%;">
                 </div>
-                <label class="btn-nav" style="padding:6px 10px;font-size:0.6rem;cursor:pointer;text-align:center;">📷<input type="file" accept="image/*" style="display:none;" onchange="handleCardImgUpload(${i},this)"></label>
+                <div style="display:flex; flex-direction:column; gap:4px;">
+                    <label class="btn-nav" style="padding:4px 8px;font-size:0.55rem;cursor:pointer;text-align:center;color:var(--secondary-cyan);border-color:var(--secondary-cyan);">📷 이미지<input type="file" accept="image/*" style="display:none;" onchange="handleCardImgUpload(${i},this)"></label>
+                    <button class="btn-nav" style="padding:4px 8px;font-size:0.55rem;color:var(--accent-red);border-color:var(--accent-red);" onclick="deleteCardTemplate(${i})">🗑 삭제</button>
+                </div>
             </div>
+
             <!-- 패시브 개수 설정 -->
             <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;padding:8px 12px;background:rgba(0,253,236,0.03);border-radius:8px;border:1px solid rgba(0,253,236,0.1);">
                 <span style="font-size:0.6rem;color:var(--secondary-cyan);font-weight:700;">패시브 개수:</span>
@@ -509,6 +523,32 @@ async function renderCardEditor() {
         });
     });
 }
+
+async function addNewCardTemplate() {
+    const templates = await getCardTemplates();
+    const newId = 'card_' + Date.now();
+    templates.push({
+        templateId: newId,
+        name: '새로운 카드',
+        img: 'goblin_card.png',
+        passive1: 'atk_boost',
+        passive2: 'def_boost',
+        passiveCount: 2,
+        passiveMin: 10,
+        passiveMax: 20
+    });
+    await db.from('game_settings').upsert({name:'cardTemplates', value:templates});
+    renderCardEditor();
+}
+
+async function deleteCardTemplate(idx) {
+    if(!confirm('정말 이 카드 템플릿을 삭제하시겠습니까?')) return;
+    let templates = await getCardTemplates();
+    templates.splice(idx, 1);
+    await db.from('game_settings').upsert({name:'cardTemplates', value:templates});
+    renderCardEditor();
+}
+
 
 async function saveCardTemplates() {
     const templates = await getCardTemplates();
