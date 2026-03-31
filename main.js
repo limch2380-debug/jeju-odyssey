@@ -882,7 +882,14 @@ async function handleVictory() {
             huntLog.potions++;
             renderLog('💊 포션 드랍!', 'player');
         }
-        await db.from('player_state').update(stats).eq('id', currentUserId||'singleton');
+        await db.from('player_state').update({
+            hp: stats.hp,
+            atk: stats.atk,
+            def: stats.def,
+            xp: stats.xp,
+            level: stats.level,
+            potions: stats.potions
+        }).eq('id', currentUserId||'singleton');
     } catch(e) {
         console.error('[VICTORY] DB error:', e);
         renderLog('데이터 저장 오류 (자동 복구)', 'enemy');
