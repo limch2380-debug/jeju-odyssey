@@ -1018,8 +1018,9 @@ async function uploadMonsterImage(index, input) {
     const card = input.closest('.monster-card');
     const img = card.querySelector('img'); img.style.opacity = '0.3';
     try {
-        // 1MB 이하로 자동 리사이즈
-        const dataUrl = await resizeImageFile(file, 1000000);
+        // 300KB 이하로 자동 리사이즈
+        const dataUrl = await resizeImageFile(file, 300000);
+
         // base64 → Blob 변환
         const res = await fetch(dataUrl);
         const blob = await res.blob();

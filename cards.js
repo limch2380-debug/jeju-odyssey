@@ -707,7 +707,8 @@ function hexToRgb(hex) {
 }
 
 // ===== 이미지 리사이즈 (1MB 이하) =====
-function resizeImageFile(file, maxBytes=1000000) {
+function resizeImageFile(file, maxBytes=300000) {
+
     return new Promise((resolve) => {
         const reader = new FileReader();
         reader.onload = (e) => {
@@ -736,17 +737,29 @@ function resizeImageFile(file, maxBytes=1000000) {
 
 async function handleCardImgUpload(idx, input) {
     const file = input.files[0]; if(!file) return;
-    const dataUrl = await resizeImageFile(file);
-    const templates = await getCardTemplates();
-    const ext = file.name.split('.').pop();
-    const fileName = `card_${templates[idx].templateId}_${Date.now()}.${ext}`;
-    const blob = await fetch(dataUrl).then(r=>r.blob());
-    const {data,error} = await db.storage.from('game-assets').upload(fileName, blob, {upsert:true});
-    if (error) { alert('업로드 실패: '+error.message); return; }
-    const {data:urlData} = db.storage.from('game-assets').getPublicUrl(fileName);
-    templates[idx].img = urlData.publicUrl;
-    await db.from('game_settings').upsert({name:'cardTemplates', value:templates});
-    const imgEl = document.querySelectorAll('.ce-img')[idx];
-    if(imgEl) imgEl.src = urlData.publicUrl;
-    alert('이미지 변경 완료!');
+    const container = input.closest('.glass-panel');
+    const imgEl = container.querySelector('.ce-img');
+    if (imgEl) imgEl.style.opacity = '0.3';
+    
+    try {
+        const dataUrl = await resizeImageFile(file);
+        const templates = await getCardTemplates();
+        const ext = 'jpg'; // resizeImageFile converts to jpeg
+        const fileName = `card_${templates[idx].templateId}_${Date.now()}.${ext}`;
+        const blob = await fetch(dataUrl).then(r=>r.blob());
+        
+        const {data,error} = await db.storage.from('game-assets').upload(fileName, blob, {contentType: 'image/jpeg', upsert:true});
+        if (error) { alert('업로드 실패: '+error.message); if(imgEl) imgEl.style.opacity='1'; return; }
+        
+        const {data:urlData} = db.storage.from('game-assets').getPublicUrl(fileName);
+        templates[idx].img = urlData.publicUrl;
+        await db.from('game_settings').upsert({name:'cardTemplates', value:templates});
+        
+        if(imgEl) { imgEl.src = urlData.publicUrl; imgEl.style.opacity = '1'; }
+        alert(`✅ 이미지 변경 완료! (${(blob.size/1024).toFixed(0)}KB)`);
+    } catch(e) {
+        alert('에러: ' + e.message);
+        if(imgEl) imgEl.style.opacity = '1';
+    }
 }
+
