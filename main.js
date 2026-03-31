@@ -628,9 +628,9 @@ async function startCombat(forcedMonsterName = null, autoStart = false) {
         equippedCard = inv[equippedCardIdx];
         bonus = getPassiveBonus(equippedCard);
     }
-    const finalHp = base.hp + bonus.hp;
-    const finalAtk = base.atk + bonus.atk;
-    const finalDef = base.def + bonus.def;
+    const finalHp = Math.floor(base.hp * (1 + bonus.hp / 100));
+    const finalAtk = Math.floor(base.atk * (1 + bonus.atk / 100));
+    const finalDef = Math.floor(base.def * (1 + bonus.def / 100));
     const pool = await getMonsterPool();
     let targetMonster;
     if (forcedMonsterName) {

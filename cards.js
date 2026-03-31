@@ -13,12 +13,12 @@ const MONSTER_TYPES = {
 };
 const FUSION_RULES = { common:{need:10,next:'magic'}, magic:{need:5,next:'rare'}, rare:{need:3,next:'unique'}, unique:{need:1,next:'unique'} };
 const PASSIVE_SKILLS = {
-    atk_boost: {name:'공격력 증가',icon:'⚔',desc:'ATK +N'},
-    def_boost: {name:'방어력 증가',icon:'🛡',desc:'DEF +N'},
-    hp_boost: {name:'체력 증가',icon:'❤',desc:'HP +N'},
-    critical: {name:'크리티컬',icon:'💥',desc:'크리율 +N%'},
-    dodge: {name:'회피',icon:'💨',desc:'회피율 +N%'},
-    drain: {name:'흡혈',icon:'🩸',desc:'흡혈 +N%'}
+    atk_boost: {name:'공격력 증가',icon:'⚔',desc:'ATK +N%',unit:'%'},
+    def_boost: {name:'방어력 증가',icon:'🛡',desc:'DEF +N%',unit:'%'},
+    hp_boost: {name:'체력 증가',icon:'❤',desc:'HP +N%',unit:'%'},
+    critical: {name:'크리티컬',icon:'💥',desc:'크리율 +N%',unit:'%'},
+    dodge: {name:'회피',icon:'💨',desc:'회피율 +N%',unit:'%'},
+    drain: {name:'흡혈',icon:'🩸',desc:'흡혈 +N%',unit:'%'}
 };
 const DEFAULT_GAME_CONFIG = {
     playerBaseStats: { hp:100, atk:15, def:5 },
@@ -142,9 +142,9 @@ async function craftCard(templateId) {
     await saveInventory(inv);
     await saveShards(shards - cost);
     // 멋진 팝업
-    let passiveMsg = `${PASSIVE_SKILLS[card.passive1]?.icon} ${PASSIVE_SKILLS[card.passive1]?.name}: +${card.passive1Value}`;
+    let passiveMsg = `${PASSIVE_SKILLS[card.passive1]?.icon} ${PASSIVE_SKILLS[card.passive1]?.name}: +${card.passive1Value}%`;
     if (card.passiveCount >= 2 && card.passive2) {
-        passiveMsg += `\n${PASSIVE_SKILLS[card.passive2]?.icon} ${PASSIVE_SKILLS[card.passive2]?.name}: +${card.passive2Value}`;
+        passiveMsg += `\n${PASSIVE_SKILLS[card.passive2]?.icon} ${PASSIVE_SKILLS[card.passive2]?.name}: +${card.passive2Value}%`;
     }
     alert(`🎉 카드 제작 성공!\n\n${card.name} [일반]\n\n패시브 스킬:\n${passiveMsg}\n\n수정조각: ${shards} → ${shards - cost}`);
     renderInventory();
@@ -187,10 +187,10 @@ async function updateEquippedCardDisplay() {
         // 패시브 보너스 계산
         const bonus = getPassiveBonus(c);
         bonusHp=bonus.hp; bonusAtk=bonus.atk; bonusDef=bonus.def;
-        const p1 = `${PASSIVE_SKILLS[c.passive1]?.icon||''} ${PASSIVE_SKILLS[c.passive1]?.name||''} +${c.passive1Value}`;
+        const p1 = `${PASSIVE_SKILLS[c.passive1]?.icon||''} ${PASSIVE_SKILLS[c.passive1]?.name||''} +${c.passive1Value}%`;
         let passiveText;
         if (c.passiveCount >= 2 && c.passive2) {
-            const p2 = `${PASSIVE_SKILLS[c.passive2]?.icon||''} ${PASSIVE_SKILLS[c.passive2]?.name||''} +${c.passive2Value}`;
+            const p2 = `${PASSIVE_SKILLS[c.passive2]?.icon||''} ${PASSIVE_SKILLS[c.passive2]?.name||''} +${c.passive2Value}%`;
             passiveText = `<div style="font-size:0.5rem;color:var(--secondary-cyan);margin-top:4px;">${p1} / ${p2}</div>`;
         } else {
             passiveText = `<div style="font-size:0.5rem;color:var(--secondary-cyan);margin-top:4px;">${p1}</div>`;
@@ -205,7 +205,7 @@ async function updateEquippedCardDisplay() {
     // 최종 스탯 표시
     const finalEl = document.getElementById('player-final-stats');
     if(finalEl) {
-        finalEl.innerHTML = `<span style="color:var(--accent-red);">HP:${base.hp+bonusHp}</span> <span style="color:var(--primary-gold);">ATK:${base.atk+bonusAtk}</span> <span style="color:var(--secondary-cyan);">DEF:${base.def+bonusDef}</span>`;
+        finalEl.innerHTML = `<span style="color:var(--accent-red);">HP:${Math.floor(base.hp*(1+bonusHp/100))}</span> <span style="color:var(--primary-gold);">ATK:${Math.floor(base.atk*(1+bonusAtk/100))}</span> <span style="color:var(--secondary-cyan);">DEF:${Math.floor(base.def*(1+bonusDef/100))}</span>`;
     }
 }
 
@@ -255,8 +255,8 @@ async function renderInventory() {
         if (equipped && !isBase && !isMat) badge = `<div style="position:absolute;top:8px;right:10px;font-size:0.6rem;color:${rc};font-weight:700;">🎴 장착</div>`;
         if (isBase) badge = `<div style="position:absolute;top:8px;right:10px;font-size:0.6rem;color:var(--primary-gold);font-weight:700;">⭐ 베이스</div>`;
         if (isMat) badge = `<div style="position:absolute;top:8px;right:10px;font-size:0.6rem;color:var(--accent-red);font-weight:700;">🔥 재료</div>`;
-        const p1 = `${PASSIVE_SKILLS[c.passive1]?.icon||''} +${c.passive1Value||0}`;
-        const p2 = (c.passiveCount >= 2 && c.passive2) ? `${PASSIVE_SKILLS[c.passive2]?.icon||''} +${c.passive2Value||0}` : '';
+        const p1 = `${PASSIVE_SKILLS[c.passive1]?.icon||''} +${c.passive1Value||0}%`;
+        const p2 = (c.passiveCount >= 2 && c.passive2) ? `${PASSIVE_SKILLS[c.passive2]?.icon||''} +${c.passive2Value||0}%` : '';
         const passiveDisplay = p2 ? `${p1} / ${p2}` : p1;
         let fuseBtnStyle = 'flex:1;padding:8px;font-size:0.7rem;text-align:center;';
         if (isBase) fuseBtnStyle += 'background:rgba(233,196,0,0.25);color:var(--primary-gold);';
