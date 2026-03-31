@@ -835,10 +835,10 @@ async function handleVictory() {
         const tierDrop = drops[mType] || drops.normal;
         let stats = await getPlayerSettings();
         
-        // 수정조각 드랍 (5종 조각 시스템)
-        if (Math.random() * 100 < (tierDrop.shardRate || 40)) {
-            const shardKeys = Object.keys(SHARD_FRAGMENTS);
-            const droppedShard = shardKeys[Math.floor(Math.random() * shardKeys.length)];
+        // 수정조각 드랍 (몬스터별 설정 기반)
+        const monsterShards = combatState.currentEnemy.shardDrops || Object.keys(SHARD_FRAGMENTS);
+        if (monsterShards.length > 0 && Math.random() * 100 < (tierDrop.shardRate || 40)) {
+            const droppedShard = monsterShards[Math.floor(Math.random() * monsterShards.length)];
             await addFragment(droppedShard);
             const currentShards = await getShards();
             await saveShards(currentShards + 1);
@@ -916,11 +916,22 @@ async function renderSettingsMonsterList() {
     const pool = await getMonsterPool();
     const container = document.getElementById('set-monster-list');
     container.innerHTML = '';
+    const shardKeys = Object.keys(SHARD_FRAGMENTS);
     pool.forEach((m, i) => {
         const typeInfo = MONSTER_TYPES[m.type] || MONSTER_TYPES.normal;
+        const drops = m.shardDrops || shardKeys; // 기본: 모두 드랍 가능
         const item = document.createElement('div');
         item.className = 'glass-panel monster-card';
         item.style.cssText = `margin-bottom:15px; padding:20px; border-left:4px solid ${typeInfo.color};`;
+        let shardCheckboxes = shardKeys.map(k => {
+            const s = SHARD_FRAGMENTS[k];
+            const checked = drops.includes(k) ? 'checked' : '';
+            return `<label style="display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;padding:5px 3px;border-radius:8px;border:1px solid ${checked ? s.color : 'rgba(255,255,255,0.08)'};background:${checked ? `rgba(${hexToRgb(s.color)},0.08)` : 'transparent'};transition:0.3s;min-width:45px;">
+                <input type="checkbox" class="set-m-shard" data-monster="${i}" data-shard="${k}" ${checked} style="display:none;" onchange="this.closest('label').style.borderColor=this.checked?'${s.color}':'rgba(255,255,255,0.08)';this.closest('label').style.background=this.checked?'rgba(${hexToRgb(s.color)},0.08)':'transparent';">
+                <img src="shard.png" style="width:22px;height:22px;object-fit:contain;filter:${s.hue} ${checked ? '' : 'grayscale(0.8) opacity(0.3)'};" onerror="this.outerHTML='<span style=font-size:1rem;>${s.icon}</span>'" onload="this.closest('label').querySelector('input').addEventListener('change',function(){this.closest('label').querySelector('img').style.filter='${s.hue} '+(this.checked?'':'grayscale(0.8) opacity(0.3)')})">
+                <span style="font-size:0.5rem;color:${checked ? s.color : 'var(--text-dim)'};font-weight:700;">${s.name}</span>
+            </label>`;
+        }).join('');
         item.innerHTML = `
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
                 <div style="display:flex; align-items:center; gap:10px;">
@@ -955,10 +966,13 @@ async function renderSettingsMonsterList() {
                         <div><label>ATK min</label><input type="number" class="set-m-atkmin btn-nav" data-index="${i}" value="${m.atkMin||m.dmg||10}" style="width:100%;"></div>
                         <div><label>ATK max</label><input type="number" class="set-m-atkmax btn-nav" data-index="${i}" value="${m.atkMax||m.dmg||10}" style="width:100%;"></div>
                     </div>
-                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:12px;">
                         <div><label>DEF min</label><input type="number" class="set-m-defmin btn-nav" data-index="${i}" value="${m.defMin||0}" style="width:100%;"></div>
                         <div><label>DEF max</label><input type="number" class="set-m-defmax btn-nav" data-index="${i}" value="${m.defMax||0}" style="width:100%;"></div>
                     </div>
+                    <div style="font-size:0.75rem; color:var(--primary-gold); margin-bottom:6px; font-weight:700;">💎 드랍 조각 설정</div>
+                    <div style="font-size:0.5rem; color:var(--text-dim); margin-bottom:8px;">이 몬스터가 드랍할 수 있는 조각 종류</div>
+                    <div style="display:flex; gap:4px; flex-wrap:wrap;">${shardCheckboxes}</div>
                 </div>
             </div>
         `;
@@ -1025,6 +1039,11 @@ async function saveMonsterPool() {
         // hp, dmg 호환: 전투에서 랜덤 생성 시 사용
         pool[i].hp = pool[i].hpMax;
         pool[i].dmg = pool[i].atkMax;
+        // 수정조각 드랍 설정 저장
+        const shardCbs = document.querySelectorAll(`.set-m-shard[data-monster="${i}"]`);
+        const enabledShards = [];
+        shardCbs.forEach(cb => { if (cb.checked) enabledShards.push(cb.dataset.shard); });
+        pool[i].shardDrops = enabledShards;
     });
     await db.from('game_settings').update({ value: pool }).eq('name', 'monsterPool');
     cachedMonsterPool = pool;
