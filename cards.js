@@ -742,24 +742,39 @@ async function handleCardImgUpload(idx, input) {
     if (imgEl) imgEl.style.opacity = '0.3';
     
     try {
-        const dataUrl = await resizeImageFile(file);
+        const dataUrl = await resizeImageFile(file, 300000); 
         const templates = await getCardTemplates();
-        const ext = 'jpg'; // resizeImageFile converts to jpeg
-        const fileName = `card_${templates[idx].templateId}_${Date.now()}.${ext}`;
-        const blob = await fetch(dataUrl).then(r=>r.blob());
         
-        const {data,error} = await db.storage.from('game-assets').upload(fileName, blob, {contentType: 'image/jpeg', upsert:true});
-        if (error) { alert('업로드 실패: '+error.message); if(imgEl) imgEl.style.opacity='1'; return; }
+        // 날짜를 포함해 겹치지 않는 파일명 생성 (monster-images 버킷 내 cards 폴더)
+        const fileName = `cards/card_${Date.now()}.jpg`;
         
-        const {data:urlData} = db.storage.from('game-assets').getPublicUrl(fileName);
-        templates[idx].img = urlData.publicUrl;
-        await db.from('game_settings').upsert({name:'cardTemplates', value:templates});
+        // DataURL을 Blob으로 수동 변환 (가장 안정적)
+        const byteString = atob(dataUrl.split(',')[1]);
+        const mimeString = dataUrl.split(',')[0].split(':')[1].split(';')[0];
+        const ab = new ArrayBuffer(byteString.length);
+        const ia = new Uint8Array(ab);
+        for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
+        const blob = new Blob([ab], {type: mimeString});
+
+        const { data, error } = await db.storage.from('monster-images').upload(fileName, blob, {
+            contentType: 'image/jpeg',
+            cacheControl: '3600',
+            upsert: false 
+        });
+
+        if (error) throw error;
         
-        if(imgEl) { imgEl.src = urlData.publicUrl; imgEl.style.opacity = '1'; }
-        alert(`✅ 이미지 변경 완료! (${(blob.size/1024).toFixed(0)}KB)`);
+        const { data: { publicUrl } } = db.storage.from('monster-images').getPublicUrl(fileName);
+        templates[idx].img = publicUrl;
+        await db.from('game_settings').upsert({name: 'cardTemplates', value: templates});
+        
+        if(imgEl) { imgEl.src = publicUrl; imgEl.style.opacity = '1'; }
+        alert(`✅ 카드 이미지 업로드 성공! (${(blob.size/1024).toFixed(0)}KB)`);
     } catch(e) {
-        alert('에러: ' + e.message);
+        console.error('[STORAGE_ERROR]', e);
+        alert('업로드 실패: ' + (e.message || '버킷 권한 설정을 확인하세요.'));
         if(imgEl) imgEl.style.opacity = '1';
     }
 }
+
 
