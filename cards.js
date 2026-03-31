@@ -561,11 +561,12 @@ async function saveGameConfig() {
         passiveMin: parseInt(document.getElementById('cfg-passive-min')?.value)||10,
         passiveMax: parseInt(document.getElementById('cfg-passive-max')?.value)||20,
         monsterDrops: {
-            normal: { shardRate: parseInt(document.getElementById('cfg-drop-normal-shard')?.value)||40, potionRate: parseInt(document.getElementById('cfg-drop-normal-potion')?.value)||20 },
-            magic: { shardRate: parseInt(document.getElementById('cfg-drop-magic-shard')?.value)||55, potionRate: parseInt(document.getElementById('cfg-drop-magic-potion')?.value)||25 },
-            rare: { shardRate: parseInt(document.getElementById('cfg-drop-rare-shard')?.value)||70, potionRate: parseInt(document.getElementById('cfg-drop-rare-potion')?.value)||30 },
-            unique: { shardRate: parseInt(document.getElementById('cfg-drop-unique-shard')?.value)||85, potionRate: parseInt(document.getElementById('cfg-drop-unique-potion')?.value)||40 }
+            normal: { potionRate: parseInt(document.getElementById('cfg-drop-normal-potion')?.value)||20 },
+            magic: { potionRate: parseInt(document.getElementById('cfg-drop-magic-potion')?.value)||25 },
+            rare: { potionRate: parseInt(document.getElementById('cfg-drop-rare-potion')?.value)||30 },
+            unique: { potionRate: parseInt(document.getElementById('cfg-drop-unique-potion')?.value)||40 }
         }
+
     };
     await db.from('game_settings').upsert({name:'gameConfig', value:config});
     alert(`게임 설정 저장!\n\nHP:${config.playerBaseStats.hp} ATK:${config.playerBaseStats.atk} DEF:${config.playerBaseStats.def}\n수정조각 비용: ${config.shardCost}\n패시브 범위: ${config.passiveMin}~${config.passiveMax}`);
@@ -579,15 +580,12 @@ async function loadGameConfigUI() {
     set('cfg-shard-cost', c.shardCost||10);
     set('cfg-passive-min', c.passiveMin||10);
     set('cfg-passive-max', c.passiveMax||20);
-    const d = c.monsterDrops||DEFAULT_GAME_CONFIG.monsterDrops;
-    set('cfg-drop-normal-shard', d.normal?.shardRate||40);
+    const d = c.monsterDrops||{};
     set('cfg-drop-normal-potion', d.normal?.potionRate||20);
-    set('cfg-drop-magic-shard', d.magic?.shardRate||55);
     set('cfg-drop-magic-potion', d.magic?.potionRate||25);
-    set('cfg-drop-rare-shard', d.rare?.shardRate||70);
     set('cfg-drop-rare-potion', d.rare?.potionRate||30);
-    set('cfg-drop-unique-shard', d.unique?.shardRate||85);
     set('cfg-drop-unique-potion', d.unique?.potionRate||40);
+
 }
 
 // ===== 수정조각 획득 팝업 =====

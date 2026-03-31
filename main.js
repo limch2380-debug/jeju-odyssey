@@ -274,6 +274,14 @@ function showScreen(screenId) {
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     const target = document.getElementById(`screen-${screenId}`);
     if (target) target.classList.add('active');
+    
+    // 미션 오버레이는 대시보드(지도) 화면에서만 표시
+    const mo = document.getElementById('mission-overlay');
+    if (mo) {
+        if (screenId === 'dashboard') mo.style.display = 'block';
+        else mo.style.display = 'none';
+    }
+
     if (screenId === 'dashboard') {
         setTimeout(() => { initMap(); startTracking(); loadPortals(); if (map) { map.invalidateSize(); map.setView(currentUserPos, 17); } }, 100);
     } else if (screenId === 'settings') {
@@ -286,6 +294,7 @@ function showScreen(screenId) {
         updateEquippedCardDisplay(); updateMainShards();
     } else { stopTracking(); }
 }
+
 
 function tryStartAdventure() {
     showScreen('dashboard');
@@ -402,7 +411,8 @@ async function updateDashboardHUD() {
         }
     }
     const bcl = document.getElementById('battle-card-lv');
-    if (bcl) bcl.innerText = `💎 ${shards}`;
+    if (bcl) bcl.innerText = shards;
+
     // 조각 현황 표시
     const fragEl = document.getElementById('fragment-status');
     if (fragEl) {
@@ -411,7 +421,8 @@ async function updateDashboardHUD() {
         let html = keys.map(k => {
             const s = SHARD_FRAGMENTS[k];
             const count = frags[k] || 0;
-            return `<span style="color:${count>0?s.color:'rgba(255,255,255,0.2)'};font-size:0.7rem;cursor:default;" title="${s.name}: ${count}개">💎</span>`;
+            return `<span style="display:inline-block; filter:${s.hue} ${count>0?'':'grayscale(1) opacity(0.2)'}; font-size:0.75rem; transition:0.3s;" title="${s.name}: ${count}개">💎</span>`;
+
         }).join(' ');
         if (canCombine) {
             html += ` <button onclick="showCombineUI()" style="font-size:0.6rem;padding:3px 8px;background:linear-gradient(135deg,var(--primary-gold),#ff8800);border:none;border-radius:6px;color:#000;font-weight:900;cursor:pointer;animation:pulse 1s infinite;margin-left:5px;">합치기</button>`;
@@ -666,7 +677,8 @@ async function startCombat(forcedMonsterName = null, autoStart = false) {
         playerHP: finalHp, playerMaxHP: finalHp,
         playerAtk: finalAtk, playerDef: finalDef,
         crit: bonus.crit, dodge: bonus.dodge, drain: bonus.drain,
-        potions: playerData.potions || 1,
+        potions: playerData.potions || 0,
+
         currentEnemy: { ...targetMonster, hp: mHp, maxHp: mHp, dmg: mAtk, def: mDef },
         isGameOver: false, busy: false,
         cardName: '탐험가', equippedCard
@@ -836,28 +848,32 @@ async function handleVictory() {
         let stats = await getPlayerSettings();
         
         // 수정조각 드랍 (몬스터별 설정 + 조각별 확률)
-        const monsterShards = combatState.currentEnemy.shardDrops || Object.keys(SHARD_FRAGMENTS);
+        const monsterShards = combatState.currentEnemy.shardDrops || [];
         const shardRates = combatState.currentEnemy.shardRates || {};
-        let shardDropped = false;
-        if (monsterShards.length > 0 && Math.random() * 100 < (tierDrop.shardRate || 40)) {
-            // 조각별 개별 확률 적용
-            const candidates = monsterShards.filter(k => {
-                const rate = shardRates[k] ?? 100;
-                return Math.random() * 100 < rate;
-            });
-            if (candidates.length > 0) {
-                const droppedShard = candidates[Math.floor(Math.random() * candidates.length)];
-                await addFragment(droppedShard);
-                const currentShards = await getShards();
-                await saveShards(currentShards + 1);
-                huntLog.shardsGot++;
-                const fragInfo = SHARD_FRAGMENTS[droppedShard];
+        let dropsOccurred = 0;
+        let lastDroppedKey = null;
+
+        for (const k of monsterShards) {
+            const individualRate = shardRates[k] ?? 100;
+            if (Math.random() * 100 < individualRate) {
+                await addFragment(k);
+                dropsOccurred++;
+                lastDroppedKey = k;
+                const fragInfo = SHARD_FRAGMENTS[k] || SHARD_FRAGMENTS.shard1;
                 renderLog(`💎 ${fragInfo.name} 획득!`, 'player');
-                showShardPopup(droppedShard);
-                shardDropped = true;
             }
         }
-        if (!shardDropped) {
+
+        let shardWasDropped = dropsOccurred > 0;
+        if (shardWasDropped) {
+            const currentShards = await getShards();
+            await saveShards(currentShards + dropsOccurred);
+            huntLog.shardsGot += dropsOccurred;
+            // 대표로 마지막 조각 팝업 하나만 노출
+            if (lastDroppedKey) showShardPopup(lastDroppedKey);
+        }
+        
+        if (!shardWasDropped) {
             renderLog('드랍 없음', 'enemy');
         }
         
