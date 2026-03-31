@@ -835,18 +835,29 @@ async function handleVictory() {
         const tierDrop = drops[mType] || drops.normal;
         let stats = await getPlayerSettings();
         
-        // 수정조각 드랍 (몬스터별 설정 기반)
+        // 수정조각 드랍 (몬스터별 설정 + 조각별 확률)
         const monsterShards = combatState.currentEnemy.shardDrops || Object.keys(SHARD_FRAGMENTS);
+        const shardRates = combatState.currentEnemy.shardRates || {};
+        let shardDropped = false;
         if (monsterShards.length > 0 && Math.random() * 100 < (tierDrop.shardRate || 40)) {
-            const droppedShard = monsterShards[Math.floor(Math.random() * monsterShards.length)];
-            await addFragment(droppedShard);
-            const currentShards = await getShards();
-            await saveShards(currentShards + 1);
-            huntLog.shardsGot++;
-            const fragInfo = SHARD_FRAGMENTS[droppedShard];
-            renderLog(`💎 ${fragInfo.name} 획득!`, 'player');
-            showShardPopup(droppedShard);
-        } else {
+            // 조각별 개별 확률 적용
+            const candidates = monsterShards.filter(k => {
+                const rate = shardRates[k] ?? 100;
+                return Math.random() * 100 < rate;
+            });
+            if (candidates.length > 0) {
+                const droppedShard = candidates[Math.floor(Math.random() * candidates.length)];
+                await addFragment(droppedShard);
+                const currentShards = await getShards();
+                await saveShards(currentShards + 1);
+                huntLog.shardsGot++;
+                const fragInfo = SHARD_FRAGMENTS[droppedShard];
+                renderLog(`💎 ${fragInfo.name} 획득!`, 'player');
+                showShardPopup(droppedShard);
+                shardDropped = true;
+            }
+        }
+        if (!shardDropped) {
             renderLog('드랍 없음', 'enemy');
         }
         
@@ -919,60 +930,66 @@ async function renderSettingsMonsterList() {
     const shardKeys = Object.keys(SHARD_FRAGMENTS);
     pool.forEach((m, i) => {
         const typeInfo = MONSTER_TYPES[m.type] || MONSTER_TYPES.normal;
-        const drops = m.shardDrops || shardKeys; // 기본: 모두 드랍 가능
+        const drops = m.shardDrops || shardKeys;
+        const rates = m.shardRates || {};
         const item = document.createElement('div');
         item.className = 'glass-panel monster-card';
         item.style.cssText = `margin-bottom:15px; padding:20px; border-left:4px solid ${typeInfo.color};`;
-        let shardCheckboxes = shardKeys.map(k => {
+        let shardUI = shardKeys.map(k => {
             const s = SHARD_FRAGMENTS[k];
-            const checked = drops.includes(k) ? 'checked' : '';
-            return `<label style="display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;padding:5px 3px;border-radius:8px;border:1px solid ${checked ? s.color : 'rgba(255,255,255,0.08)'};background:${checked ? `rgba(${hexToRgb(s.color)},0.08)` : 'transparent'};transition:0.3s;min-width:45px;">
-                <input type="checkbox" class="set-m-shard" data-monster="${i}" data-shard="${k}" ${checked} style="display:none;" onchange="this.closest('label').style.borderColor=this.checked?'${s.color}':'rgba(255,255,255,0.08)';this.closest('label').style.background=this.checked?'rgba(${hexToRgb(s.color)},0.08)':'transparent';">
-                <img src="shard.png" style="width:22px;height:22px;object-fit:contain;filter:${s.hue} ${checked ? '' : 'grayscale(0.8) opacity(0.3)'};" onerror="this.outerHTML='<span style=font-size:1rem;>${s.icon}</span>'" onload="this.closest('label').querySelector('input').addEventListener('change',function(){this.closest('label').querySelector('img').style.filter='${s.hue} '+(this.checked?'':'grayscale(0.8) opacity(0.3)')})">
-                <span style="font-size:0.5rem;color:${checked ? s.color : 'var(--text-dim)'};font-weight:700;">${s.name}</span>
-            </label>`;
+            const enabled = drops.includes(k);
+            const rate = rates[k] ?? 100;
+            return `<div style="text-align:center;padding:5px 2px;border-radius:8px;border:1px solid ${enabled ? s.color : 'rgba(255,255,255,0.08)'};background:${enabled ? `rgba(${hexToRgb(s.color)},0.06)` : 'transparent'};min-width:0;">
+                <label style="cursor:pointer;display:block;">
+                    <input type="checkbox" class="set-m-shard" data-monster="${i}" data-shard="${k}" ${enabled?'checked':''} style="display:none;"
+                        onchange="let lbl=this.closest('div');lbl.style.borderColor=this.checked?'${s.color}':'rgba(255,255,255,0.08)';lbl.style.background=this.checked?'rgba(${hexToRgb(s.color)},0.06)':'transparent';">
+                    <div style="font-size:0.85rem;filter:${s.hue} ${enabled?'':'grayscale(0.8) opacity(0.3)'};">💎</div>
+                    <div style="font-size:0.45rem;color:${enabled?s.color:'var(--text-dim)'};font-weight:700;margin-top:1px;">${s.name}</div>
+                </label>
+                <input type="number" class="set-m-shardrate btn-nav" data-monster="${i}" data-shard="${k}" value="${rate}" min="0" max="100" style="width:100%;text-align:center;padding:3px 2px !important;font-size:0.6rem !important;margin-top:3px;border-radius:6px;" placeholder="%">
+            </div>`;
         }).join('');
         item.innerHTML = `
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-                <div style="display:flex; align-items:center; gap:10px;">
-                    <span style="font-size:0.8rem; padding:4px 12px; border-radius:20px; font-weight:700;
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <span style="font-size:0.75rem; padding:3px 10px; border-radius:16px; font-weight:700;
                         background:rgba(0,0,0,0.3); color:${typeInfo.color}; border:1px solid ${typeInfo.border};">
                         ${typeInfo.icon} ${typeInfo.name}
                     </span>
-                    <span style="font-size:0.75rem; color:var(--text-dim);">#${i+1}</span>
+                    <span style="font-size:0.65rem; color:var(--text-dim);">#${i+1}</span>
                 </div>
-                <button class="btn-nav" style="padding:6px 14px; font-size:0.75rem; color:var(--accent-red); border-color:var(--accent-red);" onclick="deleteMonster(${i})">삭제</button>
+                <button class="btn-nav" style="padding:5px 12px; font-size:0.65rem; color:var(--accent-red); border-color:var(--accent-red);" onclick="deleteMonster(${i})">삭제</button>
             </div>
-            <div style="display:flex; gap:15px; align-items:flex-start;">
+            <div style="display:flex; gap:10px; align-items:flex-start;">
                 <div style="flex-shrink:0; text-align:center;">
-                    <img src="${m.img}" style="width:80px; height:80px; object-fit:contain; border-radius:12px; background:rgba(0,0,0,0.4); border:1px solid var(--glass-border);"
+                    <img src="${m.img}" style="width:60px; height:60px; object-fit:contain; border-radius:10px; background:rgba(0,0,0,0.4); border:1px solid var(--glass-border);"
                         onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 80 80%22><text x=%2240%22 y=%2250%22 text-anchor=%22middle%22 font-size=%2240%22>👾</text></svg>'">
-                    <label class="btn-nav" style="display:block; margin-top:8px; padding:6px 10px; font-size:0.7rem; cursor:pointer; text-align:center; border-color:var(--secondary-cyan); color:var(--secondary-cyan);">
-                        이미지 변경
+                    <label class="btn-nav" style="display:block; margin-top:6px; padding:4px 6px; font-size:0.55rem; cursor:pointer; text-align:center; border-color:var(--secondary-cyan); color:var(--secondary-cyan);">
+                        📷 변경
                         <input type="file" accept="image/*" style="display:none;" onchange="uploadMonsterImage(${i}, this)">
                     </label>
                 </div>
-                <div style="flex:1;">
-                    <div style="margin-bottom:10px;">
+                <div style="flex:1;min-width:0;">
+                    <div style="margin-bottom:8px;">
                         <label>몬스터 이름</label>
                         <input type="text" class="set-m-name btn-nav" data-index="${i}" value="${m.name}" style="width:100%;">
                     </div>
-                    <div style="font-size:0.8rem; color:${typeInfo.color}; margin-bottom:6px; font-weight:700;">📊 능력치 범위</div>
-                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
-                        <div><label>HP min</label><input type="number" class="set-m-hpmin btn-nav" data-index="${i}" value="${m.hpMin||m.hp||100}" style="width:100%;"></div>
-                        <div><label>HP max</label><input type="number" class="set-m-hpmax btn-nav" data-index="${i}" value="${m.hpMax||m.hp||100}" style="width:100%;"></div>
+                    <div style="font-size:0.7rem; color:${typeInfo.color}; margin-bottom:4px; font-weight:700;">📊 능력치</div>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-bottom:6px;">
+                        <div><label style="font-size:0.55rem !important;">HP min</label><input type="number" class="set-m-hpmin btn-nav" data-index="${i}" value="${m.hpMin||m.hp||100}" style="width:100%;"></div>
+                        <div><label style="font-size:0.55rem !important;">HP max</label><input type="number" class="set-m-hpmax btn-nav" data-index="${i}" value="${m.hpMax||m.hp||100}" style="width:100%;"></div>
                     </div>
-                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
-                        <div><label>ATK min</label><input type="number" class="set-m-atkmin btn-nav" data-index="${i}" value="${m.atkMin||m.dmg||10}" style="width:100%;"></div>
-                        <div><label>ATK max</label><input type="number" class="set-m-atkmax btn-nav" data-index="${i}" value="${m.atkMax||m.dmg||10}" style="width:100%;"></div>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-bottom:6px;">
+                        <div><label style="font-size:0.55rem !important;">ATK min</label><input type="number" class="set-m-atkmin btn-nav" data-index="${i}" value="${m.atkMin||m.dmg||10}" style="width:100%;"></div>
+                        <div><label style="font-size:0.55rem !important;">ATK max</label><input type="number" class="set-m-atkmax btn-nav" data-index="${i}" value="${m.atkMax||m.dmg||10}" style="width:100%;"></div>
                     </div>
-                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:12px;">
-                        <div><label>DEF min</label><input type="number" class="set-m-defmin btn-nav" data-index="${i}" value="${m.defMin||0}" style="width:100%;"></div>
-                        <div><label>DEF max</label><input type="number" class="set-m-defmax btn-nav" data-index="${i}" value="${m.defMax||0}" style="width:100%;"></div>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-bottom:10px;">
+                        <div><label style="font-size:0.55rem !important;">DEF min</label><input type="number" class="set-m-defmin btn-nav" data-index="${i}" value="${m.defMin||0}" style="width:100%;"></div>
+                        <div><label style="font-size:0.55rem !important;">DEF max</label><input type="number" class="set-m-defmax btn-nav" data-index="${i}" value="${m.defMax||0}" style="width:100%;"></div>
                     </div>
-                    <div style="font-size:0.75rem; color:var(--primary-gold); margin-bottom:6px; font-weight:700;">💎 드랍 조각 설정</div>
-                    <div style="font-size:0.5rem; color:var(--text-dim); margin-bottom:8px;">이 몬스터가 드랍할 수 있는 조각 종류</div>
-                    <div style="display:flex; gap:4px; flex-wrap:wrap;">${shardCheckboxes}</div>
+                    <div style="font-size:0.7rem; color:var(--primary-gold); margin-bottom:4px; font-weight:700;">💎 조각 드랍 (ON/OFF + 확률%)</div>
+                    <div style="font-size:0.45rem; color:var(--text-dim); margin-bottom:6px;">체크=드랍가능 / 숫자=조각별 드랍확률(%)</div>
+                    <div style="display:grid; grid-template-columns:repeat(5,1fr); gap:4px;">${shardUI}</div>
                 </div>
             </div>
         `;
@@ -1044,6 +1061,11 @@ async function saveMonsterPool() {
         const enabledShards = [];
         shardCbs.forEach(cb => { if (cb.checked) enabledShards.push(cb.dataset.shard); });
         pool[i].shardDrops = enabledShards;
+        // 수정조각별 드랍률 저장
+        const shardRateInputs = document.querySelectorAll(`.set-m-shardrate[data-monster="${i}"]`);
+        const shardRates = {};
+        shardRateInputs.forEach(inp => { shardRates[inp.dataset.shard] = parseInt(inp.value) || 0; });
+        pool[i].shardRates = shardRates;
     });
     await db.from('game_settings').update({ value: pool }).eq('name', 'monsterPool');
     cachedMonsterPool = pool;

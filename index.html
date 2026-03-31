@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>제주 오디세이 — 차원의 균열 RPG</title>
     <meta name="description" content="제주도를 배경으로 한 위치기반 RPG. 수정조각을 모아 카드를 제작하고 장착하세요.">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
@@ -74,26 +74,26 @@
         </div>
 
         <!-- MAIN MENU -->
-        <div id="screen-main" class="screen">
+        <div id="screen-main" class="screen" style="overflow-y:auto;">
             <div class="top-bar">
                 <span id="system-time" style="font-family: 'Space Grotesk'; font-size: 0.7rem; color: var(--text-dim); letter-spacing: 2px;"></span>
             </div>
-            <div class="main-menu-content">
+            <div class="main-menu-content" style="padding-bottom:80px;">
                 <h1 class="game-title">제주 오디세이</h1>
                 <div class="title-sub">차원 균열 탐사 시스템 // DIMENSION_RIFT_RPG</div>
                 
                 <!-- 캐릭터 & 장착카드 표시 -->
-                <div id="selected-card-display" class="glass-panel" style="margin: 20px auto; padding: 15px; max-width: 300px; text-align: center; border-color: rgba(233,196,0,0.2);">
-                    <div style="font-size: 0.55rem; color: var(--primary-gold); letter-spacing: 2px; margin-bottom: 6px;">🎴 장착 카드</div>
-                    <div id="equipped-card-preview" style="font-size: 0.8rem; color: var(--text-dim);">장착된 카드 없음</div>
-                    <div style="margin-top:8px;font-size:0.65rem;font-weight:700;" id="player-final-stats"></div>
+                <div id="selected-card-display" class="glass-panel" style="margin: 12px auto; padding: 12px; max-width: 280px; text-align: center; border-color: rgba(233,196,0,0.2);">
+                    <div style="font-size: 0.55rem; color: var(--primary-gold); letter-spacing: 2px; margin-bottom: 4px;">🎴 장착 카드</div>
+                    <div id="equipped-card-preview" style="font-size: 0.75rem; color: var(--text-dim);">장착된 카드 없음</div>
+                    <div style="margin-top:6px;font-size:0.6rem;font-weight:700;" id="player-final-stats"></div>
                 </div>
 
                 <!-- 수정조각 표시 -->
-                <div class="glass-panel" style="margin: 0 auto 15px; padding: 10px 20px; max-width: 200px; text-align: center; border-color: rgba(0,253,236,0.2);">
-                    <span style="font-size:1.1rem;">💎</span>
-                    <span style="font-size:0.85rem;color:var(--secondary-cyan);font-weight:700;margin-left:6px;" id="main-shard-count">0</span>
-                    <span style="font-size:0.6rem;color:var(--text-dim);margin-left:4px;">수정조각</span>
+                <div class="glass-panel" style="margin: 0 auto 12px; padding: 8px 16px; max-width: 180px; text-align: center; border-color: rgba(0,253,236,0.2);">
+                    <span style="font-size:1rem;">💎</span>
+                    <span style="font-size:0.8rem;color:var(--secondary-cyan);font-weight:700;margin-left:5px;" id="main-shard-count">0</span>
+                    <span style="font-size:0.55rem;color:var(--text-dim);margin-left:3px;">수정조각</span>
                 </div>
 
                 <div class="menu-controls">
@@ -104,22 +104,22 @@
                 </div>
             </div>
 
-            <!-- 사냥 기록 패널 -->
-            <div id="hunt-log-panel" class="glass-panel" style="position: absolute; bottom: 70px; left: 20px; right: 20px; padding: 12px 16px; border-radius: 14px; border-color: rgba(0,253,236,0.15);">
-                <div style="font-size: 0.5rem; color: var(--secondary-cyan); letter-spacing: 2px; margin-bottom: 8px; font-weight: 700;">📊 세션 사냥 기록</div>
-                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; text-align: center;">
-                    <div><div style="font-size: 0.9rem; font-weight: 700; color: #fff;" id="hunt-kills">0</div><div style="font-size: 0.4rem; color: var(--text-dim);">처치</div></div>
-                    <div><div style="font-size: 0.9rem; font-weight: 700; color: var(--primary-gold);" id="hunt-boss-kills">0</div><div style="font-size: 0.4rem; color: var(--text-dim);">레어+</div></div>
-                    <div><div style="font-size: 0.9rem; font-weight: 700; color: var(--secondary-cyan);" id="hunt-shards">0</div><div style="font-size: 0.4rem; color: var(--text-dim);">수정조각</div></div>
-                    <div><div style="font-size: 0.9rem; font-weight: 700; color: #a78bfa;" id="hunt-potions">0</div><div style="font-size: 0.4rem; color: var(--text-dim);">포션</div></div>
+            <!-- 사냥 기록 패널 (하단 고정) -->
+            <div id="hunt-log-panel" class="glass-panel" style="position: fixed; bottom: 45px; left: 10px; right: 10px; padding: 8px 12px; border-radius: 12px; border-color: rgba(0,253,236,0.15); z-index:50; background:rgba(15,18,32,0.95); backdrop-filter:blur(15px);">
+                <div style="font-size: 0.45rem; color: var(--secondary-cyan); letter-spacing: 2px; margin-bottom: 4px; font-weight: 700;">📊 사냥 기록</div>
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; text-align: center;">
+                    <div><div style="font-size: 0.8rem; font-weight: 700; color: #fff;" id="hunt-kills">0</div><div style="font-size: 0.4rem; color: var(--text-dim);">처치</div></div>
+                    <div><div style="font-size: 0.8rem; font-weight: 700; color: var(--primary-gold);" id="hunt-boss-kills">0</div><div style="font-size: 0.4rem; color: var(--text-dim);">레어+</div></div>
+                    <div><div style="font-size: 0.8rem; font-weight: 700; color: var(--secondary-cyan);" id="hunt-shards">0</div><div style="font-size: 0.4rem; color: var(--text-dim);">수정조각</div></div>
+                    <div><div style="font-size: 0.8rem; font-weight: 700; color: #a78bfa;" id="hunt-potions">0</div><div style="font-size: 0.4rem; color: var(--text-dim);">포션</div></div>
                 </div>
             </div>
-            <div style="position: absolute; bottom: 15px; left: 30px; right: 30px; display:flex; justify-content:space-between;">
-                <div onclick="startCombat(null,false)" class="glass-panel" style="padding: 6px 12px; border-radius: 10px; border-color: rgba(255,77,77,0.3); cursor:pointer; display: inline-block;">
-                    <span style="font-family:'Space Grotesk'; font-size:0.5rem; color:var(--accent-red); letter-spacing:2px;">TEST</span>
+            <div style="position: fixed; bottom: 8px; left: 12px; right: 12px; display:flex; justify-content:space-between; z-index:51;">
+                <div onclick="startCombat(null,false)" class="glass-panel" style="padding: 5px 10px; border-radius: 8px; border-color: rgba(255,77,77,0.3); cursor:pointer; display: inline-block;">
+                    <span style="font-family:'Space Grotesk'; font-size:0.45rem; color:var(--accent-red); letter-spacing:2px;">TEST</span>
                 </div>
-                <div onclick="doLogout()" class="glass-panel" style="padding: 6px 12px; border-radius: 10px; border-color: rgba(255,255,255,0.1); cursor:pointer; display: inline-block;">
-                    <span style="font-family:'Space Grotesk'; font-size:0.5rem; color:var(--text-dim); letter-spacing:2px;">🚪 로그아웃</span>
+                <div onclick="doLogout()" class="glass-panel" style="padding: 5px 10px; border-radius: 8px; border-color: rgba(255,255,255,0.1); cursor:pointer; display: inline-block;">
+                    <span style="font-family:'Space Grotesk'; font-size:0.45rem; color:var(--text-dim); letter-spacing:2px;">🚪 로그아웃</span>
                 </div>
             </div>
         </div>

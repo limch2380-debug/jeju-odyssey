@@ -286,18 +286,21 @@ async function renderInventory() {
     if (fragPanel) {
         const keys = Object.keys(SHARD_FRAGMENTS);
         const canCombine = keys.every(k => (frags[k] || 0) >= 1);
-        let html = '<div style="display:flex;gap:6px;justify-content:center;align-items:center;flex-wrap:wrap;">';
+        let html = '<div style="font-size:0.7rem;color:var(--primary-gold);font-weight:700;margin-bottom:8px;">💎 수정 조각 현황</div>';
+        html += '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:4px;">';
         html += keys.map(k => {
             const s = SHARD_FRAGMENTS[k]; const count = frags[k] || 0;
-            return `<div style="text-align:center;padding:6px 8px;border-radius:10px;border:1px solid ${count>0?s.color:'rgba(255,255,255,0.08)'};background:${count>0?`rgba(${hexToRgb(s.color)},0.08)`:'transparent'};min-width:48px;">
-                <img src="shard.png" style="width:28px;height:28px;object-fit:contain;filter:${s.hue} ${count>0?'':'grayscale(0.8) opacity(0.3)'};" onerror="this.outerHTML='<span style=font-size:1.3rem;>${s.icon}</span>'">
-                <div style="font-size:0.55rem;color:${count>0?s.color:'var(--text-dim)'};margin-top:2px;">${s.name}</div>
-                <div style="font-size:0.6rem;color:#fff;font-weight:900;">${count}</div>
+            return `<div style="text-align:center;padding:5px 2px;border-radius:8px;border:1px solid ${count>0?s.color:'rgba(255,255,255,0.08)'};background:${count>0?`rgba(${hexToRgb(s.color)},0.06)`:'transparent'};">
+                <div style="font-size:1.1rem;filter:${s.hue} ${count>0?'':'grayscale(0.8) opacity(0.3)'};">💎</div>
+                <div style="font-size:0.45rem;color:${count>0?s.color:'var(--text-dim)'};margin-top:1px;">${s.name}</div>
+                <div style="font-size:0.65rem;color:#fff;font-weight:900;">${count}</div>
             </div>`;
         }).join('');
         html += '</div>';
         if (canCombine) {
-            html += `<button onclick="showCombineUI()" class="btn-primary" style="width:100%;margin-top:10px;padding:10px;font-size:0.85rem;font-weight:900;background:linear-gradient(135deg,var(--primary-gold),#ff8800);animation:pulse 1.5s infinite;">💎 조각 합치기 — 카드 생성</button>`;
+            html += `<button onclick="showCombineUI()" class="btn-primary" style="width:100%;margin-top:8px;padding:10px;font-size:0.8rem;font-weight:900;background:linear-gradient(135deg,var(--primary-gold),#ff8800);animation:pulse 1.5s infinite;">💎 조각 합치기 — 카드 생성</button>`;
+        } else {
+            html += `<button onclick="showCombineUI()" class="btn-nav" style="width:100%;margin-top:8px;padding:10px;font-size:0.75rem;text-align:center;border-color:rgba(255,170,0,0.2);color:var(--text-dim);">💎 조각 합치기 (5종 필요)</button>`;
         }
         fragPanel.innerHTML = html;
     }
@@ -617,33 +620,33 @@ async function showCombineUI() {
     const canCombine = keys.every(k => (frags[k] || 0) >= 1);
     const popup = document.createElement('div');
     popup.id = 'combine-popup';
-    popup.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:9998;background:rgba(0,0,0,0.92);display:flex;align-items:center;justify-content:center;animation:fadeIn 0.3s;overflow-y:auto;padding:20px;';
+    popup.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:9998;background:rgba(0,0,0,0.95);display:flex;align-items:flex-start;justify-content:center;animation:fadeIn 0.3s;overflow-y:auto;padding:15px;padding-top:40px;';
     let fragHTML = keys.map(k => {
         const s = SHARD_FRAGMENTS[k];
         const count = frags[k] || 0;
         const owned = count >= 1;
-        return `<div style="text-align:center;padding:10px;border-radius:12px;border:2px solid ${owned ? s.color : 'rgba(255,255,255,0.1)'};background:${owned ? `rgba(${hexToRgb(s.color)},0.1)` : 'rgba(255,255,255,0.02)'};min-width:60px;">
-            <img src="shard.png" style="width:45px;height:45px;object-fit:contain;filter:${s.hue} ${owned?'':'grayscale(0.8) opacity(0.3)'};" onerror="this.outerHTML='<div style=font-size:2rem;${owned?'':'filter:grayscale(1);opacity:0.3;'}>${s.icon}</div>'">
-            <div style="font-size:0.7rem;color:${owned ? s.color : 'var(--text-dim)'};margin-top:4px;font-weight:700;">${s.name}</div>
+        return `<div style="text-align:center;padding:8px 4px;border-radius:10px;border:1px solid ${owned ? s.color : 'rgba(255,255,255,0.1)'};background:${owned ? `rgba(${hexToRgb(s.color)},0.08)` : 'rgba(255,255,255,0.02)'};">
+            <div style="font-size:1.5rem;filter:${s.hue} ${owned?'':'grayscale(0.8) opacity(0.3)'};">💎</div>
+            <div style="font-size:0.55rem;color:${owned ? s.color : 'var(--text-dim)'};margin-top:3px;font-weight:700;">${s.name}</div>
             <div style="font-size:0.6rem;color:${owned ? '#fff' : 'var(--text-dim)'};">${count}개</div>
         </div>`;
     }).join('');
     let templateHTML = templates.map(t => {
-        return `<button onclick="doCombine('${t.templateId}')" style="display:flex;align-items:center;gap:10px;padding:12px;width:100%;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);border-radius:10px;color:#fff;cursor:pointer;margin-bottom:8px;${canCombine?'':'opacity:0.4;pointer-events:none;'}">
-            <img src="${t.img}" style="width:40px;height:50px;object-fit:cover;border-radius:6px;" onerror="this.src='goblin_card.png'">
-            <div style="text-align:left;"><div style="font-weight:700;">${t.name}</div><div style="font-size:0.7rem;color:var(--text-dim);">카드 생성</div></div>
+        return `<button onclick="doCombine('${t.templateId}')" style="display:flex;align-items:center;gap:8px;padding:10px;width:100%;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);border-radius:10px;color:#fff;cursor:pointer;margin-bottom:6px;font-size:0.8rem;${canCombine?'':'opacity:0.4;pointer-events:none;'}">
+            <img src="${t.img}" style="width:35px;height:45px;object-fit:cover;border-radius:6px;" onerror="this.src='goblin_card.png'">
+            <div style="text-align:left;"><div style="font-weight:700;">${t.name}</div><div style="font-size:0.6rem;color:var(--text-dim);">카드 생성</div></div>
         </button>`;
     }).join('');
     popup.innerHTML = `
-        <div style="max-width:400px;width:100%;">
-            <div style="text-align:center;margin-bottom:20px;">
-                <div style="font-size:1.3rem;font-weight:900;color:var(--primary-gold);">💎 조각 합치기</div>
-                <div style="font-size:0.75rem;color:var(--text-dim);margin-top:5px;">5종 조각을 모아 카드를 생성합니다</div>
+        <div style="max-width:380px;width:100%;">
+            <div style="text-align:center;margin-bottom:15px;">
+                <div style="font-size:1.2rem;font-weight:900;color:var(--primary-gold);">💎 조각 합치기</div>
+                <div style="font-size:0.7rem;color:var(--text-dim);margin-top:4px;">5종 조각을 모아 카드를 생성합니다</div>
             </div>
-            <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:25px;">${fragHTML}</div>
-            ${canCombine ? '<div style="text-align:center;color:var(--secondary-cyan);font-weight:700;margin-bottom:15px;animation:pulse 1s infinite;">✨ 합성 가능! 카드를 선택하세요</div>' : '<div style="text-align:center;color:var(--accent-red);font-size:0.8rem;margin-bottom:15px;">⚠ 5종 조각이 모두 필요합니다</div>'}
-            <div style="max-height:200px;overflow-y:auto;">${templateHTML}</div>
-            <button onclick="document.getElementById('combine-popup')?.remove()" class="btn-primary" style="width:100%;margin-top:15px;padding:12px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);">닫기</button>
+            <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:18px;">${fragHTML}</div>
+            ${canCombine ? '<div style="text-align:center;color:var(--secondary-cyan);font-weight:700;margin-bottom:12px;font-size:0.85rem;animation:pulse 1s infinite;">✨ 합성 가능! 카드를 선택하세요</div>' : '<div style="text-align:center;color:var(--accent-red);font-size:0.75rem;margin-bottom:12px;">⚠ 5종 조각이 모두 필요합니다</div>'}
+            <div style="max-height:180px;overflow-y:auto;">${templateHTML}</div>
+            <button onclick="document.getElementById('combine-popup')?.remove()" class="btn-nav" style="width:100%;margin-top:12px;padding:12px;text-align:center;font-size:0.8rem;">닫기</button>
         </div>`;
     document.body.appendChild(popup);
 }
