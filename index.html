@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>제주 오디세이 — 카드 배틀 RPG</title>
-    <meta name="description" content="제주도를 배경으로 한 위치기반 카드 배틀 RPG. 몬스터 카드를 수집하고 전투하세요.">
+    <title>제주 오디세이 — 차원의 균열 RPG</title>
+    <meta name="description" content="제주도를 배경으로 한 위치기반 RPG. 수정조각을 모아 카드를 제작하고 장착하세요.">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;700;900&family=Space+Grotesk:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
@@ -15,18 +15,13 @@
     <div id="app-container">
         <!-- LOGIN / LANDING SCREEN -->
         <div id="screen-login" class="screen active" style="background: linear-gradient(180deg, #0a0c1a 0%, #101221 40%, #0d1025 100%); overflow-y: auto;">
-            <!-- 파티클 배경 -->
             <canvas id="particle-canvas" style="position:absolute; inset:0; z-index:0; pointer-events:none;"></canvas>
-            
             <div style="position:relative; z-index:1; padding: 30px 20px; min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center;">
-                <!-- 로고 -->
                 <div style="text-align:center; margin-bottom:30px;">
                     <div style="font-size:0.75rem; letter-spacing:6px; color:var(--secondary-cyan); font-family:'Space Grotesk'; margin-bottom:8px; text-shadow:0 0 20px rgba(0,253,236,0.3);">DIMENSION RIFT</div>
                     <h1 style="font-size:2.2rem; font-weight:900; background:linear-gradient(135deg, #ffe16f, #e9c400, #ff9500); -webkit-background-clip:text; -webkit-text-fill-color:transparent; margin:0; line-height:1.1; text-shadow:none; filter:drop-shadow(0 0 30px rgba(233,196,0,0.3));">제주 오디세이</h1>
-                    <div style="font-size:0.7rem; color:rgba(225,225,246,0.5); font-family:'Space Grotesk'; letter-spacing:3px; margin-top:6px;">JEJU ODYSSEY — CARD BATTLE RPG</div>
+                    <div style="font-size:0.7rem; color:rgba(225,225,246,0.5); font-family:'Space Grotesk'; letter-spacing:3px; margin-top:6px;">JEJU ODYSSEY — DIMENSION RIFT RPG</div>
                 </div>
-
-                <!-- 게임 설명 카드들 -->
                 <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:10px; max-width:380px; width:100%; margin-bottom:30px;">
                     <div style="background:rgba(29,31,45,0.6); backdrop-filter:blur(12px); border:1px solid rgba(0,253,236,0.12); border-radius:14px; padding:16px 8px; text-align:center;">
                         <div style="font-size:1.5rem; margin-bottom:6px;">🗺</div>
@@ -34,27 +29,23 @@
                         <div style="font-size:0.55rem; color:rgba(225,225,246,0.4); margin-top:3px;">GPS 탐사</div>
                     </div>
                     <div style="background:rgba(29,31,45,0.6); backdrop-filter:blur(12px); border:1px solid rgba(233,196,0,0.12); border-radius:14px; padding:16px 8px; text-align:center;">
-                        <div style="font-size:1.5rem; margin-bottom:6px;">⚔</div>
-                        <div style="font-size:0.7rem; color:var(--primary-gold); font-weight:700;">카드 배틀</div>
-                        <div style="font-size:0.55rem; color:rgba(225,225,246,0.4); margin-top:3px;">자동 전투</div>
+                        <div style="font-size:1.5rem; margin-bottom:6px;">💎</div>
+                        <div style="font-size:0.7rem; color:var(--primary-gold); font-weight:700;">수정조각</div>
+                        <div style="font-size:0.55rem; color:rgba(225,225,246,0.4); margin-top:3px;">카드 제작</div>
                     </div>
                     <div style="background:rgba(29,31,45,0.6); backdrop-filter:blur(12px); border:1px solid rgba(255,77,77,0.12); border-radius:14px; padding:16px 8px; text-align:center;">
-                        <div style="font-size:1.5rem; margin-bottom:6px;">🎴</div>
-                        <div style="font-size:0.7rem; color:var(--accent-red); font-weight:700;">카드 수집</div>
-                        <div style="font-size:0.55rem; color:rgba(225,225,246,0.4); margin-top:3px;">합성 & 강화</div>
+                        <div style="font-size:1.5rem; margin-bottom:6px;">⚔</div>
+                        <div style="font-size:0.7rem; color:var(--accent-red); font-weight:700;">캐릭터 전투</div>
+                        <div style="font-size:0.55rem; color:rgba(225,225,246,0.4); margin-top:3px;">패시브 장착</div>
                     </div>
                 </div>
-
-                <!-- 게임 소개 텍스트 -->
                 <div style="max-width:380px; width:100%; text-align:center; margin-bottom:30px;">
                     <p style="font-size:0.75rem; color:rgba(208,198,172,0.7); line-height:1.6; margin:0;">
                         제주도 곳곳에 열린 <span style="color:var(--secondary-cyan);">차원의 균열</span>을 탐험하세요.<br>
-                        몬스터 카드를 수집하고 합성하여<br>
-                        <span style="color:var(--primary-gold);">최강의 덱</span>을 구축하세요.
+                        몬스터를 처치하고 <span style="color:var(--secondary-cyan);">수정조각</span>을 모아<br>
+                        <span style="color:var(--primary-gold);">강력한 카드</span>를 제작하세요.
                     </p>
                 </div>
-
-                <!-- 로그인 폼 -->
                 <div id="login-form" style="max-width:380px; width:100%; background:rgba(29,31,45,0.5); backdrop-filter:blur(16px); border:1px solid rgba(233,196,0,0.1); border-radius:18px; padding:28px 24px;">
                     <div style="text-align:center; margin-bottom:20px;">
                         <div style="font-size:0.95rem; color:var(--primary-gold); font-weight:700;">모험을 시작하세요</div>
@@ -76,10 +67,8 @@
                     <button onclick="doRegister()" style="width:100%; padding:14px; font-size:0.85rem; font-weight:600; border:1px solid rgba(0,253,236,0.25); border-radius:12px; background:transparent; color:var(--secondary-cyan); cursor:pointer; margin-top:10px; transition:0.3s; letter-spacing:1px;">회원가입</button>
                     <div id="login-message" style="text-align:center; margin-top:14px; font-size:0.75rem; color:var(--accent-red); min-height:20px;"></div>
                 </div>
-
-                <!-- 버전 -->
                 <div style="margin-top:30px; text-align:center;">
-                    <div style="font-size:0.55rem; color:rgba(225,225,246,0.2); font-family:'Space Grotesk'; letter-spacing:3px;">v1.0 // Built with Supabase</div>
+                    <div style="font-size:0.55rem; color:rgba(225,225,246,0.2); font-family:'Space Grotesk'; letter-spacing:3px;">v2.0 // Built with Supabase</div>
                 </div>
             </div>
         </div>
@@ -91,17 +80,25 @@
             </div>
             <div class="main-menu-content">
                 <h1 class="game-title">제주 오디세이</h1>
-                <div class="title-sub">카드 배틀 시스템 // CARD_BATTLE_RPG</div>
+                <div class="title-sub">차원 균열 탐사 시스템 // DIMENSION_RIFT_RPG</div>
                 
-                <!-- 선택된 카드 표시 -->
-                <div id="selected-card-display" class="glass-panel" style="margin: 20px auto; padding: 15px; max-width: 280px; text-align: center; border-color: rgba(233,196,0,0.2);">
-                    <div style="font-size: 0.55rem; color: var(--primary-gold); letter-spacing: 2px; margin-bottom: 10px;">전투 카드</div>
-                    <div id="selected-card-preview" style="font-size: 0.8rem; color: var(--text-dim);">카드를 선택해주세요</div>
+                <!-- 캐릭터 & 장착카드 표시 -->
+                <div id="selected-card-display" class="glass-panel" style="margin: 20px auto; padding: 15px; max-width: 300px; text-align: center; border-color: rgba(233,196,0,0.2);">
+                    <div style="font-size: 0.55rem; color: var(--primary-gold); letter-spacing: 2px; margin-bottom: 6px;">🎴 장착 카드</div>
+                    <div id="equipped-card-preview" style="font-size: 0.8rem; color: var(--text-dim);">장착된 카드 없음</div>
+                    <div style="margin-top:8px;font-size:0.65rem;font-weight:700;" id="player-final-stats"></div>
+                </div>
+
+                <!-- 수정조각 표시 -->
+                <div class="glass-panel" style="margin: 0 auto 15px; padding: 10px 20px; max-width: 200px; text-align: center; border-color: rgba(0,253,236,0.2);">
+                    <span style="font-size:1.1rem;">💎</span>
+                    <span style="font-size:0.85rem;color:var(--secondary-cyan);font-weight:700;margin-left:6px;" id="main-shard-count">0</span>
+                    <span style="font-size:0.6rem;color:var(--text-dim);margin-left:4px;">수정조각</span>
                 </div>
 
                 <div class="menu-controls">
                     <button class="btn-primary" onclick="tryStartAdventure()">모험 시작 (ADVENTURE)</button>
-                    <button class="btn-nav" onclick="showScreen('inventory')">카드 인벤토리 (INVENTORY)</button>
+                    <button class="btn-nav" onclick="showScreen('inventory')">카드 & 장비 (INVENTORY)</button>
                     <button class="btn-nav" onclick="showScreen('collection')">카드 도감 (COLLECTION)</button>
                     <button id="btn-settings" class="btn-nav" onclick="showScreen('settings')" style="display:none;">🔧 시스템 설정 (ADMIN)</button>
                 </div>
@@ -112,9 +109,9 @@
                 <div style="font-size: 0.5rem; color: var(--secondary-cyan); letter-spacing: 2px; margin-bottom: 8px; font-weight: 700;">📊 세션 사냥 기록</div>
                 <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; text-align: center;">
                     <div><div style="font-size: 0.9rem; font-weight: 700; color: #fff;" id="hunt-kills">0</div><div style="font-size: 0.4rem; color: var(--text-dim);">처치</div></div>
-                    <div><div style="font-size: 0.9rem; font-weight: 700; color: var(--primary-gold);" id="hunt-boss-kills">0</div><div style="font-size: 0.4rem; color: var(--text-dim);">보스</div></div>
-                    <div><div style="font-size: 0.9rem; font-weight: 700; color: #a78bfa;" id="hunt-cards">0</div><div style="font-size: 0.4rem; color: var(--text-dim);">카드획득</div></div>
-                    <div><div style="font-size: 0.9rem; font-weight: 700; color: var(--secondary-cyan);" id="hunt-potions">0</div><div style="font-size: 0.4rem; color: var(--text-dim);">포션</div></div>
+                    <div><div style="font-size: 0.9rem; font-weight: 700; color: var(--primary-gold);" id="hunt-boss-kills">0</div><div style="font-size: 0.4rem; color: var(--text-dim);">레어+</div></div>
+                    <div><div style="font-size: 0.9rem; font-weight: 700; color: var(--secondary-cyan);" id="hunt-shards">0</div><div style="font-size: 0.4rem; color: var(--text-dim);">수정조각</div></div>
+                    <div><div style="font-size: 0.9rem; font-weight: 700; color: #a78bfa;" id="hunt-potions">0</div><div style="font-size: 0.4rem; color: var(--text-dim);">포션</div></div>
                 </div>
             </div>
             <div style="position: absolute; bottom: 15px; left: 30px; right: 30px; display:flex; justify-content:space-between;">
@@ -131,23 +128,28 @@
         <div id="screen-inventory" class="screen" style="background: var(--bg-space); overflow-y: auto;">
             <div style="padding: 20px; padding-top: 60px;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-                    <h2 style="color: var(--primary-gold); font-size: 1.1rem;">🃏 카드 인벤토리</h2>
+                    <h2 style="color: var(--primary-gold); font-size: 1.1rem;">🃏 카드 & 장비</h2>
                     <span id="inv-count" style="font-size:0.6rem; color:var(--text-dim);">0 / 10</span>
                 </div>
 
-                <!-- 카드 뽑기 패널 (카드 없을 때 표시) -->
-                <div id="draw-card-panel" class="glass-panel" style="margin-bottom:20px; padding:20px; text-align:center; border-color:rgba(233,196,0,0.3); display:none;">
-                    <div style="font-size:1rem; margin-bottom:8px;">🎴</div>
-                    <div style="font-size:0.9rem; color:var(--primary-gold); font-weight:700; margin-bottom:8px;">시작 카드 뽑기</div>
-                    <div style="font-size:0.75rem; color:var(--text-dim); margin-bottom:15px;">고블린 병사 카드를 랜덤 능력치로 뽑습니다!</div>
-                    <button class="btn-primary" style="width:100%; padding:14px; font-size:0.9rem;" onclick="drawStarterCard()">🎲 카드 뽑기!</button>
+                <!-- 수정조각 & 카드 제작 -->
+                <div id="craft-card-panel" class="glass-panel" style="margin-bottom:20px; padding:20px; border-color:rgba(0,253,236,0.3);">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                        <div>
+                            <span style="font-size:1.3rem;">💎</span>
+                            <span style="font-size:1rem;color:var(--secondary-cyan);font-weight:900;margin-left:6px;" id="shard-count">0</span>
+                            <span style="font-size:0.7rem;color:var(--text-dim);margin-left:4px;">수정조각</span>
+                        </div>
+                    </div>
+                    <div style="font-size:0.65rem; color:var(--text-dim); margin-bottom:12px;">수정조각을 모아 카드를 제작하세요! 카드마다 랜덤 패시브 스킬이 부여됩니다.</div>
+                    <div id="craft-card-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;"></div>
                 </div>
                 
                 <div id="inventory-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;"></div>
                 
                 <div class="glass-panel" style="margin-top: 20px; padding: 15px; border-color: rgba(233,196,0,0.15);">
                     <div style="font-size: 0.6rem; color: var(--primary-gold); font-weight: 700; margin-bottom: 10px;">⚗ 카드 합성</div>
-                    <div style="font-size: 0.5rem; color: var(--text-dim); margin-bottom: 10px;">같은 카드 2장 선택 → 합성 시 경험치 증가 + 레벨업 가능</div>
+                    <div style="font-size: 0.5rem; color: var(--text-dim); margin-bottom: 10px;">같은 등급의 카드를 합성하면 등급이 상승합니다</div>
                     <div id="fusion-selection" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;"></div>
                     <button class="btn-primary" style="width:100%; padding:12px; font-size:0.75rem;" onclick="fuseCards()">합성하기</button>
                 </div>
@@ -156,7 +158,7 @@
             </div>
         </div>
 
-        <!-- COLLECTION SCREEN (업적/도감) -->
+        <!-- COLLECTION SCREEN -->
         <div id="screen-collection" class="screen" style="background: var(--bg-space); overflow-y: auto;">
             <div style="padding: 20px; padding-top: 60px;">
                 <h2 style="color: var(--secondary-cyan); font-size: 1.1rem; margin-bottom: 20px;">📖 카드 도감 (COLLECTION)</h2>
@@ -172,8 +174,8 @@
                 <div class="glass-panel" style="padding: 12px 16px; border-radius: 16px;">
                     <div style="display:flex; justify-content:space-between; align-items:center;">
                         <div>
-                            <span id="battle-card-name" style="font-size: 0.7rem; color: var(--primary-gold); font-weight: 700;">카드 미선택</span>
-                            <span id="battle-card-lv" style="font-size: 0.55rem; color: var(--text-dim); margin-left: 8px;">Lv.1</span>
+                            <span id="battle-card-name" style="font-size: 0.7rem; color: var(--primary-gold); font-weight: 700;">탐험가</span>
+                            <span id="battle-card-lv" style="font-size: 0.55rem; color: var(--text-dim); margin-left: 8px;">💎 0</span>
                         </div>
                         <div style="display:flex; gap:10px; align-items:center;">
                             <span id="hud-hp-text" style="font-size:0.6rem; color:var(--accent-red);">100%</span>
@@ -224,7 +226,7 @@
         <div id="screen-combat" class="screen">
             <div class="combat-scene">
                 <div class="enemy-area" style="display:flex; justify-content:space-around; align-items:center; padding:10px;">
-                    <!-- 적 측 -->
+                    <!-- 적 -->
                     <div class="enemy-container" style="text-align:center; flex:1;">
                         <div id="enemy-name-label" style="font-family:'Space Grotesk'; color:var(--accent-red); font-size:0.75rem; margin-bottom:6px; letter-spacing:1px;">타겟</div>
                         <img id="enemy-img-main" src="" style="width:110px; height:110px; object-fit:contain; filter:drop-shadow(0 0 15px rgba(255,0,0,0.3)); transition:0.3s; margin-bottom:6px;">
@@ -235,13 +237,13 @@
                     </div>
                     <!-- VS -->
                     <div style="font-size:1.2rem; color:var(--primary-gold); font-weight:900; text-shadow:0 0 15px rgba(233,196,0,0.5); padding:0 10px;">VS</div>
-                    <!-- 내 카드 -->
+                    <!-- 플레이어 캐릭터 -->
                     <div style="text-align:center; flex:1;">
                         <div style="display:flex; align-items:center; justify-content:center; gap:4px; margin-bottom:6px;">
-                            <span id="player-card-name" style="font-size:0.7rem; color:var(--secondary-cyan); font-weight:700;"></span>
+                            <span id="player-card-name" style="font-size:0.7rem; color:var(--secondary-cyan); font-weight:700;">탐험가</span>
                             <span id="player-card-rarity" style="font-size:0.5rem;"></span>
                         </div>
-                        <img id="player-card-img" src="goblin_card.png" style="width:110px; height:110px; object-fit:contain; border-radius:8px; border:2px solid var(--secondary-cyan); filter:drop-shadow(0 0 15px rgba(0,253,236,0.2)); margin-bottom:6px;" onerror="this.src='goblin_card.png'">
+                        <div style="width:110px;height:110px;margin:0 auto 6px;background:rgba(0,253,236,0.05);border-radius:50%;border:2px solid var(--secondary-cyan);display:flex;align-items:center;justify-content:center;font-size:3rem;">🧙</div>
                         <div class="hp-bar-outer" style="width:100%; height:10px; margin-bottom:4px;">
                             <div id="player-hp-bar" class="hp-bar-inner" style="width:100%; background:var(--secondary-cyan);"></div>
                         </div>
@@ -262,64 +264,56 @@
             <div style="padding: 20px; padding-top: 60px;">
                 <h2 style="color: var(--primary-gold); font-size: 1.1rem; margin-bottom: 20px;">⚙ 시스템 설정</h2>
 
+                <!-- 플레이어 기본 스탯 & 게임 설정 -->
+                <div class="glass-panel" style="margin-bottom: 20px; padding: 25px; border-color:rgba(0,253,236,0.2);">
+                    <h3 style="color: var(--secondary-cyan); font-size: 0.9rem; margin-bottom: 15px;">🧙 플레이어 & 게임 설정</h3>
+                    <div style="font-size:0.55rem; color:var(--text-dim); margin-bottom:12px;">유저 캐릭터 기본 능력치와 수정조각/패시브 설정</div>
+                    <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:15px;">
+                        <div><label style="font-size:0.6rem;color:var(--accent-red);">기본 HP</label><input type="number" id="cfg-base-hp" class="btn-nav" style="width:100%;text-align:center;" value="100"></div>
+                        <div><label style="font-size:0.6rem;color:var(--primary-gold);">기본 ATK</label><input type="number" id="cfg-base-atk" class="btn-nav" style="width:100%;text-align:center;" value="15"></div>
+                        <div><label style="font-size:0.6rem;color:var(--secondary-cyan);">기본 DEF</label><input type="number" id="cfg-base-def" class="btn-nav" style="width:100%;text-align:center;" value="5"></div>
+                    </div>
+                    <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:15px;">
+                        <div><label style="font-size:0.6rem;color:var(--secondary-cyan);">💎 제작 비용</label><input type="number" id="cfg-shard-cost" class="btn-nav" style="width:100%;text-align:center;" value="10"></div>
+                        <div><label style="font-size:0.6rem;color:var(--text-dim);">패시브 최소</label><input type="number" id="cfg-passive-min" class="btn-nav" style="width:100%;text-align:center;" value="10"></div>
+                        <div><label style="font-size:0.6rem;color:var(--text-dim);">패시브 최대</label><input type="number" id="cfg-passive-max" class="btn-nav" style="width:100%;text-align:center;" value="20"></div>
+                    </div>
+                    <!-- 몬스터 등급별 드랍률 -->
+                    <div style="font-size:0.6rem; color:var(--primary-gold); font-weight:700; margin-bottom:8px;">몬스터 등급별 드랍률 (%)</div>
+                    <div style="font-size:0.5rem;color:var(--text-dim);margin-bottom:8px;">수정조각 / 포션 드랍 확률</div>
+                    <div style="display:grid; grid-template-columns:auto 1fr 1fr; gap:6px; align-items:center; margin-bottom:12px;">
+                        <div style="font-size:0.6rem;color:#fff;">일반</div>
+                        <input type="number" id="cfg-drop-normal-shard" class="btn-nav" style="text-align:center;" value="40" placeholder="💎%">
+                        <input type="number" id="cfg-drop-normal-potion" class="btn-nav" style="text-align:center;" value="20" placeholder="💊%">
+                        <div style="font-size:0.6rem;color:#4488ff;">매직</div>
+                        <input type="number" id="cfg-drop-magic-shard" class="btn-nav" style="text-align:center;" value="55">
+                        <input type="number" id="cfg-drop-magic-potion" class="btn-nav" style="text-align:center;" value="25">
+                        <div style="font-size:0.6rem;color:#ffdd00;">레어</div>
+                        <input type="number" id="cfg-drop-rare-shard" class="btn-nav" style="text-align:center;" value="70">
+                        <input type="number" id="cfg-drop-rare-potion" class="btn-nav" style="text-align:center;" value="30">
+                        <div style="font-size:0.6rem;color:#ffa500;">유니크</div>
+                        <input type="number" id="cfg-drop-unique-shard" class="btn-nav" style="text-align:center;" value="85">
+                        <input type="number" id="cfg-drop-unique-potion" class="btn-nav" style="text-align:center;" value="40">
+                    </div>
+                    <button class="btn-primary" style="width:100%; padding:12px; font-size:0.8rem;" onclick="saveGameConfig()">게임 설정 저장</button>
+                </div>
+
                 <!-- 카드 에디터 -->
                 <div class="glass-panel" style="margin-bottom: 20px; padding: 25px;">
-                    <h3 style="color: var(--primary-gold); font-size: 0.9rem; margin-bottom: 15px;">🃏 카드 능력치 에디터</h3>
-                    <div style="font-size:0.5rem; color:var(--text-dim); margin-bottom:15px;">각 몬스터 카드의 기본 능력치와 고유기술을 설정합니다.</div>
+                    <h3 style="color: var(--primary-gold); font-size: 0.9rem; margin-bottom: 15px;">🃏 카드 템플릿 에디터</h3>
+                    <div style="font-size:0.5rem; color:var(--text-dim); margin-bottom:15px;">카드 이미지와 패시브 스킬 종류를 설정합니다.</div>
                     <div id="card-editor-list"></div>
                     <button class="btn-primary" style="margin-top:15px; width:100%; padding:12px; font-size:0.8rem; background:linear-gradient(135deg, var(--primary-gold) 0%, #b38600 100%);" onclick="saveCardTemplates()">카드 템플릿 저장</button>
                 </div>
 
-                <!-- 포션 드랍률 설정 -->
-                <div class="glass-panel" style="margin-bottom: 20px; padding: 25px;">
-                    <h3 style="color: var(--secondary-cyan); font-size: 0.9rem; margin-bottom: 15px;">🎲 포션 드랍 설정</h3>
-                    <div style="font-size:0.5rem; color:var(--text-dim); margin-bottom:10px;">카드 드랍률은 카드 에디터에서 몹스터별로 설정합니다.</div>
-                    <div>
-                        <label style="font-size:0.6rem; color:var(--text-dim);">포션 드랍률 (%)</label>
-                        <input type="number" id="set-potion-drop" class="btn-nav" style="width:100%;" value="30" min="1" max="100">
-                    </div>
-                    <button class="btn-primary" style="margin-top:15px; width:100%; padding:12px; font-size:0.8rem;" onclick="saveDropSettings()">드랍 설정 저장</button>
-                </div>
-
-                <!-- 등급별 능력치 배율 -->
-                <div class="glass-panel" style="margin-bottom: 20px; padding: 25px; border-color: rgba(255,165,0,0.2);">
-                    <h3 style="color: var(--primary-gold); font-size: 0.9rem; margin-bottom: 8px;">📊 등급별 능력치 배율</h3>
-                    <div style="font-size:0.55rem; color:var(--text-dim); margin-bottom:15px;">일반(100%) 기준으로 각 등급의 HP/ATK/DEF 배율을 설정합니다.</div>
-                    <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:15px;">
-                        <div style="text-align:center;">
-                            <label style="font-size:0.65rem; color:#ffffff; font-weight:700; display:block; margin-bottom:6px;">일반</label>
-                            <input type="number" id="mult-common" class="btn-nav" style="width:100%; text-align:center; font-weight:700;" value="100" min="50" max="500">
-                            <div style="font-size:0.5rem; color:var(--text-dim); margin-top:3px;">%</div>
-                        </div>
-                        <div style="text-align:center;">
-                            <label style="font-size:0.65rem; color:#4488ff; font-weight:700; display:block; margin-bottom:6px;">매직</label>
-                            <input type="number" id="mult-magic" class="btn-nav" style="width:100%; text-align:center; font-weight:700; color:#4488ff;" value="115" min="50" max="500">
-                            <div style="font-size:0.5rem; color:var(--text-dim); margin-top:3px;">%</div>
-                        </div>
-                        <div style="text-align:center;">
-                            <label style="font-size:0.65rem; color:#ffdd00; font-weight:700; display:block; margin-bottom:6px;">레어</label>
-                            <input type="number" id="mult-rare" class="btn-nav" style="width:100%; text-align:center; font-weight:700; color:#ffdd00;" value="135" min="50" max="500">
-                            <div style="font-size:0.5rem; color:var(--text-dim); margin-top:3px;">%</div>
-                        </div>
-                        <div style="text-align:center;">
-                            <label style="font-size:0.65rem; color:#ffa500; font-weight:700; display:block; margin-bottom:6px;">유니크</label>
-                            <input type="number" id="mult-unique" class="btn-nav" style="width:100%; text-align:center; font-weight:700; color:#ffa500;" value="160" min="50" max="500">
-                            <div style="font-size:0.5rem; color:var(--text-dim); margin-top:3px;">%</div>
-                        </div>
-                    </div>
-                    <div class="glass-panel" style="padding:10px; margin-bottom:12px; border-color:rgba(0,253,236,0.1);">
-                        <div style="font-size:0.55rem; color:var(--text-dim);">💡 예시: 일반 ATK 20인 카드가 매직(130%)이면 ATK 26</div>
-                    </div>
-                    <button class="btn-primary" style="width:100%; padding:12px; font-size:0.8rem; background:linear-gradient(135deg, #ffa500 0%, #b37300 100%);" onclick="saveRarityMult()">배율 설정 저장</button>
-                </div>
-
-
                 <!-- 몬스터 DB -->
                 <div class="glass-panel" style="margin-bottom: 20px; padding: 25px;">
                     <h3 style="color: var(--accent-red); font-size: 0.9rem; margin-bottom: 15px;">몬스터 데이터베이스</h3>
-                    <div style="display:flex; gap:10px; margin-bottom:20px;">
-                        <div class="glass-panel" style="flex:1; padding:12px; text-align:center; cursor:pointer; border-color:rgba(0,253,236,0.3);" onclick="addMonster('normal')"><div style="font-size:0.7rem; color:var(--secondary-cyan);">🗡 일반 추가</div></div>
-                        <div class="glass-panel" style="flex:1; padding:12px; text-align:center; cursor:pointer; border-color:rgba(233,196,0,0.3);" onclick="addMonster('boss')"><div style="font-size:0.7rem; color:var(--primary-gold);">⚔ 보스 추가</div></div>
+                    <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:6px; margin-bottom:20px;">
+                        <div class="glass-panel" style="padding:10px; text-align:center; cursor:pointer; border-color:rgba(255,255,255,0.2);" onclick="addMonster('normal')"><div style="font-size:0.6rem; color:#fff;">🗡 일반</div></div>
+                        <div class="glass-panel" style="padding:10px; text-align:center; cursor:pointer; border-color:rgba(68,136,255,0.3);" onclick="addMonster('magic')"><div style="font-size:0.6rem; color:#4488ff;">✨ 매직</div></div>
+                        <div class="glass-panel" style="padding:10px; text-align:center; cursor:pointer; border-color:rgba(255,221,0,0.3);" onclick="addMonster('rare')"><div style="font-size:0.6rem; color:#ffdd00;">⚔ 레어</div></div>
+                        <div class="glass-panel" style="padding:10px; text-align:center; cursor:pointer; border-color:rgba(255,165,0,0.3);" onclick="addMonster('unique')"><div style="font-size:0.6rem; color:#ffa500;">👑 유니크</div></div>
                     </div>
                     <div id="set-monster-list"></div>
                     <button class="btn-primary" style="margin-top:15px; width:100%; padding:12px; font-size:0.8rem; background:linear-gradient(135deg, var(--accent-red) 0%, #b30000 100%);" onclick="saveMonsterPool()">몬스터 데이터 저장</button>
@@ -332,7 +326,7 @@
                     <div id="set-portal-list"></div>
                 </div>
 
-                <!-- 유저 관리 (관리자 전용) -->
+                <!-- 유저 관리 -->
                 <div class="glass-panel" style="margin-bottom: 20px; padding: 25px; border-color: rgba(255,77,77,0.2);">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
                         <h3 style="color: var(--accent-red); font-size: 0.9rem;">👥 유저 관리</h3>
@@ -373,12 +367,8 @@
                     <div><label style="font-size:0.6rem; color:var(--accent-red);">출현율 (%)</label><input type="number" id="ed-p-chance" class="btn-nav" style="width:100%; border-color:rgba(255,77,77,0.3);" placeholder="50" min="1" max="100"></div>
                 </div>
                 <div style="margin-bottom:15px; padding:15px; background:rgba(0,253,236,0.03); border-radius:12px; border:1px solid rgba(0,253,236,0.12);">
-                    <label style="font-size:0.65rem; color:var(--secondary-cyan); display:block; margin-bottom:10px; font-weight:700;">🗡 일반 몬스터</label>
+                    <label style="font-size:0.65rem; color:var(--secondary-cyan); display:block; margin-bottom:10px; font-weight:700;">몬스터 배정</label>
                     <div id="ed-normal-monsters"></div>
-                </div>
-                <div style="margin-bottom:20px; padding:15px; background:rgba(233,196,0,0.05); border-radius:12px; border:1px solid rgba(233,196,0,0.15);">
-                    <label style="font-size:0.65rem; color:var(--primary-gold); display:block; margin-bottom:10px; font-weight:700;">⚔ 보스 몬스터</label>
-                    <div id="ed-boss-monsters"></div>
                 </div>
                 <div style="display:flex; gap:10px;">
                     <button class="btn-primary" style="flex:1; padding:14px;" onclick="applyPortalEdit()">적용</button>

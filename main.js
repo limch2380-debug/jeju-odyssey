@@ -16,7 +16,7 @@ let encounterPending = false;
 let autoHuntPortal = null; // 현재 자동사냥 중인 포탈 정보
 
 // ===== 세션 사냥 기록 =====
-let huntLog = { kills: 0, bossKills: 0, potions: 0, cardsGot: 0 };
+let huntLog = { kills: 0, bossKills: 0, potions: 0, shardsGot: 0 };
 
 // ===== WAKE LOCK — 백그라운드 유지 =====
 let wakeLock = null;
@@ -57,9 +57,9 @@ const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const DEFAULT_MONSTERS = [
-    { name: "고블린 병사", hp: 100, dmg: 8, img: "goblin_soldier_tactical.png", type: "normal" },
-    { name: "고블린 궁수", hp: 70, dmg: 12, img: "goblin_archer_cloak.png", type: "normal" },
-    { name: "대왕 고블린", hp: 250, dmg: 18, img: "great_goblin_boss.png", type: "boss" }
+    { name: "고블린 병사", hp: 100, dmg: 8, img: "goblin_soldier_tactical.png", type: "normal", hpMin:80,hpMax:120,atkMin:8,atkMax:14,defMin:0,defMax:3 },
+    { name: "고블린 궁수", hp: 70, dmg: 12, img: "goblin_archer_cloak.png", type: "magic", hpMin:90,hpMax:140,atkMin:12,atkMax:20,defMin:2,defMax:5 },
+    { name: "대왕 고블린", hp: 250, dmg: 18, img: "great_goblin_boss.png", type: "rare", hpMin:180,hpMax:280,atkMin:18,atkMax:30,defMin:5,defMax:12 }
 ];
 
 async function getMonsterPool() {
@@ -223,8 +223,7 @@ async function initAppForUser() {
     try {
         cachedMonsterPool = await getMonsterPool();
         cachedPlayerStats = await getPlayerSettings();
-        const inv = await getInventory();
-        await updateSelectedCardDisplay();
+        await updateEquippedCardDisplay();
         updateClock();
         updateHuntLogUI();
         
@@ -236,12 +235,7 @@ async function initAppForUser() {
         startHeartbeat();
         startSettingsSync();
         
-        // 카드가 없으면 인벤토리로 (카드 뽑기)
-        if (inv.length === 0) {
-            showScreen('inventory');
-        } else {
-            showScreen('main');
-        }
+        showScreen('main');
     } catch(e) { console.log("Init warning:", e); showScreen('main'); }
 }
 
@@ -250,7 +244,7 @@ function doLogout() {
     currentUserId = null;
     window.isAdmin = false;
     cachedPlayerStats = null;
-    huntLog = { kills: 0, bossKills: 0, potions: 0, cardsGot: 0 };
+    huntLog = { kills: 0, bossKills: 0, potions: 0, shardsGot: 0 };
     stopHeartbeat();
     showScreen('login');
 }
@@ -282,20 +276,49 @@ function showScreen(screenId) {
     if (screenId === 'dashboard') {
         setTimeout(() => { initMap(); startTracking(); loadPortals(); if (map) { map.invalidateSize(); map.setView(currentUserPos, 17); } }, 100);
     } else if (screenId === 'settings') {
-        setTimeout(() => { initSettings(); renderCardEditor(); loadDropSettingsUI(); loadAdminUserList(); }, 100);
+        setTimeout(() => { initSettings(); renderCardEditor(); loadDropSettingsUI(); loadGameConfigUI(); loadAdminUserList(); }, 100);
     } else if (screenId === 'inventory') {
-        renderInventory();
+        renderInventory(); renderCraftGrid();
     } else if (screenId === 'collection') {
         renderCollection();
     } else if (screenId === 'main') {
-        updateSelectedCardDisplay();
+        updateEquippedCardDisplay(); updateMainShards();
     } else { stopTracking(); }
+}
+
+function tryStartAdventure() {
+    showScreen('dashboard');
+}
+
+async function updateMainShards() {
+    const shards = await getShards();
+    const el = document.getElementById('main-shard-count');
+    if(el) el.innerText = shards;
+}
+async function renderCraftGrid() {
+    const templates = await getCardTemplates();
+    const config = await getGameConfig();
+    const shards = await getShards();
+    const cost = config.shardCost || 10;
+    const grid = document.getElementById('craft-card-grid');
+    if(!grid) return;
+    grid.innerHTML = '';
+    templates.forEach(t => {
+        const canCraft = shards >= cost;
+        const div = document.createElement('div');
+        div.style.cssText = `text-align:center;padding:10px;background:rgba(0,253,236,0.03);border-radius:10px;border:1px solid ${canCraft?'rgba(0,253,236,0.2)':'rgba(255,255,255,0.06)'};cursor:pointer;`;
+        div.innerHTML = `<img src="${t.img}" style="width:40px;height:50px;object-fit:cover;border-radius:6px;margin-bottom:4px;" onerror="this.src='goblin_card.png'">
+            <div style="font-size:0.7rem;color:#fff;font-weight:700;">${t.name}</div>
+            <div style="font-size:0.55rem;color:var(--secondary-cyan);margin-top:2px;">💎${cost}개</div>`;
+        div.onclick = () => craftCard(t.templateId);
+        grid.appendChild(div);
+    });
 }
 
 function initMap() {
     if (map) return;
     map = L.map('map', { zoomControl: false, attributionControl: false }).setView(currentUserPos, 13);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {attribution:'© OpenStreetMap'}).addTo(map);
     const customIcon = L.divIcon({ className: 'gps-marker-container', html: '<div class="portal-node" style="background: var(--primary-gold); box-shadow: 0 0 20px var(--primary-gold);"></div>', iconSize: [20, 20], iconAnchor: [10, 10] });
     userMarker = L.marker(currentUserPos, { icon: customIcon }).addTo(map);
     accuracyCircle = L.circle(currentUserPos, { radius: 0, color: '#00fdec', weight: 1, fillOpacity: 0.1 }).addTo(map);
@@ -308,9 +331,9 @@ async function loadPortals() {
     const pool = await getMonsterPool();
     portals.forEach(p => {
         const names = parsePortalMonsters(p.target_monster_name);
-        const hasBoss = names.some(n => { const m = pool.find(x => x.name === n); return m && m.type === 'boss'; });
-        const hexColor = hasBoss ? '#ff4d4d' : '#00fdec';
-        const cssColor = hasBoss ? 'var(--accent-red)' : 'var(--secondary-cyan)';
+        const hasHighTier = names.some(n => { const m = pool.find(x => x.name === n); return m && (m.type === 'rare' || m.type === 'unique'); });
+        const hexColor = hasHighTier ? '#ffa500' : '#00fdec';
+        const cssColor = hasHighTier ? 'var(--primary-gold)' : 'var(--secondary-cyan)';
         // 반경 원 표시
         const radiusCircle = L.circle([p.lat, p.lng], {
             radius: p.radius || 100,
@@ -366,15 +389,18 @@ function startTracking() {
 
 async function updateDashboardHUD() {
     const inv = await getInventory();
-    selectedCardIdx = await getSelectedIdx();
-    if (selectedCardIdx >= 0 && selectedCardIdx < inv.length) {
-        const c = inv[selectedCardIdx];
-        const e = getCardEffective(c);
-        const bcn = document.getElementById('battle-card-name');
-        if (bcn) bcn.innerText = c.name;
-        const bcl = document.getElementById('battle-card-lv');
-        if (bcl) bcl.innerText = `Lv.${c.level||1}`;
+    equippedCardIdx = await getEquippedIdx();
+    const shards = await getShards();
+    const bcn = document.getElementById('battle-card-name');
+    if (bcn) {
+        if (equippedCardIdx>=0 && equippedCardIdx<inv.length) {
+            bcn.innerText = `탐험가 [${inv[equippedCardIdx].name}]`;
+        } else {
+            bcn.innerText = '탐험가';
+        }
     }
+    const bcl = document.getElementById('battle-card-lv');
+    if (bcl) bcl.innerText = `💎 ${shards}`;
     const hpText = document.getElementById('hud-hp-text');
     if (hpText && combatState.playerMaxHP > 0) hpText.innerText = `${Math.ceil((combatState.playerHP/combatState.playerMaxHP)*100)}%`;
     const hpBar = document.getElementById('hud-hp-bar');
@@ -386,7 +412,7 @@ function updateHuntLogUI() {
     if (!el) return;
     const hk = document.getElementById('hunt-kills'); if(hk) hk.innerText = huntLog.kills;
     const hb = document.getElementById('hunt-boss-kills'); if(hb) hb.innerText = huntLog.bossKills;
-    const hc = document.getElementById('hunt-cards'); if(hc) hc.innerText = huntLog.cardsGot;
+    const hc = document.getElementById('hunt-shards'); if(hc) hc.innerText = huntLog.shardsGot;
     const hp = document.getElementById('hunt-potions'); if(hp) hp.innerText = huntLog.potions;
 }
 
@@ -580,54 +606,61 @@ function stopTracking() { if (watchId) navigator.geolocation.clearWatch(watchId)
 
 // ===== COMBAT — 완전 자동 전투 =====
 async function startCombat(forcedMonsterName = null, autoStart = false) {
-    const inv = await getInventory();
-    selectedCardIdx = await getSelectedIdx();
-    if (selectedCardIdx < 0 || selectedCardIdx >= inv.length) {
-        alert('전투 카드가 없습니다! 인벤토리에서 선택하세요.');
-        showScreen('main'); return;
-    }
-    const card = inv[selectedCardIdx];
+    const config = await getGameConfig();
+    const base = config.playerBaseStats || {hp:100,atk:15,def:5};
     const playerData = await getPlayerSettings();
+    // 장착 카드 패시브 적용
+    const inv = await getInventory();
+    equippedCardIdx = await getEquippedIdx();
+    let bonus = {hp:0,atk:0,def:0,crit:0,dodge:0,drain:0};
+    let equippedCard = null;
+    if (equippedCardIdx>=0 && equippedCardIdx<inv.length) {
+        equippedCard = inv[equippedCardIdx];
+        bonus = getPassiveBonus(equippedCard);
+    }
+    const finalHp = base.hp + bonus.hp;
+    const finalAtk = base.atk + bonus.atk;
+    const finalDef = base.def + bonus.def;
     const pool = await getMonsterPool();
     let targetMonster;
     if (forcedMonsterName) {
         targetMonster = pool.find(m => m.name === forcedMonsterName) || pool[0];
     } else {
-        const normals = pool.filter(m => m.type !== 'boss');
+        const normals = pool.filter(m => m.type === 'normal' || m.type === 'magic');
         const p = normals.length > 0 ? normals : pool;
         targetMonster = p[Math.floor(Math.random() * p.length)];
     }
-    // 몬스터 스탯 랜덤 생성
     const randBetween = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
     const mHp = randBetween(targetMonster.hpMin || targetMonster.hp || 100, targetMonster.hpMax || targetMonster.hp || 100);
     const mAtk = randBetween(targetMonster.atkMin || targetMonster.dmg || 10, targetMonster.atkMax || targetMonster.dmg || 10);
     const mDef = randBetween(targetMonster.defMin || 0, targetMonster.defMax || 0);
+    const mType = targetMonster.type || 'normal';
+    const mTypeInfo = MONSTER_TYPES[mType] || MONSTER_TYPES.normal;
     combatState = {
-        playerHP: card.hp, playerMaxHP: card.hp,
-        playerAtk: card.atk, playerDef: card.def,
-        skill1: card.skill1||'none', skill1Chance: card.skill1Chance||0,
-        skill2: card.skill2||'none', skill2Chance: card.skill2Chance||0,
+        playerHP: finalHp, playerMaxHP: finalHp,
+        playerAtk: finalAtk, playerDef: finalDef,
+        crit: bonus.crit, dodge: bonus.dodge, drain: bonus.drain,
         potions: playerData.potions || 1,
         currentEnemy: { ...targetMonster, hp: mHp, maxHp: mHp, dmg: mAtk, def: mDef },
         isGameOver: false, busy: false,
-        cardName: card.name, cardImg: card.img, cardRarity: card.rarity||'common'
+        cardName: '탐험가', equippedCard
     };
     // UI 업데이트 - 적
-    document.getElementById('enemy-name-label').innerText = combatState.currentEnemy.name;
-    document.getElementById('enemy-img-main').src = combatState.currentEnemy.img;
-    document.getElementById('enemy-img-main').style.opacity = '1';
-    const isBoss = combatState.currentEnemy.type === 'boss';
     const nameLabel = document.getElementById('enemy-name-label');
-    if (isBoss) { nameLabel.style.color = 'var(--primary-gold)'; nameLabel.innerText = `⚔ ${combatState.currentEnemy.name} [BOSS]`; }
-    else { nameLabel.style.color = 'var(--accent-red)'; }
-    // UI - 내 카드
-    const pn = document.getElementById('player-card-name'); if(pn) pn.innerText = card.name;
-    const pr = document.getElementById('player-card-rarity'); if(pr) { pr.innerText = `[${rarityLabel(card.rarity)}]`; pr.style.color = rarityColor(card.rarity); }
-    const pi = document.getElementById('player-card-img'); if(pi) { pi.src = card.img; pi.style.borderColor = rarityColor(card.rarity); }
+    nameLabel.innerText = `${mTypeInfo.icon} ${targetMonster.name} [${mTypeInfo.name}]`;
+    nameLabel.style.color = mTypeInfo.color;
+    document.getElementById('enemy-img-main').src = targetMonster.img;
+    document.getElementById('enemy-img-main').style.opacity = '1';
+    // UI - 플레이어
+    const pn = document.getElementById('player-card-name'); if(pn) pn.innerText = '탐험가';
+    const pr = document.getElementById('player-card-rarity');
+    if(pr) {
+        if(equippedCard) { pr.innerText = `[${equippedCard.name}]`; pr.style.color = rarityColor(equippedCard.rarity); }
+        else { pr.innerText = '[장비 없음]'; pr.style.color = 'var(--text-dim)'; }
+    }
     updateCombatUI();
-    document.getElementById('combat-log').innerHTML = `<div class="log-entry">${card.name} [${rarityLabel(card.rarity)}] ${isBoss ? 'vs ⚔ BOSS!' : '전투 개시!'}</div>`;
+    document.getElementById('combat-log').innerHTML = `<div class="log-entry">탐험가 vs ${mTypeInfo.icon} ${targetMonster.name} 전투 개시!</div>`;
     playSound('swordSwing'); showScreen('combat');
-    // 항상 자동전투 시작
     setTimeout(() => startAutoCombat(), 800);
 }
 function startAutoCombat() {
@@ -669,10 +702,10 @@ function executeEnemyTurn() {
     combatState.busy = true;
     const enemy = combatState.currentEnemy;
     let raw = Math.floor(Math.random() * 5) + enemy.dmg;
-    // 회피 체크 (skill1 or skill2)
-    const dodgeChance = (combatState.skill1==='dodge'?combatState.skill1Chance:0) + (combatState.skill2==='dodge'?combatState.skill2Chance:0);
+    // 회피 체크 (패시브 dodge)
+    const dodgeChance = combatState.dodge || 0;
     if (dodgeChance > 0 && Math.random()*100 < dodgeChance) {
-        renderLog(`💨 ${combatState.cardName} 회피!`, 'player');
+        renderLog(`💨 탐험가 회피!`, 'player');
         setTimeout(() => { combatState.busy = false; }, 500);
         updateCombatUI(); return;
     }
@@ -709,24 +742,26 @@ function executePlayerTurn() {
     let enemy = combatState.currentEnemy;
     let dmg = Math.floor(Math.random() * 10) + combatState.playerAtk;
     let healAmt = 0;
-    // 기술1 체크
-    if (combatState.skill1!=='none' && Math.random()*100 < combatState.skill1Chance) {
-        dmg = applySkill(combatState.skill1, dmg, 'skill1');
+    // 크리티컬 체크 (패시브)
+    const critChance = combatState.crit || 0;
+    if (critChance > 0 && Math.random()*100 < critChance) {
+        dmg = dmg * 2;
+        renderLog('💥 크리티컬! 2배 데미지!', 'player');
     }
-    // 기술2 체크
-    if (combatState.skill2!=='none' && Math.random()*100 < combatState.skill2Chance) {
-        dmg = applySkill(combatState.skill2, dmg, 'skill2');
-    }
+    // 방어 적용
+    const enemyDef = enemy.def || 0;
+    dmg = Math.max(1, dmg - Math.floor(dmg * (enemyDef / 100)));
     enemy.hp = Math.max(0, enemy.hp - dmg);
-    // 흡혈 처리
-    if ((combatState.skill1==='drain'||combatState.skill2==='drain') && dmg > 0) {
-        healAmt = Math.floor(dmg*0.3);
+    // 흡혈 체크 (패시브)
+    const drainRate = combatState.drain || 0;
+    if (drainRate > 0 && dmg > 0) {
+        healAmt = Math.floor(dmg * drainRate / 100);
         combatState.playerHP = Math.min(combatState.playerMaxHP, combatState.playerHP + healAmt);
     }
     playSound('swordSwing'); setTimeout(() => playSound('hit'), 150);
     const img = document.getElementById('enemy-img-main');
     if(img) { img.classList.add('shake'); setTimeout(() => img.classList.remove('shake'), 400); }
-    renderLog(`${combatState.cardName} 공격! ${dmg} 대미지${healAmt?` (+${healAmt} 흡혈)`:''}`, 'player');
+    renderLog(`탐험가 공격! ${dmg} 대미지${healAmt?` (+${healAmt} 흡혈)`:''}`, 'player');
     updateCombatUI();
     if (enemy.hp <= 0) {
         combatState.busy = false;
@@ -734,20 +769,6 @@ function executePlayerTurn() {
     } else {
         setTimeout(() => { combatState.busy = false; executeEnemyTurn(); }, 1000);
     }
-}
-function applySkill(skill, dmg, label) {
-    if (skill==='double_attack') {
-        const d2 = Math.floor(Math.random()*8)+combatState.playerAtk;
-        renderLog(`⚔ 이중 어택! +${d2}`, 'player');
-        return dmg+d2;
-    } else if (skill==='magic_attack') {
-        renderLog('🔮 마법 공격! 방어무시', 'player');
-        return Math.floor(dmg*1.5);
-    } else if (skill==='critical') {
-        renderLog('💥 크리티컬! 2배', 'player');
-        return dmg*2;
-    }
-    return dmg;
 }
 
 async function handleVictory() {
@@ -760,26 +781,31 @@ async function handleVictory() {
     if ('vibrate' in navigator) navigator.vibrate([100, 50, 100, 50, 200]);
     
     huntLog.kills++;
-    const isBoss = combatState.currentEnemy.type === 'boss';
-    if (isBoss) huntLog.bossKills++;
+    const mType = combatState.currentEnemy.type || 'normal';
+    if (mType === 'rare' || mType === 'unique') huntLog.bossKills++;
     
     try {
-        // 카드 드랍 (등급별)
-        const droppedCards = await rollCardDrop(combatState.currentEnemy.name, isBoss);
-        droppedCards.forEach(d => {
-            huntLog.cardsGot++;
-            renderLog(`🃏 [${rarityLabel(d.rarity)}] ${d.name} 카드 획득!`, 'player');
-            playSound('victory');
-        });
-        if (droppedCards.length === 0) renderLog('카드 드랍 없음', 'enemy');
+        const config = await getGameConfig();
+        const drops = config.monsterDrops || DEFAULT_GAME_CONFIG.monsterDrops;
+        const tierDrop = drops[mType] || drops.normal;
+        let stats = await getPlayerSettings();
+        
+        // 수정조각 드랍
+        if (Math.random() * 100 < (tierDrop.shardRate || 40)) {
+            const currentShards = await getShards();
+            await saveShards(currentShards + 1);
+            huntLog.shardsGot++;
+            renderLog('💎 수정조각 획득!', 'player');
+            showShardPopup();
+        } else {
+            renderLog('드랍 없음', 'enemy');
+        }
         
         // 포션 드랍
-        const dropS = await getDropSettings();
-        let stats = await getPlayerSettings();
-        if (Math.random() * 100 < (dropS.potionDrop||30)) {
+        if (Math.random() * 100 < (tierDrop.potionRate || 20)) {
             stats.potions = (stats.potions||0) + 1;
             huntLog.potions++;
-            renderLog('포션 드랍!', 'player');
+            renderLog('💊 포션 드랍!', 'player');
         }
         await db.from('player_state').update(stats).eq('id', currentUserId||'singleton');
     } catch(e) {
@@ -842,18 +868,16 @@ async function renderSettingsMonsterList() {
     const container = document.getElementById('set-monster-list');
     container.innerHTML = '';
     pool.forEach((m, i) => {
-        const isBoss = m.type === 'boss';
+        const typeInfo = MONSTER_TYPES[m.type] || MONSTER_TYPES.normal;
         const item = document.createElement('div');
         item.className = 'glass-panel monster-card';
-        item.style.cssText = `margin-bottom:15px; padding:20px; ${isBoss ? 'border-left:4px solid var(--primary-gold); box-shadow:0 0 15px rgba(233,196,0,0.1);' : 'border-left:4px solid var(--secondary-cyan);'}`;
+        item.style.cssText = `margin-bottom:15px; padding:20px; border-left:4px solid ${typeInfo.color};`;
         item.innerHTML = `
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
                 <div style="display:flex; align-items:center; gap:10px;">
                     <span style="font-size:0.8rem; padding:4px 12px; border-radius:20px; font-weight:700;
-                        background:${isBoss ? 'rgba(233,196,0,0.2)' : 'rgba(0,253,236,0.15)'}; 
-                        color:${isBoss ? 'var(--primary-gold)' : 'var(--secondary-cyan)'}; 
-                        border:1px solid ${isBoss ? 'rgba(233,196,0,0.4)' : 'rgba(0,253,236,0.3)'};">
-                        ${isBoss ? '⚔ BOSS' : '🗡 NORMAL'}
+                        background:rgba(0,0,0,0.3); color:${typeInfo.color}; border:1px solid ${typeInfo.border};">
+                        ${typeInfo.icon} ${typeInfo.name}
                     </span>
                     <span style="font-size:0.75rem; color:var(--text-dim);">#${i+1}</span>
                 </div>
@@ -873,7 +897,7 @@ async function renderSettingsMonsterList() {
                         <label>몬스터 이름</label>
                         <input type="text" class="set-m-name btn-nav" data-index="${i}" value="${m.name}" style="width:100%;">
                     </div>
-                    <div style="font-size:0.8rem; color:var(--secondary-cyan); margin-bottom:6px; font-weight:700;">📊 능력치 범위 (최소 ~ 최대)</div>
+                    <div style="font-size:0.8rem; color:${typeInfo.color}; margin-bottom:6px; font-weight:700;">📊 능력치 범위</div>
                     <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
                         <div><label>HP min</label><input type="number" class="set-m-hpmin btn-nav" data-index="${i}" value="${m.hpMin||m.hp||100}" style="width:100%;"></div>
                         <div><label>HP max</label><input type="number" class="set-m-hpmax btn-nav" data-index="${i}" value="${m.hpMax||m.hp||100}" style="width:100%;"></div>
@@ -917,12 +941,17 @@ async function uploadMonsterImage(index, input) {
 
 async function addMonster(type) {
     const pool = await getMonsterPool();
+    const typeInfo = MONSTER_TYPES[type] || MONSTER_TYPES.normal;
+    const defaults = {
+        normal: {hpMin:80,hpMax:120,atkMin:8,atkMax:14,defMin:0,defMax:3},
+        magic: {hpMin:100,hpMax:160,atkMin:12,atkMax:20,defMin:2,defMax:6},
+        rare: {hpMin:150,hpMax:250,atkMin:18,atkMax:30,defMin:5,defMax:12},
+        unique: {hpMin:250,hpMax:400,atkMin:25,atkMax:45,defMin:8,defMax:20}
+    };
+    const d = defaults[type] || defaults.normal;
     pool.push({
-        name: type === 'boss' ? '새 보스 몬스터' : '새 일반 몬스터',
-        hpMin: type === 'boss' ? 200 : 80, hpMax: type === 'boss' ? 300 : 120,
-        atkMin: type === 'boss' ? 15 : 8, atkMax: type === 'boss' ? 25 : 14,
-        defMin: type === 'boss' ? 5 : 0, defMax: type === 'boss' ? 10 : 3,
-        img: '', type
+        name: `새 ${typeInfo.name} 몬스터`,
+        ...d, img: '', type
     });
     await db.from('game_settings').update({ value: pool }).eq('name', 'monsterPool');
     renderSettingsMonsterList();
@@ -956,7 +985,7 @@ async function saveMonsterPool() {
 function initSettingsMap() {
     if (setMap) return;
     setMap = L.map('set-map', { zoomControl: true }).setView(currentUserPos, 13);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(setMap);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {attribution:'© OpenStreetMap'}).addTo(setMap);
     setMap.on('click', async (e) => {
         const name = prompt("지역 이름:", `탐사구역_${Math.floor(Math.random()*1000)}`);
         if (name) {
