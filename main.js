@@ -269,7 +269,7 @@ function initApp() {
 }
 initApp();
 
-let activeScreen = 'login';
+activeScreen = 'login';
 let previousScreen = 'main';
 
 function goBack() {
