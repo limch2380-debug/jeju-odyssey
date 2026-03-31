@@ -392,6 +392,7 @@ async function updateDashboardHUD() {
     const inv = await getInventory();
     equippedCardIdx = await getEquippedIdx();
     const shards = await getShards();
+    const frags = await getFragments();
     const bcn = document.getElementById('battle-card-name');
     if (bcn) {
         if (equippedCardIdx>=0 && equippedCardIdx<inv.length) {
@@ -402,6 +403,21 @@ async function updateDashboardHUD() {
     }
     const bcl = document.getElementById('battle-card-lv');
     if (bcl) bcl.innerText = `💎 ${shards}`;
+    // 조각 현황 표시
+    const fragEl = document.getElementById('fragment-status');
+    if (fragEl) {
+        const keys = Object.keys(SHARD_FRAGMENTS);
+        const canCombine = keys.every(k => (frags[k] || 0) >= 1);
+        let html = keys.map(k => {
+            const s = SHARD_FRAGMENTS[k];
+            const count = frags[k] || 0;
+            return `<span style="color:${count>0?s.color:'rgba(255,255,255,0.2)'};font-size:0.7rem;cursor:default;" title="${s.name}: ${count}개">💎</span>`;
+        }).join(' ');
+        if (canCombine) {
+            html += ` <button onclick="showCombineUI()" style="font-size:0.6rem;padding:3px 8px;background:linear-gradient(135deg,var(--primary-gold),#ff8800);border:none;border-radius:6px;color:#000;font-weight:900;cursor:pointer;animation:pulse 1s infinite;margin-left:5px;">합치기</button>`;
+        }
+        fragEl.innerHTML = html;
+    }
     const hpText = document.getElementById('hud-hp-text');
     if (hpText && combatState.playerMaxHP > 0) hpText.innerText = `${Math.ceil((combatState.playerHP/combatState.playerMaxHP)*100)}%`;
     const hpBar = document.getElementById('hud-hp-bar');
@@ -819,13 +835,17 @@ async function handleVictory() {
         const tierDrop = drops[mType] || drops.normal;
         let stats = await getPlayerSettings();
         
-        // 수정조각 드랍
+        // 수정조각 드랍 (5종 조각 시스템)
         if (Math.random() * 100 < (tierDrop.shardRate || 40)) {
+            const shardKeys = Object.keys(SHARD_FRAGMENTS);
+            const droppedShard = shardKeys[Math.floor(Math.random() * shardKeys.length)];
+            await addFragment(droppedShard);
             const currentShards = await getShards();
             await saveShards(currentShards + 1);
             huntLog.shardsGot++;
-            renderLog('💎 수정조각 획득!', 'player');
-            showShardPopup();
+            const fragInfo = SHARD_FRAGMENTS[droppedShard];
+            renderLog(`💎 ${fragInfo.name} 획득!`, 'player');
+            showShardPopup(droppedShard);
         } else {
             renderLog('드랍 없음', 'enemy');
         }

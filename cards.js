@@ -20,6 +20,16 @@ const PASSIVE_SKILLS = {
     dodge: {name:'회피',icon:'💨',desc:'회피율 +N%',unit:'%'},
     drain: {name:'흡혈',icon:'🩸',desc:'흡혈 +N%',unit:'%'}
 };
+
+// ===== 수정조각 5종 시스템 =====
+const SHARD_FRAGMENTS = {
+    shard1: {name:'조각 1',icon:'💎',color:'#ff4466',hue:'hue-rotate(0deg) saturate(1.3)',glow:'rgba(255,68,102,0.5)'},
+    shard2: {name:'조각 2',icon:'💎',color:'#44aaff',hue:'hue-rotate(200deg) saturate(1.3)',glow:'rgba(68,170,255,0.5)'},
+    shard3: {name:'조각 3',icon:'💎',color:'#44ff88',hue:'hue-rotate(120deg) saturate(1.3)',glow:'rgba(68,255,136,0.5)'},
+    shard4: {name:'조각 4',icon:'💎',color:'#ffaa00',hue:'hue-rotate(40deg) saturate(1.5)',glow:'rgba(255,170,0,0.5)'},
+    shard5: {name:'조각 5',icon:'💎',color:'#cc44ff',hue:'hue-rotate(280deg) saturate(1.3)',glow:'rgba(204,68,255,0.5)'}
+};
+
 const DEFAULT_GAME_CONFIG = {
     playerBaseStats: { hp:100, atk:15, def:5 },
     shardCost: 10,
@@ -87,6 +97,44 @@ async function setEquippedIdx(idx) {
 async function getDropSettings() {
     const { data } = await db.from('game_settings').select('value').eq('name', 'dropSettings').single();
     return data ? data.value : { potionDrop: 30 };
+}
+
+// 조각 인벤토리 (5종 각각 보유 개수)
+async function getFragments() {
+    const uid = currentUserId || 'singleton';
+    const {data} = await db.from('game_settings').select('value').eq('name', `fragments_${uid}`).single();
+    return data?.value || {shard1:0, shard2:0, shard3:0, shard4:0, shard5:0};
+}
+async function saveFragments(frags) {
+    const uid = currentUserId || 'singleton';
+    await db.from('game_settings').upsert({name: `fragments_${uid}`, value: frags});
+}
+async function addFragment(shardKey) {
+    const frags = await getFragments();
+    frags[shardKey] = (frags[shardKey] || 0) + 1;
+    await saveFragments(frags);
+    return frags;
+}
+async function combineFragments(templateId) {
+    const frags = await getFragments();
+    // 5종 모두 1개 이상 필요
+    const keys = Object.keys(SHARD_FRAGMENTS);
+    for (const k of keys) {
+        if ((frags[k] || 0) < 1) { alert('조각이 부족합니다!'); return false; }
+    }
+    // 차감
+    for (const k of keys) frags[k]--;
+    await saveFragments(frags);
+    // 카드 생성
+    const templates = await getCardTemplates();
+    const t = templates.find(x => x.templateId === templateId);
+    if (!t) { alert('카드 템플릿을 찾을 수 없습니다.'); return false; }
+    const inv = await getInventory();
+    if (inv.length >= 10) { alert('인벤토리가 가득 찼습니다! (최대 10장)'); return false; }
+    const card = await generateCard(t);
+    inv.push(card);
+    await saveInventory(inv);
+    return card;
 }
 
 function rarityColor(r) { return RARITIES[r]?.color || '#fff'; }
@@ -228,10 +276,31 @@ function getPassiveBonus(card) {
 async function renderInventory() {
     const inv = await getInventory();
     const shards = await getShards();
+    const frags = await getFragments();
     equippedCardIdx = await getEquippedIdx();
     document.getElementById('inv-count').innerText = `${inv.length} / 10`;
     const shardEl = document.getElementById('shard-count');
     if(shardEl) shardEl.innerText = shards;
+    // 조각 현황 패널
+    const fragPanel = document.getElementById('inv-fragment-panel');
+    if (fragPanel) {
+        const keys = Object.keys(SHARD_FRAGMENTS);
+        const canCombine = keys.every(k => (frags[k] || 0) >= 1);
+        let html = '<div style="display:flex;gap:6px;justify-content:center;align-items:center;flex-wrap:wrap;">';
+        html += keys.map(k => {
+            const s = SHARD_FRAGMENTS[k]; const count = frags[k] || 0;
+            return `<div style="text-align:center;padding:6px 8px;border-radius:10px;border:1px solid ${count>0?s.color:'rgba(255,255,255,0.08)'};background:${count>0?`rgba(${hexToRgb(s.color)},0.08)`:'transparent'};min-width:48px;">
+                <img src="shard.png" style="width:28px;height:28px;object-fit:contain;filter:${s.hue} ${count>0?'':'grayscale(0.8) opacity(0.3)'};" onerror="this.outerHTML='<span style=font-size:1.3rem;>${s.icon}</span>'">
+                <div style="font-size:0.55rem;color:${count>0?s.color:'var(--text-dim)'};margin-top:2px;">${s.name}</div>
+                <div style="font-size:0.6rem;color:#fff;font-weight:900;">${count}</div>
+            </div>`;
+        }).join('');
+        html += '</div>';
+        if (canCombine) {
+            html += `<button onclick="showCombineUI()" class="btn-primary" style="width:100%;margin-top:10px;padding:10px;font-size:0.85rem;font-weight:900;background:linear-gradient(135deg,var(--primary-gold),#ff8800);animation:pulse 1.5s infinite;">💎 조각 합치기 — 카드 생성</button>`;
+        }
+        fragPanel.innerHTML = html;
+    }
     const drawPanel = document.getElementById('craft-card-panel');
     if (drawPanel) drawPanel.style.display = 'block';
     const grid = document.getElementById('inventory-grid');
@@ -519,20 +588,81 @@ async function loadGameConfigUI() {
 }
 
 // ===== 수정조각 획득 팝업 =====
-function showShardPopup() {
+function showShardPopup(shardKey) {
+    const info = SHARD_FRAGMENTS[shardKey] || SHARD_FRAGMENTS.shard1;
     const popup = document.createElement('div');
-    popup.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:9999;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;animation:fadeIn 0.3s;';
+    popup.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:9999;background:rgba(0,0,0,0.9);display:flex;align-items:center;justify-content:center;animation:fadeIn 0.3s;cursor:pointer;';
+    popup.onclick = () => { popup.style.opacity='0'; popup.style.transition='opacity 0.3s'; setTimeout(()=>popup.remove(),300); };
     popup.innerHTML = `
-        <div style="text-align:center;animation:popIn 0.4s;">
-            <div style="font-size:4rem;margin-bottom:15px;filter:drop-shadow(0 0 30px rgba(0,253,236,0.5));animation:glow 1s infinite alternate;">💎</div>
-            <div style="font-size:1.3rem;color:var(--secondary-cyan);font-weight:900;text-shadow:0 0 20px rgba(0,253,236,0.4);">수정조각 획득!</div>
+        <div style="text-align:center;animation:popIn 0.5s;">
+            <div style="position:relative;width:120px;height:120px;margin:0 auto 20px;">
+                <img src="shard.png" style="width:120px;height:120px;object-fit:contain;filter:${info.hue} drop-shadow(0 0 25px ${info.glow}) drop-shadow(0 0 50px ${info.glow});animation:glow 1.5s infinite alternate;" onerror="this.outerHTML='<div style=font-size:5rem;>${info.icon}</div>'">
+                <div style="position:absolute;inset:0;border-radius:50%;background:radial-gradient(circle,${info.glow} 0%,transparent 70%);opacity:0.4;animation:pulse 1.5s infinite;"></div>
+            </div>
+            <div style="font-size:1.4rem;color:${info.color};font-weight:900;text-shadow:0 0 20px ${info.glow};letter-spacing:2px;">${info.name} 획득!</div>
             <div style="font-size:0.8rem;color:var(--text-dim);margin-top:8px;">차원의 에너지가 결정화되었습니다</div>
+            <div style="font-size:0.65rem;color:rgba(255,255,255,0.3);margin-top:15px;">화면을 터치하여 닫기</div>
         </div>`;
     document.body.appendChild(popup);
-    // 진동 + 사운드
     if ('vibrate' in navigator) navigator.vibrate([100, 50, 200]);
     playSound('victory');
-    setTimeout(() => { popup.style.opacity='0'; popup.style.transition='opacity 0.3s'; setTimeout(()=>popup.remove(),300); }, 1800);
+    setTimeout(() => { if(popup.parentNode) { popup.style.opacity='0'; popup.style.transition='opacity 0.3s'; setTimeout(()=>popup.remove(),300); }}, 3000);
+}
+
+// ===== 조각 합치기 UI =====
+async function showCombineUI() {
+    const frags = await getFragments();
+    const templates = await getCardTemplates();
+    const keys = Object.keys(SHARD_FRAGMENTS);
+    const canCombine = keys.every(k => (frags[k] || 0) >= 1);
+    const popup = document.createElement('div');
+    popup.id = 'combine-popup';
+    popup.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:9998;background:rgba(0,0,0,0.92);display:flex;align-items:center;justify-content:center;animation:fadeIn 0.3s;overflow-y:auto;padding:20px;';
+    let fragHTML = keys.map(k => {
+        const s = SHARD_FRAGMENTS[k];
+        const count = frags[k] || 0;
+        const owned = count >= 1;
+        return `<div style="text-align:center;padding:10px;border-radius:12px;border:2px solid ${owned ? s.color : 'rgba(255,255,255,0.1)'};background:${owned ? `rgba(${hexToRgb(s.color)},0.1)` : 'rgba(255,255,255,0.02)'};min-width:60px;">
+            <img src="shard.png" style="width:45px;height:45px;object-fit:contain;filter:${s.hue} ${owned?'':'grayscale(0.8) opacity(0.3)'};" onerror="this.outerHTML='<div style=font-size:2rem;${owned?'':'filter:grayscale(1);opacity:0.3;'}>${s.icon}</div>'">
+            <div style="font-size:0.7rem;color:${owned ? s.color : 'var(--text-dim)'};margin-top:4px;font-weight:700;">${s.name}</div>
+            <div style="font-size:0.6rem;color:${owned ? '#fff' : 'var(--text-dim)'};">${count}개</div>
+        </div>`;
+    }).join('');
+    let templateHTML = templates.map(t => {
+        return `<button onclick="doCombine('${t.templateId}')" style="display:flex;align-items:center;gap:10px;padding:12px;width:100%;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);border-radius:10px;color:#fff;cursor:pointer;margin-bottom:8px;${canCombine?'':'opacity:0.4;pointer-events:none;'}">
+            <img src="${t.img}" style="width:40px;height:50px;object-fit:cover;border-radius:6px;" onerror="this.src='goblin_card.png'">
+            <div style="text-align:left;"><div style="font-weight:700;">${t.name}</div><div style="font-size:0.7rem;color:var(--text-dim);">카드 생성</div></div>
+        </button>`;
+    }).join('');
+    popup.innerHTML = `
+        <div style="max-width:400px;width:100%;">
+            <div style="text-align:center;margin-bottom:20px;">
+                <div style="font-size:1.3rem;font-weight:900;color:var(--primary-gold);">💎 조각 합치기</div>
+                <div style="font-size:0.75rem;color:var(--text-dim);margin-top:5px;">5종 조각을 모아 카드를 생성합니다</div>
+            </div>
+            <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:25px;">${fragHTML}</div>
+            ${canCombine ? '<div style="text-align:center;color:var(--secondary-cyan);font-weight:700;margin-bottom:15px;animation:pulse 1s infinite;">✨ 합성 가능! 카드를 선택하세요</div>' : '<div style="text-align:center;color:var(--accent-red);font-size:0.8rem;margin-bottom:15px;">⚠ 5종 조각이 모두 필요합니다</div>'}
+            <div style="max-height:200px;overflow-y:auto;">${templateHTML}</div>
+            <button onclick="document.getElementById('combine-popup')?.remove()" class="btn-primary" style="width:100%;margin-top:15px;padding:12px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);">닫기</button>
+        </div>`;
+    document.body.appendChild(popup);
+}
+async function doCombine(templateId) {
+    const card = await combineFragments(templateId);
+    if (!card) return;
+    document.getElementById('combine-popup')?.remove();
+    // 성공 팝업
+    let passiveMsg = `${PASSIVE_SKILLS[card.passive1]?.icon} ${PASSIVE_SKILLS[card.passive1]?.name}: +${card.passive1Value}%`;
+    if (card.passiveCount >= 2 && card.passive2) {
+        passiveMsg += `\n${PASSIVE_SKILLS[card.passive2]?.icon} ${PASSIVE_SKILLS[card.passive2]?.name}: +${card.passive2Value}%`;
+    }
+    alert(`🎉 조각 합성 성공!\n\n${card.name} [일반]\n\n패시브 스킬:\n${passiveMsg}`);
+    renderInventory();
+    updateDashboardHUD();
+}
+function hexToRgb(hex) {
+    const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+    return `${r},${g},${b}`;
 }
 
 // ===== 이미지 리사이즈 (1MB 이하) =====
