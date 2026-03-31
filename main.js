@@ -298,11 +298,18 @@ function showScreen(screenId) {
     const target = document.getElementById(`screen-${screenId}`);
     if (target) target.classList.add('active');
     
-    // 미션 오버레이는 대시보드(지도) 화면에서만 표시
+    // 미션 오버레이는 대시보드(지도) 화면에서만 표시 (전투 등 다른 화면에서는 숨김)
     const mo = document.getElementById('mission-overlay');
     if (mo) {
-        if (screenId === 'dashboard') mo.style.display = 'block';
-        else mo.style.display = 'none';
+        if (screenId === 'dashboard') {
+            // 대시보드여도 활성화된 미션 포탈이 있을 때만 보이도록 checkProximity에서 제어하므로
+            // 여기서는 기본적으로 dashboard일 때만 display 속성 유지를 허용하거나 display:block 처리
+            // (사실 checkProximity에서 매번 display:block을 하므로 여기서는 non-dashboard일 때 숨기는 게 핵심)
+            // 하지만 안정성을 위해 dashboard일 때만 block 처리 (실제 데이터 반영은 checkProximity에서 함)
+            // 만약 activeMissionPortalId가 없다면 나중에 checkProximity가 block으로 바꿀 것임
+        } else {
+            mo.style.display = 'none';
+        }
     }
 
     if (screenId === 'dashboard') {
@@ -498,8 +505,8 @@ async function checkProximity() {
                 showPortalModal('enter', insidePortal, hasBoss);
             }
             
-            // 미션 진행 중 (진입 확인 후)
-            if (activeMissionPortalId === insidePortal.id) {
+            // 미션 진행 중 (진입 확인 후 + 현재 대시보드 화면일 때만 표시)
+            if (activeMissionPortalId === insidePortal.id && activeScreen === 'dashboard') {
                 missionOverlay.style.display = 'block';
                 document.getElementById('mission-title').innerText = insidePortal.name;
                 document.getElementById('mission-desc').innerText = insidePortal.mission_text || "이 지역을 조사하십시오.";
