@@ -11,7 +11,7 @@ const MONSTER_TYPES = {
     rare: {name:'레어',color:'#ffdd00',icon:'⚔',border:'rgba(255,221,0,0.4)'},
     unique: {name:'유니크',color:'#ffa500',icon:'👑',border:'rgba(255,165,0,0.5)'}
 };
-const FUSION_RULES = { common:{need:10,next:'magic'}, magic:{need:5,next:'rare'}, rare:{need:3,next:'unique'}, unique:{need:1,next:'unique'} };
+
 const PASSIVE_SKILLS = {
     atk_boost: {name:'공격력 증가',icon:'⚔',desc:'ATK +N%',unit:'%'},
     def_boost: {name:'방어력 증가',icon:'🛡',desc:'DEF +N%',unit:'%'},
@@ -46,8 +46,7 @@ const DEFAULT_CARD_TEMPLATES = [
 
 let selectedCardIdx = -1;
 let equippedCardIdx = -1;
-let fusionBaseIdx = -1;
-let fusionMaterials = new Set();
+
 
 // DB helpers
 async function getCardTemplates() {
@@ -215,44 +214,35 @@ async function renderInventory() {
         fragPanel.innerHTML = '';
     }
     const drawPanel = document.getElementById('craft-card-panel');
-    if (drawPanel) drawPanel.style.display = 'none'; // 수정조각으로 카드 제작하는 기능도 숨김
+    if (drawPanel) drawPanel.style.display = 'none'; 
 
     const grid = document.getElementById('inventory-grid');
     grid.innerHTML = '';
-    updateFusionUI(inv);
+    
     inv.forEach((c,i) => {
         const equipped = i===equippedCardIdx;
         const rc = rarityColor(c.rarity);
         const rb = rarityBorder(c.rarity);
-        const isBase = fusionBaseIdx===i;
-        const isMat = fusionMaterials.has(i);
-        const rule = FUSION_RULES[c.rarity];
         const div = document.createElement('div');
         div.className = 'glass-panel';
         let borderC = equipped?rc:rb;
         let bgExtra = equipped?`background:${RARITIES[c.rarity]?.bg};box-shadow:0 0 15px ${rb};`:'';
-        if (isBase) { borderC='var(--primary-gold)'; bgExtra='background:rgba(233,196,0,0.08);box-shadow:0 0 12px rgba(233,196,0,0.3);'; }
-        if (isMat) { borderC='var(--accent-red)'; bgExtra='background:rgba(255,50,50,0.06);box-shadow:0 0 12px rgba(255,50,50,0.2);'; }
+        
         div.style.cssText = `padding:14px;text-align:center;border-color:${borderC};${bgExtra}cursor:pointer;position:relative;`;
         let badge = '';
-        if (equipped && !isBase && !isMat) badge = `<div style="position:absolute;top:8px;right:10px;font-size:0.6rem;color:${rc};font-weight:700;">🎴 장착</div>`;
-        if (isBase) badge = `<div style="position:absolute;top:8px;right:10px;font-size:0.6rem;color:var(--primary-gold);font-weight:700;">⭐ 베이스</div>`;
-        if (isMat) badge = `<div style="position:absolute;top:8px;right:10px;font-size:0.6rem;color:var(--accent-red);font-weight:700;">🔥 재료</div>`;
+        if (equipped) badge = `<div style="position:absolute;top:8px;right:10px;font-size:0.6rem;color:${rc};font-weight:700;">🎴 장착</div>`;
         const p1 = `${PASSIVE_SKILLS[c.passive1]?.icon||''} +${c.passive1Value||0}%`;
         const p2 = (c.passiveCount >= 2 && c.passive2) ? `${PASSIVE_SKILLS[c.passive2]?.icon||''} +${c.passive2Value||0}%` : '';
         const passiveDisplay = p2 ? `${p1} / ${p2}` : p1;
-        let fuseBtnStyle = 'flex:1;padding:8px;font-size:0.7rem;text-align:center;';
-        if (isBase) fuseBtnStyle += 'background:rgba(233,196,0,0.25);color:var(--primary-gold);';
-        else if (isMat) fuseBtnStyle += 'background:rgba(255,50,50,0.2);color:var(--accent-red);';
+        
         div.innerHTML = `${badge}
             <img src="${c.img}" style="width:65px;height:80px;object-fit:cover;border-radius:8px;border:2px solid ${rc};margin-bottom:6px;" onerror="this.src='goblin_card.png'">
             <div style="font-size:0.9rem;color:${rc};font-weight:700;">${c.name}</div>
-            <div style="font-size:0.65rem;color:var(--text-dim);">[${rarityLabel(c.rarity)}] 합성: ${c.fusionCount||0}/${rule.need}</div>
+            <div style="font-size:0.65rem;color:var(--text-dim);">[${rarityLabel(c.rarity)}]</div>
             <div style="font-size:0.65rem;color:var(--secondary-cyan);margin-top:4px;">${passiveDisplay}</div>
             <div style="display:flex;gap:4px;margin-top:8px;">
                 <button class="btn-primary" style="flex:1;padding:8px;font-size:0.7rem;" onclick="event.stopPropagation();equipCard(${i})">${equipped?'해제':'장착'}</button>
-                <button class="btn-nav" style="${fuseBtnStyle}" onclick="event.stopPropagation();toggleFusion(${i})">${isBase?'⭐베이스':isMat?'🔥재료':'합성'}</button>
-                <button class="btn-nav" style="padding:8px 10px;font-size:0.7rem;color:var(--accent-red);border-color:var(--accent-red);text-align:center;" onclick="event.stopPropagation();confirmDeleteCard(${c.id})">✕</button>
+                <button class="btn-nav" style="padding:8px 10px;font-size:0.7rem;color:var(--accent-red);border-color:var(--accent-red);text-align:center;" onclick="event.stopPropagation();confirmDeleteCard(${c.id})">✕ 삭제</button>
             </div>`;
         grid.appendChild(div);
     });
@@ -263,77 +253,7 @@ async function confirmDeleteCard(cardId) {
     await deleteCard(cardId); renderInventory(); updateEquippedCardDisplay();
 }
 
-function toggleFusion(idx) {
-    if (fusionBaseIdx === idx) { fusionBaseIdx = -1; renderInventory(); return; }
-    if (fusionMaterials.has(idx)) { fusionMaterials.delete(idx); renderInventory(); return; }
-    if (fusionBaseIdx < 0) { fusionBaseIdx = idx; }
-    else { fusionMaterials.add(idx); }
-    renderInventory();
-}
 
-function updateFusionUI(inv) {
-    const el = document.getElementById('fusion-selection');
-    if(!el) return;
-    let html = '';
-    if (fusionBaseIdx>=0 && inv[fusionBaseIdx]) {
-        const bc = inv[fusionBaseIdx];
-        html += `<span style="font-size:0.6rem;padding:4px 10px;border-radius:8px;background:rgba(233,196,0,0.12);color:var(--primary-gold);border:1px solid rgba(233,196,0,0.3);">⭐ ${bc.name}(${bc.fusionCount||0})</span>`;
-    }
-    fusionMaterials.forEach(mi => {
-        if (inv[mi]) html += `<span style="font-size:0.6rem;padding:4px 8px;border-radius:8px;background:rgba(255,50,50,0.1);color:var(--accent-red);border:1px solid rgba(255,50,50,0.2);">🔥${inv[mi].name}(${inv[mi].fusionCount||0})</span>`;
-    });
-    if (fusionBaseIdx>=0 && fusionMaterials.size>0) {
-        const baseCount = inv[fusionBaseIdx]?.fusionCount || 0;
-        let matTotal = 0;
-        fusionMaterials.forEach(mi => { matTotal += Math.max(inv[mi]?.fusionCount || 0, 1); });
-        const preview = baseCount + matTotal;
-        const rule = FUSION_RULES[inv[fusionBaseIdx]?.rarity];
-        html += `<span style="font-size:0.6rem;padding:4px 10px;border-radius:8px;background:rgba(0,253,236,0.1);color:var(--secondary-cyan);border:1px solid rgba(0,253,236,0.2);">→ 결과: ${preview}/${rule?.need||'?'}</span>`;
-    }
-    if (!html) html = '<span style="font-size:0.6rem;color:var(--text-dim);">1. ⭐베이스 선택 → 2. 🔥재료 선택 (다중 가능)</span>';
-    el.innerHTML = html;
-}
-
-async function fuseCards() {
-    if (fusionBaseIdx<0 || fusionMaterials.size===0) { alert('⭐ 베이스 카드와 🔥 재료 카드를 선택하세요.'); return; }
-    const inv = await getInventory();
-    const base = fusionBaseIdx;
-    if (!inv[base]) return;
-    const baseRarity = inv[base].rarity;
-    for (const mi of fusionMaterials) {
-        if (!inv[mi] || inv[mi].rarity !== baseRarity) {
-            alert('같은 등급의 카드만 합성 가능합니다.'); return;
-        }
-    }
-    let addedCount = 0;
-    fusionMaterials.forEach(mi => { addedCount += Math.max(inv[mi].fusionCount || 0, 1); });
-    inv[base].fusionCount = (inv[base].fusionCount || 0) + addedCount;
-    const rule = FUSION_RULES[baseRarity];
-    if (inv[base].fusionCount >= rule.need) {
-        const newRarity = rule.next;
-        const config = await getGameConfig();
-        const pMin = config.passiveMin||10, pMax = config.passiveMax||20;
-        const rand = (min,max)=>Math.floor(Math.random()*(max-min+1))+min;
-        inv[base].rarity = newRarity;
-        inv[base].fusionCount = 0;
-        inv[base].passive1Value = rand(pMin, pMax);
-        inv[base].passive2Value = rand(pMin, pMax);
-        alert(`🎉 ${inv[base].name} [${rarityLabel(newRarity)}] 등급 승급!\n\n새 패시브:\n${PASSIVE_SKILLS[inv[base].passive1]?.icon} ${PASSIVE_SKILLS[inv[base].passive1]?.name}: +${inv[base].passive1Value}\n${PASSIVE_SKILLS[inv[base].passive2]?.icon} ${PASSIVE_SKILLS[inv[base].passive2]?.name}: +${inv[base].passive2Value}`);
-    } else {
-        alert(`합성 완료! (${inv[base].fusionCount}/${rule.need})\n다음 등급까지 ${rule.need - inv[base].fusionCount}회 남음\n소모된 재료: ${fusionMaterials.size}장`);
-    }
-    const matIndices = Array.from(fusionMaterials).sort((a,b)=>b-a);
-    for (const mi of matIndices) {
-        inv.splice(mi, 1);
-        if (equippedCardIdx === mi) { equippedCardIdx = -1; }
-        else if (equippedCardIdx > mi) { equippedCardIdx--; }
-    }
-    await setEquippedIdx(equippedCardIdx);
-    await saveInventory(inv);
-    fusionBaseIdx = -1;
-    fusionMaterials.clear();
-    renderInventory(); updateEquippedCardDisplay();
-}
 
 // ===== 도감 UI =====
 async function renderCollection() {

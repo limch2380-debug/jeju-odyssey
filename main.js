@@ -269,7 +269,21 @@ function initApp() {
 }
 initApp();
 
+let activeScreen = 'login';
+let previousScreen = 'main';
+
+function goBack() {
+    if (previousScreen && previousScreen !== activeScreen) {
+        showScreen(previousScreen);
+    } else {
+        showScreen('main');
+    }
+}
+
 function showScreen(screenId) {
+    if (activeScreen && activeScreen !== screenId) {
+        previousScreen = activeScreen;
+    }
     activeScreen = screenId;
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     const target = document.getElementById(`screen-${screenId}`);

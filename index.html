@@ -19,7 +19,7 @@
             <div style="position:relative; z-index:1; padding: 30px 20px; min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center;">
                 <div style="text-align:center; margin-bottom:30px;">
                     <div style="font-size:0.75rem; letter-spacing:6px; color:var(--secondary-cyan); font-family:'Space Grotesk'; margin-bottom:8px; text-shadow:0 0 20px rgba(0,253,236,0.3);">DIMENSION RIFT</div>
-                    <h1 style="font-size:2.2rem; font-weight:900; background:linear-gradient(135deg, #ffe16f, #e9c400, #ff9500); -webkit-background-clip:text; -webkit-text-fill-color:transparent; margin:0; line-height:1.1; text-shadow:none; filter:drop-shadow(0 0 30px rgba(233,196,0,0.3));">제주 오디세이</h1>
+                    <h1 style="font-size:2.2rem; font-weight:900; background:linear-gradient(135deg, #ffe16f, #e9c400, #ff9500); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; margin:0; line-height:1.1; text-shadow:none; filter:drop-shadow(0 0 30px rgba(233,196,0,0.3));">제주 오디세이</h1>
                     <div style="font-size:0.7rem; color:rgba(225,225,246,0.5); font-family:'Space Grotesk'; letter-spacing:3px; margin-top:6px;">JEJU ODYSSEY — DIMENSION RIFT RPG</div>
                 </div>
                 <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:10px; max-width:380px; width:100%; margin-bottom:30px;">
@@ -132,15 +132,9 @@
                 </div>
 
                 <div id="inventory-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;"></div>
-                
-                <div class="glass-panel" style="margin-top: 20px; padding: 15px; border-color: rgba(233,196,0,0.15);">
-                    <div style="font-size: 0.6rem; color: var(--primary-gold); font-weight: 700; margin-bottom: 10px;">⚗ 카드 합성</div>
-                    <div style="font-size: 0.5rem; color: var(--text-dim); margin-bottom: 10px;">같은 등급의 카드를 합성하면 등급이 상승합니다</div>
-                    <div id="fusion-selection" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;"></div>
-                    <button class="btn-primary" style="width:100%; padding:12px; font-size:0.75rem;" onclick="fuseCards()">합성하기</button>
-                </div>
 
-                <button class="btn-primary" style="width:100%; text-align:center; margin-top:20px; padding:14px; font-size:0.9rem;" onclick="showScreen('main')">🎮 게임하기</button>
+
+                <button class="btn-nav" style="width:100%; text-align:center; margin-top:20px; padding:12px; font-size:0.8rem; border-color:var(--secondary-cyan); color:var(--secondary-cyan);" onclick="goBack()">돌아가기 / 닫기</button>
             </div>
         </div>
 
@@ -164,6 +158,7 @@
                         </div>
 
                         <div style="display:flex; gap:10px; align-items:center;">
+                            <button class="btn-nav" style="padding:4px 8px; font-size:0.55rem; color:var(--primary-gold); border-color:var(--primary-gold);" onclick="showScreen('inventory')">🎴 인벤토리</button>
                             <span id="hud-hp-text" style="font-size:0.6rem; color:var(--accent-red);">100%</span>
                             <button class="btn-nav" style="padding:5px 10px; font-size:0.5rem;" onclick="showScreen('main')">EXIT</button>
                         </div>
