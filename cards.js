@@ -452,6 +452,13 @@ async function renderCardEditor() {
     if(!el) return;
     el.innerHTML = '';
 
+    // 몬스터 목록 불러오기
+    let monsterPool = [];
+    try {
+        if (typeof getMonsterPool === 'function') monsterPool = await getMonsterPool();
+    } catch(e) {}
+    const mstOpts = '<option value="-1">선택 안함</option>' + monsterPool.map((m, idx) => `<option value="${idx}">[${idx+1}] ${m.name}</option>`).join('');
+
     // 추가 버튼 상단 배치
     const addBtn = document.createElement('button');
     addBtn.className = 'btn-primary';
@@ -507,21 +514,47 @@ async function renderCardEditor() {
             </div>
             
             <div style="margin-top:12px;padding:12px;background:rgba(0,253,236,0.05);border-radius:10px;border:1px solid rgba(0,253,236,0.2);">
-                <label style="font-size:0.65rem;color:var(--secondary-cyan);display:block;margin-bottom:8px;font-weight:700;">💎 제작 필요 조각 번호 (1~5번):</label>
-                <select class="ce-shard-id btn-nav" style="width:100%;color:gold;font-weight:700;font-size:0.75rem;padding:8px !important;">
-                    <option value="1" ${t.shardId==1?'selected':''}>💎 1번 수정 (Region 1)</option>
-                    <option value="2" ${t.shardId==2?'selected':''}>💎 2번 수정 (Region 2)</option>
-                    <option value="3" ${t.shardId==3?'selected':''}>💎 3번 수정 (Region 3)</option>
-                    <option value="4" ${t.shardId==4?'selected':''}>💎 4번 수정 (Region 4)</option>
-                    <option value="5" ${t.shardId==5?'selected':''}>💎 5번 수정 (Region 5)</option>
-                </select>
-                <div style="font-size:0.5rem;color:var(--text-dim);margin-top:6px;">이 수정 조각을 5개 모아야 이 카드를 만들 수 있습니다.</div>
+                <label style="font-size:0.65rem;color:var(--secondary-cyan);display:block;margin-bottom:8px;font-weight:700;">💎 [전용 조각] 드랍 지정 (5지역 분산):</label>
+                <div style="font-size:0.5rem;color:var(--text-dim);margin-bottom:10px;">이 카드를 만들기 위한 전용 조각 1~5번이 어디서 드랍될지 선택하세요.</div>
+                
+                <div style="display:grid; grid-template-columns:1fr; gap:6px;">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span style="font-size:0.55rem; color:gold; min-width:32px;">1번 조각</span>
+                        <select class="ce-drop1 btn-nav" style="flex:1; padding:6px; font-size:0.6rem;">${mstOpts}</select>
+                        <input type="number" class="ce-rate1 btn-nav" style="width:45px; text-align:center; padding:6px; font-size:0.6rem;" placeholder="확률%" value="${t.rates?.[0]||10}">
+                    </div>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span style="font-size:0.55rem; color:gold; min-width:32px;">2번 조각</span>
+                        <select class="ce-drop2 btn-nav" style="flex:1; padding:6px; font-size:0.6rem;">${mstOpts}</select>
+                        <input type="number" class="ce-rate2 btn-nav" style="width:45px; text-align:center; padding:6px; font-size:0.6rem;" placeholder="확률%" value="${t.rates?.[1]||10}">
+                    </div>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span style="font-size:0.55rem; color:gold; min-width:32px;">3번 조각</span>
+                        <select class="ce-drop3 btn-nav" style="flex:1; padding:6px; font-size:0.6rem;">${mstOpts}</select>
+                        <input type="number" class="ce-rate3 btn-nav" style="width:45px; text-align:center; padding:6px; font-size:0.6rem;" placeholder="확률%" value="${t.rates?.[2]||10}">
+                    </div>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span style="font-size:0.55rem; color:gold; min-width:32px;">4번 조각</span>
+                        <select class="ce-drop4 btn-nav" style="flex:1; padding:6px; font-size:0.6rem;">${mstOpts}</select>
+                        <input type="number" class="ce-rate4 btn-nav" style="width:45px; text-align:center; padding:6px; font-size:0.6rem;" placeholder="확률%" value="${t.rates?.[3]||10}">
+                    </div>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span style="font-size:0.55rem; color:gold; min-width:32px;">5번 조각</span>
+                        <select class="ce-drop5 btn-nav" style="flex:1; padding:6px; font-size:0.6rem;">${mstOpts}</select>
+                        <input type="number" class="ce-rate5 btn-nav" style="width:45px; text-align:center; padding:6px; font-size:0.6rem;" placeholder="확률%" value="${t.rates?.[4]||10}">
+                    </div>
+                </div>
             </div>`;
 
         el.appendChild(div);
         // 값 설정
         el.querySelectorAll('.ce-p1')[i].value = t.passive1 || 'atk_boost';
         el.querySelectorAll('.ce-p2')[i].value = t.passive2 || 'def_boost';
+        el.querySelectorAll('.ce-drop1')[i].value = t.drops?.[0] ?? -1;
+        el.querySelectorAll('.ce-drop2')[i].value = t.drops?.[1] ?? -1;
+        el.querySelectorAll('.ce-drop3')[i].value = t.drops?.[2] ?? -1;
+        el.querySelectorAll('.ce-drop4')[i].value = t.drops?.[3] ?? -1;
+        el.querySelectorAll('.ce-drop5')[i].value = t.drops?.[4] ?? -1;
     });
     // 패시브 개수 라디오 변경 시 패시브2 활성/비활성
     document.querySelectorAll('.ce-pcount').forEach(radio => {
@@ -571,7 +604,8 @@ async function saveCardTemplates() {
     const p2s = document.querySelectorAll('.ce-p2');
     const pmins = document.querySelectorAll('.ce-pmin');
     const pmaxs = document.querySelectorAll('.ce-pmax');
-    const shardIds = document.querySelectorAll('.ce-shard-id');
+    
+    // 조각 드랍 정보 저장
     names.forEach((input,i) => {
         templates[i].name = input.value;
         templates[i].passive1 = p1s[i]?.value || 'atk_boost';
@@ -587,11 +621,26 @@ async function saveCardTemplates() {
         // 패시브 수치 범위
         templates[i].passiveMin = parseInt(pmins[i]?.value) || 10;
         templates[i].passiveMax = parseInt(pmaxs[i]?.value) || 20;
-        // 수정 번호
-        templates[i].shardId = parseInt(shardIds[i]?.value) || 1;
+
+        // 전용 조각 5개의 드랍 위치와 확률 저장
+        templates[i].drops = [
+            parseInt(document.querySelectorAll('.ce-drop1')[i]?.value) ?? -1,
+            parseInt(document.querySelectorAll('.ce-drop2')[i]?.value) ?? -1,
+            parseInt(document.querySelectorAll('.ce-drop3')[i]?.value) ?? -1,
+            parseInt(document.querySelectorAll('.ce-drop4')[i]?.value) ?? -1,
+            parseInt(document.querySelectorAll('.ce-drop5')[i]?.value) ?? -1
+        ];
+        templates[i].rates = [
+            parseInt(document.querySelectorAll('.ce-rate1')[i]?.value) || 0,
+            parseInt(document.querySelectorAll('.ce-rate2')[i]?.value) || 0,
+            parseInt(document.querySelectorAll('.ce-rate3')[i]?.value) || 0,
+            parseInt(document.querySelectorAll('.ce-rate4')[i]?.value) || 0,
+            parseInt(document.querySelectorAll('.ce-rate5')[i]?.value) || 0
+        ];
+        delete templates[i].shardId; // 이전 로직 호환성 위해 제거 (또는 방치)
     });
     await db.from('game_settings').upsert({name:'cardTemplates', value:templates});
-    alert(`카드 템플릿 저장 완료!\n\n${templates.map(t => `${t.name}: 수정 ${t.shardId}번 5개 필요`).join('\n')}`);
+    alert('카드 템플릿의 조각 분포 설정이 저장되었습니다!');
 }
 
 
@@ -672,92 +721,97 @@ function showShardPopup(shardKey) {
 async function showCombineUI() {
     const frags = await getFragments();
     const templates = await getCardTemplates();
-    const keys = Object.keys(SHARD_FRAGMENTS);
-    
-    // 특정 조각 5개가 모였는지 체크
-    const shardsAvailable = keys.filter(k => (frags[k] || 0) >= 5);
     
     const popup = document.createElement('div');
     popup.id = 'combine-popup';
     popup.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:9998;background:rgba(0,0,0,0.95);display:flex;align-items:flex-start;justify-content:center;animation:fadeIn 0.3s;overflow-y:auto;padding:15px;padding-top:40px;';
     
-    let fragHTML = keys.map(k => {
-        const s = SHARD_FRAGMENTS[k];
-        const count = frags[k] || 0;
-        const canAfford = count >= 5;
-        return `<div style="text-align:center;padding:8px 4px;border-radius:10px;border:1px solid ${canAfford ? s.color : 'rgba(255,255,255,0.1)'};background:${canAfford ? `rgba(${hexToRgb(s.color)},0.15)` : 'rgba(255,255,255,0.02)'}; position:relative;">
-            <div style="font-size:1.5rem;filter:${s.hue} ${count>0?'':'grayscale(0.8) opacity(0.3)'};">💎</div>
-            <div style="font-size:0.55rem;color:${canAfford ? s.color : 'var(--text-dim)'};margin-top:3px;font-weight:700;">${s.name}</div>
-            <div style="font-size:0.6rem;color:${canAfford ? '#fff' : 'var(--text-dim)'};">${count}/5</div>
-            ${canAfford ? '<div style="position:absolute;top:-5px;right:-5px;background:var(--primary-gold);color:#000;font-size:0.5rem;padding:2px 4px;border-radius:4px;font-weight:900;">OK</div>' : ''}
-        </div>`;
-    }).join('');
-
-    // 각 조각별 제작 가능한 카드들 섹션
-    let craftingSections = keys.map(k => {
-        const shardNum = parseInt(k.replace('shard',''));
-        const s = SHARD_FRAGMENTS[k];
-        const cardsForThisShard = templates.filter(t => (t.shardId || 1) === shardNum);
-        const count = frags[k] || 0;
-        const canAfford = count >= 5;
+    // 각 카드 템플릿별 5조각 달성도 계산
+    let craftingSections = templates.map(t => {
+        let hasPieces = 0;
+        let partsHTML = '';
+        for(let i=1; i<=5; i++) {
+            const partKey = `frag_${t.templateId}_${i}`;
+            const count = frags[partKey] || 0;
+            if (count > 0) hasPieces++;
+            partsHTML += `
+                <div style="flex:1; text-align:center; background:${count>0 ? 'rgba(255,215,0,0.15)' : 'rgba(255,255,255,0.05)'}; padding:6px 0; border:1px solid ${count>0 ? 'gold' : 'rgba(255,255,255,0.1)'}; border-radius:6px; opacity:${count>0 ? 1 : 0.3};">
+                    <div style="font-size:0.7rem;">💎</div>
+                    <div style="font-size:0.55rem;color:${count>0 ? 'gold' : '#fff'};font-weight:700;">#${i}</div>
+                    <div style="font-size:0.5rem;color:var(--text-dim);">${count}개</div>
+                </div>
+            `;
+        }
         
-        if (cardsForThisShard.length === 0) return '';
+        const canAfford = hasPieces === 5;
         
         return `
-            <div style="margin-bottom:20px; border-left:3px solid ${s.color}; padding-left:12px;">
-                <div style="font-size:0.7rem; color:${s.color}; font-weight:700; margin-bottom:8px;">${s.name}을(를) 사용하여 제작</div>
-                ${cardsForThisShard.map(t => `
-                    <button onclick="doCombine('${t.templateId}', '${k}')" style="display:flex;align-items:center;gap:10px;padding:12px;width:100%;background:${canAfford?'rgba(255,255,255,0.08)':'rgba(255,255,255,0.02)'};border:1px solid ${canAfford?s.color:'rgba(255,255,255,0.1)'};border-radius:10px;color:#fff;cursor:pointer;margin-bottom:8px;font-size:0.8rem;${canAfford ? '' : 'opacity:0.4;pointer-events:none;'} transition:0.2s;">
-                        <img src="${t.img}" style="width:40px;height:55px;object-fit:cover;border-radius:6px;border:1px solid rgba(255,255,255,0.1);" onerror="this.src='goblin_card.png'">
-                        <div style="text-align:left;flex:1;">
-                            <div style="font-weight:700;color:${canAfford?'#fff':'var(--text-dim)'};">${t.name}</div>
-                            <div style="font-size:0.55rem;color:var(--text-dim);">필요: ${s.name} 5개</div>
-                        </div>
-                        ${canAfford ? `<div style="font-size:0.6rem;background:${s.color};color:#000;padding:4px 8px;border-radius:6px;font-weight:900;">합성 가능</div>` : ''}
-                    </button>
-                `).join('')}
+            <div style="margin-bottom:15px; border:1px solid ${canAfford ? 'gold' : 'rgba(255,255,255,0.1)'}; background:${canAfford ? 'rgba(255,215,0,0.05)' : 'rgba(0,0,0,0.3)'}; border-radius:10px; padding:12px; transition:0.3s;">
+                <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
+                    <img src="${t.img}" style="width:45px;height:65px;object-fit:cover;border-radius:6px;border:1px solid rgba(255,255,255,0.2);" onerror="this.src='goblin_card.png'">
+                    <div style="flex:1;">
+                        <div style="font-size:0.85rem; font-weight:700; color:${canAfford ? 'gold' : '#fff'};">${t.name}</div>
+                        <div style="font-size:0.55rem; color:var(--text-dim); margin-top:4px;">진행도: ${hasPieces}/5 조각</div>
+                    </div>
+                    ${canAfford ? `<button onclick="doCombine('${t.templateId}')" style="background:var(--primary-gold);color:#000;font-weight:900;border:none;border-radius:6px;padding:8px 12px;font-size:0.75rem;cursor:pointer;animation:pulse 1.5s infinite;">연성하기</button>` : `<div style="font-size:0.5rem;color:var(--text-dim);border:1px solid var(--glass-border);padding:6px 10px;border-radius:6px;">조각 부족</div>`}
+                </div>
+                <div style="display:flex; gap:4px; width:100%;">
+                    ${partsHTML}
+                </div>
             </div>
         `;
     }).join('');
 
     popup.innerHTML = `
-        <div style="max-width:380px;width:100%;">
+        <div style="max-width:400px;width:100%;">
             <div style="text-align:center;margin-bottom:20px;">
-                <div style="font-size:1.3rem;font-weight:900;color:var(--primary-gold);text-shadow:0 0 15px rgba(233,196,0,0.5);">💎 차원 합성소</div>
-                <div style="font-size:0.7rem;color:var(--text-dim);margin-top:4px;">동일한 종류의 조각 5개를 모아 카드를 연성합니다</div>
+                <div style="font-size:1.4rem;font-weight:900;color:var(--primary-gold);text-shadow:0 0 15px rgba(233,196,0,0.5);">💎 엑조디아 연성진</div>
+                <div style="font-size:0.65rem;color:var(--text-dim);margin-top:6px;line-height:1.4;">각 몬스터에게서 드랍되는 고유 조각 5개(#1~#5)를<br>모두 모아 카드를 완성하세요!</div>
             </div>
-            <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:25px;">${fragHTML}</div>
-            <div style="max-height:350px;overflow-y:auto;padding-right:5px;" class="custom-scrollbar">
-                ${craftingSections || '<div style="text-align:center;color:var(--text-dim);font-size:0.7rem;padding:20px;">제작 가능한 카드가 없습니다.<br>관리자 도구에서 카드에 수정 번호를 배정해 주세요.</div>'}
+            <div style="max-height:65vh;overflow-y:auto;padding-right:5px;" class="custom-scrollbar">
+                ${craftingSections || '<div style="text-align:center;color:var(--text-dim);font-size:0.8rem;padding:20px;">생성 가능한 카드가 없습니다.</div>'}
             </div>
             <button onclick="document.getElementById('combine-popup')?.remove()" class="btn-nav" style="width:100%;margin-top:20px;padding:15px;text-align:center;font-size:0.85rem;background:rgba(255,255,255,0.05);font-weight:700;">닫기</button>
         </div>`;
     document.body.appendChild(popup);
 }
-async function doCombine(templateId, shardKey) {
-    if (!confirm('조각 5개를 소모하여 이 카드를 합성하시겠습니까?')) return;
-    const card = await combineSpecificFragments(templateId, shardKey);
+
+async function doCombine(templateId) {
+    if (!confirm('각 부위 5개 분할 조각을 1개씩 소모하여 카드를 연성하시겠습니까?')) return;
+    const card = await combineSpecificFragments(templateId);
     if (!card) return;
     document.getElementById('combine-popup')?.remove();
     // 성공 시각 효과용
-    playSound('victory'); 
+    if (typeof playSound === 'function') playSound('victory'); 
     alert(`🎉 합성 성공! [${card.name}] 카드를 획득했습니다.`);
-    renderInventory();
-    updateDashboardHUD();
+    if (typeof renderInventory === 'function') renderInventory();
+    if (typeof updateDashboardHUD === 'function') updateDashboardHUD();
 }
 
-async function combineSpecificFragments(templateId, shardKey) {
+async function combineSpecificFragments(templateId) {
     const frags = await getFragments();
-    if ((frags[shardKey] || 0) < 5) { alert('조각이 부족합니다.'); return null; }
     
-    frags[shardKey] -= 5;
+    // 1~5번 모두 있는지 체크
+    for(let i=1; i<=5; i++) {
+        const partKey = `frag_${templateId}_${i}`;
+        if((frags[partKey]||0) < 1) { 
+            alert(`조각이 부족합니다 (#${i}번)`); 
+            return null; 
+        }
+    }
+    
+    // 조각 소모
+    for(let i=1; i<=5; i++) {
+        const partKey = `frag_${templateId}_${i}`;
+        frags[partKey] -= 1;
+    }
     await saveFragments(frags);
 
     const templates = await getCardTemplates();
     const t = templates.find(x => x.templateId === templateId);
     if (!t) return null;
 
-    const config = await getGameConfig();
+    const config = typeof getGameConfig === 'function' ? await getGameConfig() : {};
     const pMin = t.passiveMin || 10, pMax = t.passiveMax || 20;
     const rand = (min,max)=>Math.floor(Math.random()*(max-min+1))+min;
 
@@ -775,9 +829,9 @@ async function combineSpecificFragments(templateId, shardKey) {
         isEquipped: false
     };
 
-    const inv = await getInventory();
+    const inv = typeof getInventory === 'function' ? await getInventory() : [];
     inv.push(newCard);
-    await saveInventory(inv);
+    if (typeof saveInventory === 'function') await saveInventory(inv);
     return newCard;
 }
 

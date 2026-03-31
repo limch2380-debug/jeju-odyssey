@@ -413,21 +413,10 @@ async function updateDashboardHUD() {
     const bcl = document.getElementById('battle-card-lv');
     if (bcl) bcl.innerText = shards;
 
-    // 조각 현황 표시
+    // 조각 현황 표시 (전체 엑조디아 모드로 변경됨)
     const fragEl = document.getElementById('fragment-status');
     if (fragEl) {
-        const keys = Object.keys(SHARD_FRAGMENTS);
-        const canCombine = keys.every(k => (frags[k] || 0) >= 1);
-        let html = keys.map(k => {
-            const s = SHARD_FRAGMENTS[k];
-            const count = frags[k] || 0;
-            return `<span style="display:inline-block; filter:${s.hue} ${count>0?'':'grayscale(1) opacity(0.2)'}; font-size:0.75rem; transition:0.3s;" title="${s.name}: ${count}개">💎</span>`;
-
-        }).join(' ');
-        if (canCombine) {
-            html += ` <button onclick="showCombineUI()" style="font-size:0.6rem;padding:3px 8px;background:linear-gradient(135deg,var(--primary-gold),#ff8800);border:none;border-radius:6px;color:#000;font-weight:900;cursor:pointer;animation:pulse 1s infinite;margin-left:5px;">합치기</button>`;
-        }
-        fragEl.innerHTML = html;
+        fragEl.innerHTML = `<button onclick="showCombineUI()" style="width:100%;font-size:0.75rem;padding:6px 12px;background:linear-gradient(135deg,var(--primary-gold),#ff8800);border:none;border-radius:8px;color:#000;font-weight:900;cursor:pointer;box-shadow:0 0 10px rgba(255,215,0,0.5);">🛠 엑조디아 카드 공방</button>`;
     }
     const hpText = document.getElementById('hud-hp-text');
     if (hpText && combatState.playerMaxHP > 0) hpText.innerText = `${Math.ceil((combatState.playerHP/combatState.playerMaxHP)*100)}%`;
@@ -847,30 +836,46 @@ async function handleVictory() {
         const tierDrop = drops[mType] || drops.normal;
         let stats = await getPlayerSettings();
         
-        // 수정조각 드랍 (몬스터별 설정 + 조각별 확률)
-        const monsterShards = combatState.currentEnemy.shardDrops || [];
-        const shardRates = combatState.currentEnemy.shardRates || {};
+        // [엑조디아 방식] 카드 전용 5조각 드랍 (최대 드랍 제한 없음, 확률 독립 시행)
         let dropsOccurred = 0;
-        let lastDroppedKey = null;
-
-        for (const k of monsterShards) {
-            const individualRate = shardRates[k] ?? 100;
-            if (Math.random() * 100 < individualRate) {
-                await addFragment(k);
-                dropsOccurred++;
-                lastDroppedKey = k;
-                const fragInfo = SHARD_FRAGMENTS[k] || SHARD_FRAGMENTS.shard1;
-                renderLog(`💎 ${fragInfo.name} 획득!`, 'player');
+        let lastDroppedCardName = null;
+        let lastDroppedPart = null;
+        
+        try {
+            const mPool = await getMonsterPool();
+            const monsterIndex = mPool.findIndex(m => m.name === combatState.currentEnemy.name);
+            if (monsterIndex !== -1 && typeof getCardTemplates === 'function') {
+                const templates = await getCardTemplates();
+                for (const t of templates) {
+                    if (!t.drops || !t.rates) continue;
+                    for (let part = 0; part < 5; part++) {
+                        // 관리자가 지정한 드랍 몬스터
+                        if (t.drops[part] === monsterIndex) {
+                            const dropRate = t.rates[part] || 0;
+                            if (Math.random() * 100 < dropRate) {
+                                // 엑조디아 키: frag_{templateId}_{Part 1~5}
+                                const partKey = `frag_${t.templateId}_${part+1}`;
+                                await addFragment(partKey);
+                                dropsOccurred++;
+                                lastDroppedCardName = t.name;
+                                lastDroppedPart = part + 1;
+                                renderLog(`💎 [${t.name}] #${part+1} 획득!`, 'player');
+                            }
+                        }
+                    }
+                }
             }
-        }
+        } catch(e) { console.error('엑조디아 드랍 오류:', e); }
 
         let shardWasDropped = dropsOccurred > 0;
         if (shardWasDropped) {
             const currentShards = await getShards();
             await saveShards(currentShards + dropsOccurred);
             huntLog.shardsGot += dropsOccurred;
-            // 대표로 마지막 조각 팝업 하나만 노출
-            if (lastDroppedKey) showShardPopup(lastDroppedKey);
+            // 엑조디아 팝업 띄우기 (여러개 나와도 마지막 1개만)
+            if (lastDroppedCardName !== null && typeof showExodiaShardPopup === 'function') {
+                showExodiaShardPopup(lastDroppedCardName, lastDroppedPart);
+            }
         }
         
         if (!shardWasDropped) {
@@ -946,25 +951,9 @@ async function renderSettingsMonsterList() {
     const shardKeys = Object.keys(SHARD_FRAGMENTS);
     pool.forEach((m, i) => {
         const typeInfo = MONSTER_TYPES[m.type] || MONSTER_TYPES.normal;
-        const drops = m.shardDrops || shardKeys;
-        const rates = m.shardRates || {};
         const item = document.createElement('div');
         item.className = 'glass-panel monster-card';
         item.style.cssText = `margin-bottom:15px; padding:20px; border-left:4px solid ${typeInfo.color};`;
-        let shardUI = shardKeys.map(k => {
-            const s = SHARD_FRAGMENTS[k];
-            const enabled = drops.includes(k);
-            const rate = rates[k] ?? 100;
-            return `<div style="text-align:center;padding:5px 2px;border-radius:8px;border:1px solid ${enabled ? s.color : 'rgba(255,255,255,0.08)'};background:${enabled ? `rgba(${hexToRgb(s.color)},0.06)` : 'transparent'};min-width:0;">
-                <label style="cursor:pointer;display:block;">
-                    <input type="checkbox" class="set-m-shard" data-monster="${i}" data-shard="${k}" ${enabled?'checked':''} style="display:none;"
-                        onchange="let lbl=this.closest('div');lbl.style.borderColor=this.checked?'${s.color}':'rgba(255,255,255,0.08)';lbl.style.background=this.checked?'rgba(${hexToRgb(s.color)},0.06)':'transparent';">
-                    <div style="font-size:0.85rem;filter:${s.hue} ${enabled?'':'grayscale(0.8) opacity(0.3)'};">💎</div>
-                    <div style="font-size:0.45rem;color:${enabled?s.color:'var(--text-dim)'};font-weight:700;margin-top:1px;">${s.name}</div>
-                </label>
-                <input type="number" class="set-m-shardrate btn-nav" data-monster="${i}" data-shard="${k}" value="${rate}" min="0" max="100" style="width:100%;text-align:center;padding:3px 2px !important;font-size:0.6rem !important;margin-top:3px;border-radius:6px;" placeholder="%">
-            </div>`;
-        }).join('');
         item.innerHTML = `
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
                 <div style="display:flex; align-items:center; gap:8px;">
@@ -1003,9 +992,10 @@ async function renderSettingsMonsterList() {
                         <div><label style="font-size:0.55rem !important;">DEF min</label><input type="number" class="set-m-defmin btn-nav" data-index="${i}" value="${m.defMin||0}" style="width:100%;"></div>
                         <div><label style="font-size:0.55rem !important;">DEF max</label><input type="number" class="set-m-defmax btn-nav" data-index="${i}" value="${m.defMax||0}" style="width:100%;"></div>
                     </div>
-                    <div style="font-size:0.7rem; color:var(--primary-gold); margin-bottom:4px; font-weight:700;">💎 조각 드랍 (ON/OFF + 확률%)</div>
-                    <div style="font-size:0.45rem; color:var(--text-dim); margin-bottom:6px;">체크=드랍가능 / 숫자=조각별 드랍확률(%)</div>
-                    <div style="display:grid; grid-template-columns:repeat(5,1fr); gap:4px;">${shardUI}</div>
+                    <div style="padding:10px; background:rgba(0,0,0,0.3); border-radius:8px; border:1px solid rgba(255,255,255,0.1);">
+                        <div style="font-size:0.6rem; color:var(--primary-gold); font-weight:700; margin-bottom:4px;">💬 전용 조각 드랍 안내</div>
+                        <div style="font-size:0.5rem; color:var(--text-dim); line-height:1.4;">이 몬스터가 드랍하는 엑조디아 방식의 &lt;카드 전용 5조각&gt;은 <b>카드 템플릿 설정</b> 메뉴에서 해당 카드를 생성/수정할 때 지정할 수 있습니다.</div>
+                    </div>
                 </div>
             </div>
         `;
@@ -1073,16 +1063,7 @@ async function saveMonsterPool() {
         // hp, dmg 호환: 전투에서 랜덤 생성 시 사용
         pool[i].hp = pool[i].hpMax;
         pool[i].dmg = pool[i].atkMax;
-        // 수정조각 드랍 설정 저장
-        const shardCbs = document.querySelectorAll(`.set-m-shard[data-monster="${i}"]`);
-        const enabledShards = [];
-        shardCbs.forEach(cb => { if (cb.checked) enabledShards.push(cb.dataset.shard); });
-        pool[i].shardDrops = enabledShards;
-        // 수정조각별 드랍률 저장
-        const shardRateInputs = document.querySelectorAll(`.set-m-shardrate[data-monster="${i}"]`);
-        const shardRates = {};
-        shardRateInputs.forEach(inp => { shardRates[inp.dataset.shard] = parseInt(inp.value) || 0; });
-        pool[i].shardRates = shardRates;
+        // shardDrops no longer set here - they are pulled dynamically from Card Templates
     });
     await db.from('game_settings').update({ value: pool }).eq('name', 'monsterPool');
     cachedMonsterPool = pool;
