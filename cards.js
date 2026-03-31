@@ -35,11 +35,11 @@ const DEFAULT_GAME_CONFIG = {
 
 const DEFAULT_CARD_TEMPLATES = [
     { templateId:'goblin_soldier', name:'고블린 병사', img:'goblin_card.png',
-      passive1:'atk_boost', passive2:'critical' },
+      passive1:'atk_boost', passive2:'critical', passiveCount:2, passiveMin:10, passiveMax:20 },
     { templateId:'goblin_archer', name:'고블린 궁수', img:'goblin_card.png',
-      passive1:'dodge', passive2:'critical' },
+      passive1:'dodge', passive2:'critical', passiveCount:2, passiveMin:10, passiveMax:20 },
     { templateId:'great_goblin', name:'대왕 고블린', img:'boss_goblin_card.png',
-      passive1:'hp_boost', passive2:'drain' }
+      passive1:'hp_boost', passive2:'drain', passiveCount:2, passiveMin:15, passiveMax:30 }
 ];
 
 let selectedCardIdx = -1;
@@ -93,26 +93,34 @@ function rarityColor(r) { return RARITIES[r]?.color || '#fff'; }
 function rarityBorder(r) { return RARITIES[r]?.border || 'rgba(255,255,255,0.2)'; }
 function rarityLabel(r) { return RARITIES[r]?.name || '일반'; }
 
-// ===== 카드 생성 (제작 시) =====
 async function generateCard(template) {
     const config = await getGameConfig();
-    const pMin = config.passiveMin || 10;
-    const pMax = config.passiveMax || 20;
+    const pMin = template.passiveMin || config.passiveMin || 10;
+    const pMax = template.passiveMax || config.passiveMax || 20;
+    const passiveCount = template.passiveCount || 2;
     const rand = (min,max) => Math.floor(Math.random()*(max-min+1))+min;
     const passiveKeys = Object.keys(PASSIVE_SKILLS).filter(k=>k!=='none');
-    // 패시브 2종 랜덤 선택
+    // 패시브 1종 또는 2종 랜덤 선택
     const p1 = template.passive1 || passiveKeys[rand(0,passiveKeys.length-1)];
-    const p2 = template.passive2 || passiveKeys.filter(k=>k!==p1)[rand(0,passiveKeys.length-2)] || 'def_boost';
-    return {
+    let card = {
         id: Date.now() + Math.floor(Math.random()*10000),
         templateId: template.templateId,
         name: template.name,
         img: template.img,
         rarity: 'common',
         passive1: p1, passive1Value: rand(pMin, pMax),
-        passive2: p2, passive2Value: rand(pMin, pMax),
+        passiveCount: passiveCount,
         fusionCount: 0
     };
+    if (passiveCount >= 2) {
+        const p2 = template.passive2 || passiveKeys.filter(k=>k!==p1)[rand(0,passiveKeys.length-2)] || 'def_boost';
+        card.passive2 = p2;
+        card.passive2Value = rand(pMin, pMax);
+    } else {
+        card.passive2 = null;
+        card.passive2Value = 0;
+    }
+    return card;
 }
 
 // ===== 카드 제작 (수정조각 소모) =====
@@ -134,7 +142,11 @@ async function craftCard(templateId) {
     await saveInventory(inv);
     await saveShards(shards - cost);
     // 멋진 팝업
-    alert(`🎉 카드 제작 성공!\n\n${card.name} [일반]\n\n패시브 스킬:\n${PASSIVE_SKILLS[card.passive1]?.icon} ${PASSIVE_SKILLS[card.passive1]?.name}: +${card.passive1Value}\n${PASSIVE_SKILLS[card.passive2]?.icon} ${PASSIVE_SKILLS[card.passive2]?.name}: +${card.passive2Value}\n\n수정조각: ${shards} → ${shards - cost}`);
+    let passiveMsg = `${PASSIVE_SKILLS[card.passive1]?.icon} ${PASSIVE_SKILLS[card.passive1]?.name}: +${card.passive1Value}`;
+    if (card.passiveCount >= 2 && card.passive2) {
+        passiveMsg += `\n${PASSIVE_SKILLS[card.passive2]?.icon} ${PASSIVE_SKILLS[card.passive2]?.name}: +${card.passive2Value}`;
+    }
+    alert(`🎉 카드 제작 성공!\n\n${card.name} [일반]\n\n패시브 스킬:\n${passiveMsg}\n\n수정조각: ${shards} → ${shards - cost}`);
     renderInventory();
 }
 
@@ -176,8 +188,13 @@ async function updateEquippedCardDisplay() {
         const bonus = getPassiveBonus(c);
         bonusHp=bonus.hp; bonusAtk=bonus.atk; bonusDef=bonus.def;
         const p1 = `${PASSIVE_SKILLS[c.passive1]?.icon||''} ${PASSIVE_SKILLS[c.passive1]?.name||''} +${c.passive1Value}`;
-        const p2 = `${PASSIVE_SKILLS[c.passive2]?.icon||''} ${PASSIVE_SKILLS[c.passive2]?.name||''} +${c.passive2Value}`;
-        passiveText = `<div style="font-size:0.5rem;color:var(--secondary-cyan);margin-top:4px;">${p1} / ${p2}</div>`;
+        let passiveText;
+        if (c.passiveCount >= 2 && c.passive2) {
+            const p2 = `${PASSIVE_SKILLS[c.passive2]?.icon||''} ${PASSIVE_SKILLS[c.passive2]?.name||''} +${c.passive2Value}`;
+            passiveText = `<div style="font-size:0.5rem;color:var(--secondary-cyan);margin-top:4px;">${p1} / ${p2}</div>`;
+        } else {
+            passiveText = `<div style="font-size:0.5rem;color:var(--secondary-cyan);margin-top:4px;">${p1}</div>`;
+        }
         el.innerHTML = `<div style="display:flex;align-items:center;gap:12px;justify-content:center;">
             <img src="${c.img}" style="width:40px;height:50px;object-fit:cover;border-radius:6px;border:2px solid ${rc};" onerror="this.src='goblin_card.png'">
             <div style="text-align:left;"><div style="font-size:0.75rem;color:${rc};font-weight:700;">${c.name} <span style="font-size:0.5rem;">[${rarityLabel(c.rarity)}]</span></div>
@@ -239,7 +256,8 @@ async function renderInventory() {
         if (isBase) badge = `<div style="position:absolute;top:8px;right:10px;font-size:0.6rem;color:var(--primary-gold);font-weight:700;">⭐ 베이스</div>`;
         if (isMat) badge = `<div style="position:absolute;top:8px;right:10px;font-size:0.6rem;color:var(--accent-red);font-weight:700;">🔥 재료</div>`;
         const p1 = `${PASSIVE_SKILLS[c.passive1]?.icon||''} +${c.passive1Value||0}`;
-        const p2 = `${PASSIVE_SKILLS[c.passive2]?.icon||''} +${c.passive2Value||0}`;
+        const p2 = (c.passiveCount >= 2 && c.passive2) ? `${PASSIVE_SKILLS[c.passive2]?.icon||''} +${c.passive2Value||0}` : '';
+        const passiveDisplay = p2 ? `${p1} / ${p2}` : p1;
         let fuseBtnStyle = 'flex:1;padding:8px;font-size:0.7rem;text-align:center;';
         if (isBase) fuseBtnStyle += 'background:rgba(233,196,0,0.25);color:var(--primary-gold);';
         else if (isMat) fuseBtnStyle += 'background:rgba(255,50,50,0.2);color:var(--accent-red);';
@@ -247,7 +265,7 @@ async function renderInventory() {
             <img src="${c.img}" style="width:65px;height:80px;object-fit:cover;border-radius:8px;border:2px solid ${rc};margin-bottom:6px;" onerror="this.src='goblin_card.png'">
             <div style="font-size:0.9rem;color:${rc};font-weight:700;">${c.name}</div>
             <div style="font-size:0.65rem;color:var(--text-dim);">[${rarityLabel(c.rarity)}] 합성: ${c.fusionCount||0}/${rule.need}</div>
-            <div style="font-size:0.65rem;color:var(--secondary-cyan);margin-top:4px;">${p1} / ${p2}</div>
+            <div style="font-size:0.65rem;color:var(--secondary-cyan);margin-top:4px;">${passiveDisplay}</div>
             <div style="display:flex;gap:4px;margin-top:8px;">
                 <button class="btn-primary" style="flex:1;padding:8px;font-size:0.7rem;" onclick="event.stopPropagation();equipCard(${i})">${equipped?'해제':'장착'}</button>
                 <button class="btn-nav" style="${fuseBtnStyle}" onclick="event.stopPropagation();toggleFusion(${i})">${isBase?'⭐베이스':isMat?'🔥재료':'합성'}</button>
@@ -356,7 +374,6 @@ async function renderCollection() {
     });
 }
 
-// ===== 관리자 카드 에디터 =====
 async function renderCardEditor() {
     const templates = await getCardTemplates();
     const el = document.getElementById('card-editor-list');
@@ -364,6 +381,9 @@ async function renderCardEditor() {
     el.innerHTML = '';
     const passiveOpts = Object.entries(PASSIVE_SKILLS).map(([k,v])=>`<option value="${k}">${v.icon} ${v.name}</option>`).join('');
     templates.forEach((t,i) => {
+        const passiveCount = t.passiveCount || 2;
+        const pMin = t.passiveMin || 10;
+        const pMax = t.passiveMax || 20;
         const div = document.createElement('div');
         div.className = 'glass-panel';
         div.style.cssText = 'padding:15px; margin-bottom:12px;';
@@ -375,14 +395,46 @@ async function renderCardEditor() {
                 </div>
                 <label class="btn-nav" style="padding:6px 10px;font-size:0.6rem;cursor:pointer;text-align:center;">📷<input type="file" accept="image/*" style="display:none;" onchange="handleCardImgUpload(${i},this)"></label>
             </div>
+            <!-- 패시브 개수 설정 -->
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;padding:8px 12px;background:rgba(0,253,236,0.03);border-radius:8px;border:1px solid rgba(0,253,236,0.1);">
+                <span style="font-size:0.6rem;color:var(--secondary-cyan);font-weight:700;">패시브 개수:</span>
+                <label style="display:flex;align-items:center;gap:4px;cursor:pointer;">
+                    <input type="radio" name="ce-pcount-${i}" value="1" class="ce-pcount" data-index="${i}" ${passiveCount===1?'checked':''} style="accent-color:var(--secondary-cyan);">
+                    <span style="font-size:0.7rem;color:#fff;">1개</span>
+                </label>
+                <label style="display:flex;align-items:center;gap:4px;cursor:pointer;">
+                    <input type="radio" name="ce-pcount-${i}" value="2" class="ce-pcount" data-index="${i}" ${passiveCount===2?'checked':''} style="accent-color:var(--secondary-cyan);">
+                    <span style="font-size:0.7rem;color:#fff;">2개</span>
+                </label>
+            </div>
+            <!-- 패시브 수치 범위 -->
+            <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;padding:8px 12px;background:rgba(233,196,0,0.03);border-radius:8px;border:1px solid rgba(233,196,0,0.1);">
+                <span style="font-size:0.6rem;color:var(--primary-gold);font-weight:700;white-space:nowrap;">패시브 수치:</span>
+                <input type="number" class="ce-pmin btn-nav" data-index="${i}" value="${pMin}" style="width:60px;text-align:center;padding:6px;font-size:0.8rem;" placeholder="min">
+                <span style="font-size:0.7rem;color:var(--text-dim);">~</span>
+                <input type="number" class="ce-pmax btn-nav" data-index="${i}" value="${pMax}" style="width:60px;text-align:center;padding:6px;font-size:0.8rem;" placeholder="max">
+                <span style="font-size:0.5rem;color:var(--text-dim);white-space:nowrap;">(랜덤)</span>
+            </div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
                 <div><label style="font-size:0.55rem;color:var(--text-dim);">패시브1</label><select class="ce-p1 btn-nav" style="width:100%;">${passiveOpts}</select></div>
-                <div><label style="font-size:0.55rem;color:var(--text-dim);">패시브2</label><select class="ce-p2 btn-nav" style="width:100%;">${passiveOpts}</select></div>
+                <div class="ce-p2-wrap" data-index="${i}" style="${passiveCount<2?'opacity:0.3;pointer-events:none;':''}"><label style="font-size:0.55rem;color:var(--text-dim);">패시브2</label><select class="ce-p2 btn-nav" style="width:100%;">${passiveOpts}</select></div>
             </div>`;
         el.appendChild(div);
         // 값 설정
         el.querySelectorAll('.ce-p1')[i].value = t.passive1 || 'atk_boost';
         el.querySelectorAll('.ce-p2')[i].value = t.passive2 || 'def_boost';
+    });
+    // 패시브 개수 라디오 변경 시 패시브2 활성/비활성
+    document.querySelectorAll('.ce-pcount').forEach(radio => {
+        radio.addEventListener('change', (e) => {
+            const idx = e.target.dataset.index;
+            const val = parseInt(e.target.value);
+            const wrap = document.querySelector(`.ce-p2-wrap[data-index="${idx}"]`);
+            if (wrap) {
+                wrap.style.opacity = val >= 2 ? '1' : '0.3';
+                wrap.style.pointerEvents = val >= 2 ? 'auto' : 'none';
+            }
+        });
     });
 }
 
@@ -391,13 +443,26 @@ async function saveCardTemplates() {
     const names = document.querySelectorAll('.ce-name');
     const p1s = document.querySelectorAll('.ce-p1');
     const p2s = document.querySelectorAll('.ce-p2');
+    const pmins = document.querySelectorAll('.ce-pmin');
+    const pmaxs = document.querySelectorAll('.ce-pmax');
     names.forEach((input,i) => {
         templates[i].name = input.value;
         templates[i].passive1 = p1s[i]?.value || 'atk_boost';
-        templates[i].passive2 = p2s[i]?.value || 'def_boost';
+        // 패시브 개수
+        const pcountRadio = document.querySelector(`input[name="ce-pcount-${i}"]:checked`);
+        const pcount = pcountRadio ? parseInt(pcountRadio.value) : 2;
+        templates[i].passiveCount = pcount;
+        if (pcount >= 2) {
+            templates[i].passive2 = p2s[i]?.value || 'def_boost';
+        } else {
+            templates[i].passive2 = null;
+        }
+        // 패시브 수치 범위
+        templates[i].passiveMin = parseInt(pmins[i]?.value) || 10;
+        templates[i].passiveMax = parseInt(pmaxs[i]?.value) || 20;
     });
     await db.from('game_settings').upsert({name:'cardTemplates', value:templates});
-    alert('카드 템플릿 저장 완료!');
+    alert(`카드 템플릿 저장 완료!\n\n${templates.map(t => `${t.name}: 패시브 ${t.passiveCount}개, 수치 ${t.passiveMin}~${t.passiveMax}`).join('\n')}`);
 }
 
 // ===== 드랍 설정 저장/로드 =====

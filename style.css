@@ -218,13 +218,26 @@ input[type="number"].btn-nav {
 
 #map { border-radius: 20px; overflow: hidden; height: 100%; background: #000; }
 
-/* Combat Specific Styles */
+/* Combat Specific Styles — 1인칭 시점 */
 .combat-scene {
     flex: 1;
     display: flex;
     flex-direction: column;
-    padding: 20px;
-    background: radial-gradient(circle at 50% 50%, #1a0a0a 0%, #020305 100%);
+    padding: 15px;
+    background: radial-gradient(ellipse at 50% 30%, #1a0a0a 0%, #0a0205 40%, #020305 100%);
+    position: relative;
+}
+
+.fps-enemy-zone {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.fps-player-hud {
+    flex-shrink: 0;
 }
 
 .enemy-area {
@@ -432,4 +445,30 @@ input[type="number"].btn-nav {
 @keyframes glow {
     0% { filter: drop-shadow(0 0 20px rgba(0,253,236,0.4)); }
     100% { filter: drop-shadow(0 0 40px rgba(0,253,236,0.8)); }
+}
+
+/* Rift Grade Selector */
+.rift-grade-option {
+    transition: all 0.3s ease;
+}
+.rift-grade-option:hover {
+    transform: scale(1.08) !important;
+    opacity: 0.9 !important;
+}
+.rift-grade-option input:checked + span + span,
+.rift-grade-option input:checked ~ span {
+    text-shadow: 0 0 10px currentColor;
+}
+
+/* 1인칭 전투 적 등장 애니메이션 */
+@keyframes enemy-appear {
+    0% { transform: scale(0.2) translateY(100px); opacity: 0; }
+    70% { transform: scale(1.1) translateY(-10px); }
+    100% { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+/* 1인칭 피격 효과 */
+@keyframes fps-hit {
+    0%, 100% { border-color: rgba(0,253,236,0.2); }
+    50% { border-color: rgba(255,0,0,0.6); background: rgba(255,0,0,0.05); }
 }

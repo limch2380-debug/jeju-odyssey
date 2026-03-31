@@ -223,6 +223,7 @@ async function initAppForUser() {
     try {
         cachedMonsterPool = await getMonsterPool();
         cachedPlayerStats = await getPlayerSettings();
+        await getRiftGrades();
         await updateEquippedCardDisplay();
         updateClock();
         updateHuntLogUI();
@@ -486,7 +487,16 @@ async function checkProximity() {
                         encounterPending = true;
                         const assignedNames = parsePortalMonsters(insidePortal.target_monster_name);
                         let monsterToSpawn = null;
-                        if (assignedNames.length > 0) monsterToSpawn = assignedNames[Math.floor(Math.random() * assignedNames.length)];
+                        if (assignedNames.length > 0) {
+                            monsterToSpawn = assignedNames[Math.floor(Math.random() * assignedNames.length)];
+                        } else {
+                            // 균열 등급에 따라 자동으로 몬스터 필터링
+                            const riftGrade = getPortalRiftGrade(insidePortal.id);
+                            const filtered = getMonstersByRiftGrade(pool, riftGrade);
+                            if (filtered.length > 0) {
+                                monsterToSpawn = filtered[Math.floor(Math.random() * filtered.length)].name;
+                            }
+                        }
                         triggerPortalAlert();
                         document.getElementById('map-status').innerHTML = `<span style="color: var(--accent-red); animation: pulse 1s infinite; font-weight:bold;">[!] 적의 기습! 자동전투 진입...</span>`;
                         missionOverlay.style.display = 'none';
@@ -661,6 +671,19 @@ async function startCombat(forcedMonsterName = null, autoStart = false) {
     updateCombatUI();
     document.getElementById('combat-log').innerHTML = `<div class="log-entry">탐험가 vs ${mTypeInfo.icon} ${targetMonster.name} 전투 개시!</div>`;
     playSound('swordSwing'); showScreen('combat');
+    // 1인칭 시점: 적 등장 애니메이션
+    const enemyImg = document.getElementById('enemy-img-main');
+    if (enemyImg) {
+        enemyImg.style.transform = 'scale(0.3) translateY(100px)';
+        enemyImg.style.opacity = '0';
+        setTimeout(() => { enemyImg.style.transition = 'all 0.8s cubic-bezier(0.175,0.885,0.32,1.275)'; enemyImg.style.transform = 'scale(1)'; enemyImg.style.opacity = '1'; }, 100);
+    }
+    // 비네팅 플래시 효과
+    const vignette = document.getElementById('fps-vignette');
+    if (vignette) {
+        vignette.style.background = 'radial-gradient(ellipse at center,transparent 30%,rgba(255,0,0,0.3) 100%)';
+        setTimeout(() => { vignette.style.background = 'radial-gradient(ellipse at center,transparent 50%,rgba(0,0,0,0.6) 100%)'; }, 600);
+    }
     setTimeout(() => startAutoCombat(), 800);
 }
 function startAutoCombat() {
@@ -695,7 +718,13 @@ function updateActionButtons(enabled) {
     if (p) p.disabled = !enabled || combatState.potions <= 0;
 }
 function playSound(name) { if (SOUNDS[name]) { SOUNDS[name].currentTime = 0; SOUNDS[name].play().catch(() => {}); } }
-function triggerShake() { const s = document.querySelector('.combat-scene'); if(s) { s.classList.add('shake'); setTimeout(() => s.classList.remove('shake'), 400); } }
+function triggerShake() {
+    // 1인칭: 화면 전체 흔들림 + 비네팅 빨갛게
+    const s = document.querySelector('.combat-scene');
+    if(s) { s.classList.add('shake'); setTimeout(() => s.classList.remove('shake'), 400); }
+    const v = document.getElementById('fps-vignette');
+    if(v) { v.style.background='radial-gradient(ellipse at center,transparent 30%,rgba(255,0,0,0.4) 100%)'; setTimeout(()=>{ v.style.background='radial-gradient(ellipse at center,transparent 50%,rgba(0,0,0,0.6) 100%)'; },400); }
+}
 
 function executeEnemyTurn() {
     if (combatState.isGameOver) return;
@@ -995,29 +1024,67 @@ function initSettingsMap() {
     });
 }
 
+const RIFT_GRADE_ORDER = ['normal','magic','rare','unique'];
+const RIFT_GRADE_INFO = {
+    normal: {name:'일반',color:'#ffffff',icon:'🗡',border:'rgba(255,255,255,0.3)'},
+    magic: {name:'매직',color:'#4488ff',icon:'✨',border:'rgba(68,136,255,0.4)'},
+    rare: {name:'레어',color:'#ffdd00',icon:'⚔',border:'rgba(255,221,0,0.4)'},
+    unique: {name:'유니크',color:'#ffa500',icon:'👑',border:'rgba(255,165,0,0.5)'}
+};
+
+function getMonstersByRiftGrade(pool, riftGrade) {
+    const gradeIdx = RIFT_GRADE_ORDER.indexOf(riftGrade || 'normal');
+    const allowedTypes = RIFT_GRADE_ORDER.slice(0, gradeIdx + 1);
+    return pool.filter(m => allowedTypes.includes(m.type || 'normal'));
+}
+
+// 균열 등급 저장/로드 (game_settings 테이블 사용)
+let cachedRiftGrades = {};
+async function getRiftGrades() {
+    const { data } = await db.from('game_settings').select('value').eq('name', 'portalRiftGrades').single();
+    cachedRiftGrades = data ? data.value : {};
+    return cachedRiftGrades;
+}
+async function saveRiftGrade(portalId, grade) {
+    cachedRiftGrades[String(portalId)] = grade;
+    await db.from('game_settings').upsert({ name: 'portalRiftGrades', value: cachedRiftGrades });
+}
+function getPortalRiftGrade(portalId) {
+    return cachedRiftGrades[String(portalId)] || 'normal';
+}
+
 async function renderSettingsPortalList() {
     const portals = await getPortals();
     const pool = await getMonsterPool();
+    await getRiftGrades();
     const container = document.getElementById('set-portal-list');
     container.innerHTML = '';
     setMap.eachLayer((layer) => { if (layer instanceof L.Marker || layer instanceof L.Circle) setMap.removeLayer(layer); });
     portals.forEach(p => {
+        const riftGrade = getPortalRiftGrade(p.id);
+        const gradeInfo = RIFT_GRADE_INFO[riftGrade] || RIFT_GRADE_INFO.normal;
         const assignedNames = parsePortalMonsters(p.target_monster_name);
-        const hasBoss = assignedNames.some(n => { const m = pool.find(x => x.name === n); return m && m.type === 'boss'; });
-        const normalAssigned = assignedNames.filter(n => { const m = pool.find(x => x.name === n); return m && m.type !== 'boss'; });
-        const bossAssigned = assignedNames.filter(n => { const m = pool.find(x => x.name === n); return m && m.type === 'boss'; });
         const item = document.createElement('div');
         item.className = 'glass-panel';
-        item.style.cssText = `margin-bottom:12px; padding:14px 16px; ${hasBoss ? 'border-left:4px solid var(--primary-gold); background:rgba(233,196,0,0.03);' : ''}`;
+        item.style.cssText = `margin-bottom:12px; padding:14px 16px; border-left:4px solid ${gradeInfo.color};`;
         let monsterTags = '';
-        if (normalAssigned.length > 0) monsterTags += normalAssigned.map(n => `<span style="font-size:0.5rem; padding:2px 8px; border-radius:10px; background:rgba(0,253,236,0.1); color:var(--secondary-cyan); border:1px solid rgba(0,253,236,0.2); margin-right:4px;">🗡 ${n}</span>`).join('');
-        if (bossAssigned.length > 0) monsterTags += bossAssigned.map(n => `<span style="font-size:0.5rem; padding:2px 8px; border-radius:10px; background:rgba(233,196,0,0.15); color:var(--primary-gold); border:1px solid rgba(233,196,0,0.3); margin-right:4px;">⚔ ${n}</span>`).join('');
-        if (assignedNames.length === 0) monsterTags = '<span style="font-size:0.5rem; color:var(--text-dim);">랜덤 일반 몬스터</span>';
+        const filteredMonsters = getMonstersByRiftGrade(pool, riftGrade);
+        if (assignedNames.length > 0) {
+            monsterTags = assignedNames.map(n => {
+                const m = pool.find(x => x.name === n);
+                const mType = MONSTER_TYPES[(m?.type)||'normal'];
+                return `<span style="font-size:0.5rem; padding:2px 8px; border-radius:10px; background:rgba(${mType.color==='#ffffff'?'255,255,255':mType.color==='#4488ff'?'68,136,255':mType.color==='#ffdd00'?'255,221,0':'255,165,0'},0.1); color:${mType.color}; border:1px solid ${mType.border}; margin-right:4px;">${mType.icon} ${n}</span>`;
+            }).join('');
+        } else {
+            monsterTags = `<span style="font-size:0.5rem; color:var(--text-dim);">등급 자동: ${filteredMonsters.length}종</span>`;
+        }
+        const gradeBadge = `<span style="font-size:0.55rem; padding:2px 10px; border-radius:10px; background:rgba(0,0,0,0.3); color:${gradeInfo.color}; border:1px solid ${gradeInfo.border}; font-weight:700;">${gradeInfo.icon} ${gradeInfo.name}</span>`;
         item.innerHTML = `
             <div style="display:flex; justify-content:space-between; align-items:flex-start;">
                 <div style="flex:1;">
-                    <div style="font-size:0.8rem; color:${hasBoss ? 'var(--primary-gold)' : '#fff'}; font-weight:${hasBoss ? '700' : '400'}; margin-bottom:4px;">
-                        ${p.name} ${hasBoss ? '<span style="font-size:0.55rem;">[BOSS ZONE]</span>' : ''}
+                    <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+                        <span style="font-size:0.8rem; color:${gradeInfo.color}; font-weight:700;">${p.name}</span>
+                        ${gradeBadge}
                     </div>
                     <div style="font-size:0.55rem; color:var(--text-dim); margin-bottom:6px;">${p.mission_text?.substring(0,30) || ''}...</div>
                     <div style="display:flex; flex-wrap:wrap; gap:4px; align-items:center; margin-bottom:4px;">${monsterTags}</div>
@@ -1029,8 +1096,7 @@ async function renderSettingsPortalList() {
                 </div>
             </div>`;
         container.appendChild(item);
-        const mc = hasBoss ? '#ff4d4d' : '#00fdec';
-        // 설정 맵에도 반경 원 표시
+        const mc = gradeInfo.color === '#ffffff' ? '#00fdec' : gradeInfo.color;
         L.circle([p.lat, p.lng], {
             radius: p.radius || 100,
             color: mc,
@@ -1041,7 +1107,7 @@ async function renderSettingsPortalList() {
             dashArray: '6, 4'
         }).addTo(setMap);
         const mi = L.divIcon({ className: 'portal-marker', html: `<div style="width:14px;height:14px;background:${mc};border-radius:50%;box-shadow:0 0 10px ${mc};border:2px solid rgba(255,255,255,0.3);"></div>`, iconSize: [14,14], iconAnchor: [7,7] });
-        L.marker([p.lat, p.lng], { icon: mi }).addTo(setMap).bindPopup(`<b>${p.name}</b><br>${hasBoss ? '⚔ BOSS ZONE' : '일반 구역'}<br>반경: ${p.radius || 100}m`);
+        L.marker([p.lat, p.lng], { icon: mi }).addTo(setMap).bindPopup(`<b>${p.name}</b><br>${gradeInfo.icon} ${gradeInfo.name} 균열<br>반경: ${p.radius || 100}m`);
     });
 }
 
@@ -1052,39 +1118,64 @@ async function openPortalEditor(id) {
     const p = portals.find(x => x.id == id);
     const pool = await getMonsterPool();
     const assignedNames = parsePortalMonsters(p.target_monster_name);
+    await getRiftGrades();
+    const riftGrade = getPortalRiftGrade(p.id);
     document.getElementById('ed-p-name').value = p.name;
     document.getElementById('ed-p-mission').value = p.mission_text || "";
     document.getElementById('ed-p-radius').value = p.radius || 100;
     document.getElementById('ed-p-walk').value = p.spawn_distance_requirement || 20;
     document.getElementById('ed-p-chance').value = Math.round((p.spawn_chance ?? 1) * 100);
-    const normalContainer = document.getElementById('ed-normal-monsters');
-    const bossContainer = document.getElementById('ed-boss-monsters');
-    normalContainer.innerHTML = ''; bossContainer.innerHTML = '';
-    const normals = pool.filter(m => m.type !== 'boss');
-    const bosses = pool.filter(m => m.type === 'boss');
-    if (normals.length === 0) normalContainer.innerHTML = '<div style="font-size:0.6rem; color:var(--text-dim);">일반 몬스터 없음</div>';
-    normals.forEach(m => {
-        const checked = assignedNames.includes(m.name) ? 'checked' : '';
-        normalContainer.innerHTML += `<label style="display:flex; align-items:center; gap:10px; padding:10px 12px; background:rgba(0,253,236,0.03); border:1px solid rgba(0,253,236,0.1); border-radius:10px; cursor:pointer; margin-bottom:6px;">
-            <input type="checkbox" class="ed-monster-check" value="${m.name}" data-type="normal" ${checked} style="width:18px; height:18px; accent-color:var(--secondary-cyan);">
-            <img src="${m.img}" style="width:32px; height:32px; object-fit:contain; border-radius:6px; background:rgba(0,0,0,0.3);" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22><text x=%2216%22 y=%2222%22 text-anchor=%22middle%22 font-size=%2218%22>👾</text></svg>'">
-            <div><div style="font-size:0.75rem; color:#fff;">${m.name}</div><div style="font-size:0.5rem; color:var(--text-dim);">HP:${m.hp} ATK:${m.dmg}</div></div></label>`;
+    
+    // 균열 등급 라디오 버튼 설정
+    const gradeRadios = document.querySelectorAll('input[name="rift-grade"]');
+    gradeRadios.forEach(r => {
+        r.checked = r.value === riftGrade;
+        const label = r.closest('.rift-grade-option');
+        if (label) {
+            label.style.opacity = r.checked ? '1' : '0.5';
+            label.style.transform = r.checked ? 'scale(1.05)' : 'scale(1)';
+        }
     });
-    if (bosses.length === 0) bossContainer.innerHTML = '<div style="font-size:0.6rem; color:var(--text-dim);">보스 몬스터 없음</div>';
-    bosses.forEach(m => {
-        const checked = assignedNames.includes(m.name) ? 'checked' : '';
-        bossContainer.innerHTML += `<label style="display:flex; align-items:center; gap:10px; padding:10px 12px; background:rgba(233,196,0,0.05); border:1px solid rgba(233,196,0,0.15); border-radius:10px; cursor:pointer; margin-bottom:6px;">
-            <input type="checkbox" class="ed-monster-check" value="${m.name}" data-type="boss" ${checked} style="width:18px; height:18px; accent-color:var(--primary-gold);">
-            <img src="${m.img}" style="width:32px; height:32px; object-fit:contain; border-radius:6px; background:rgba(0,0,0,0.3);" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22><text x=%2216%22 y=%2222%22 text-anchor=%22middle%22 font-size=%2218%22>👹</text></svg>'">
-            <div><div style="font-size:0.75rem; color:var(--primary-gold); font-weight:700;">⚔ ${m.name}</div><div style="font-size:0.5rem; color:var(--text-dim);">HP:${m.hp} ATK:${m.dmg} | 정령카드 100%</div></div></label>`;
+    // 라디오 클릭 시 시각 업데이트
+    gradeRadios.forEach(r => {
+        r.onchange = () => {
+            gradeRadios.forEach(rr => {
+                const l = rr.closest('.rift-grade-option');
+                if(l) { l.style.opacity = rr.checked?'1':'0.5'; l.style.transform = rr.checked?'scale(1.05)':'scale(1)'; }
+            });
+            // 등급 변경 시 몬스터 목록 다시 렌더링
+            renderPortalMonsterList(pool, assignedNames, r.value);
+        };
     });
+    
+    renderPortalMonsterList(pool, assignedNames, riftGrade);
     document.getElementById('portal-editor-modal').style.display = 'block';
+}
+
+function renderPortalMonsterList(pool, assignedNames, riftGrade) {
+    const normalContainer = document.getElementById('ed-normal-monsters');
+    normalContainer.innerHTML = '';
+    // 등급에 따라 출현 가능한 몬스터 필터링
+    const filteredMonsters = getMonstersByRiftGrade(pool, riftGrade);
+    if (filteredMonsters.length === 0) {
+        normalContainer.innerHTML = '<div style="font-size:0.6rem; color:var(--text-dim);">해당 등급의 몬스터 없음</div>';
+        return;
+    }
+    filteredMonsters.forEach(m => {
+        const checked = assignedNames.includes(m.name) ? 'checked' : '';
+        const typeInfo = MONSTER_TYPES[m.type||'normal'] || MONSTER_TYPES.normal;
+        normalContainer.innerHTML += `<label style="display:flex; align-items:center; gap:10px; padding:10px 12px; background:rgba(${typeInfo.color==='#ffffff'?'255,255,255':typeInfo.color==='#4488ff'?'68,136,255':typeInfo.color==='#ffdd00'?'255,221,0':'255,165,0'},0.03); border:1px solid ${typeInfo.border}; border-radius:10px; cursor:pointer; margin-bottom:6px;">
+            <input type="checkbox" class="ed-monster-check" value="${m.name}" data-type="${m.type||'normal'}" ${checked} style="width:18px; height:18px; accent-color:${typeInfo.color};">
+            <img src="${m.img}" style="width:32px; height:32px; object-fit:contain; border-radius:6px; background:rgba(0,0,0,0.3);" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22><text x=%2216%22 y=%2222%22 text-anchor=%22middle%22 font-size=%2218%22>👾</text></svg>'">
+            <div><div style="font-size:0.75rem; color:${typeInfo.color}; font-weight:700;">${typeInfo.icon} ${m.name}</div><div style="font-size:0.5rem; color:var(--text-dim);">HP:${m.hpMax||m.hp||100} ATK:${m.atkMax||m.dmg||10} [${typeInfo.name}]</div></div></label>`;
+    });
 }
 function closePortalEditor() { document.getElementById('portal-editor-modal').style.display = 'none'; }
 async function applyPortalEdit() {
     const checks = document.querySelectorAll('.ed-monster-check:checked');
     const selectedNames = Array.from(checks).map(c => c.value);
     const chancePct = parseInt(document.getElementById('ed-p-chance').value) || 50;
+    const selectedGrade = document.querySelector('input[name="rift-grade"]:checked')?.value || 'normal';
     const data = {
         name: document.getElementById('ed-p-name').value,
         mission_text: document.getElementById('ed-p-mission').value,
@@ -1094,6 +1185,7 @@ async function applyPortalEdit() {
         target_monster_name: selectedNames.length > 0 ? JSON.stringify(selectedNames) : null
     };
     await db.from('portals').update(data).eq('id', editingPortalId);
+    await saveRiftGrade(editingPortalId, selectedGrade);
     closePortalEditor(); renderSettingsPortalList();
 }
 async function deletePortalInSettings(id) {
