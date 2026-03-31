@@ -115,6 +115,7 @@ let autoBattleInterval = null;
 let cachedPlayerStats = null;
 let cachedMonsterPool = null;
 let currentUserId = null; // 로그인된 유저 ID
+let currentUserDisplayName = '탐험가'; // 저장된 닉네임
 
 // ===== 파티클 배경 =====
 function initParticles() {
@@ -174,8 +175,15 @@ async function doRegister() {
     const { data: existing } = await db.from('users').select('id').eq('username', username).single();
     if (existing) { msgEl.innerText = '이미 사용 중인 아이디입니다.'; msgEl.style.color = 'var(--accent-red)'; return; }
     
+    // 닉네임 프롬프트 추가
+    const nickname = prompt('게임에서 사용할 닉네임을 입력하세요 (미입력 시 아이디 사용):', username);
+    if (nickname === null) {
+        msgEl.innerText = '회원가입이 취소되었습니다.'; msgEl.style.color = 'var(--text-dim)'; return;
+    }
+    const finalNickname = nickname.trim() || username;
+
     // 유저 생성
-    const { data: newUser, error } = await db.from('users').insert({ username, password_hash: hash, display_name: username }).select().single();
+    const { data: newUser, error } = await db.from('users').insert({ username, password_hash: hash, display_name: finalNickname }).select().single();
     if (error) { msgEl.innerText = '회원가입 실패: ' + error.message; msgEl.style.color = 'var(--accent-red)'; return; }
     
     // 플레이어 데이터 생성 (빈 인벤토리)
@@ -199,6 +207,7 @@ async function doLogin() {
     
     // 로그인 성공
     currentUserId = user.id;
+    currentUserDisplayName = user.display_name || user.username || '탐험가';
     window.isAdmin = user.is_admin || false;
     await db.from('users').update({ last_login: new Date().toISOString() }).eq('id', user.id);
     
@@ -417,9 +426,9 @@ async function updateDashboardHUD() {
     const bcn = document.getElementById('battle-card-name');
     if (bcn) {
         if (equippedCardIdx>=0 && equippedCardIdx<inv.length) {
-            bcn.innerText = `탐험가 [${inv[equippedCardIdx].name}]`;
+            bcn.innerText = `${currentUserDisplayName} [${inv[equippedCardIdx].name}]`;
         } else {
-            bcn.innerText = '탐험가';
+            bcn.innerText = currentUserDisplayName;
         }
     }
 
@@ -674,7 +683,7 @@ async function startCombat(forcedMonsterName = null, autoStart = false) {
 
         currentEnemy: { ...targetMonster, hp: mHp, maxHp: mHp, dmg: mAtk, def: mDef },
         isGameOver: false, busy: false,
-        cardName: '탐험가', equippedCard
+        cardName: currentUserDisplayName, equippedCard
     };
     // UI 업데이트 - 적
     const nameLabel = document.getElementById('enemy-name-label');
@@ -683,14 +692,15 @@ async function startCombat(forcedMonsterName = null, autoStart = false) {
     document.getElementById('enemy-img-main').src = targetMonster.img;
     document.getElementById('enemy-img-main').style.opacity = '1';
     // UI - 플레이어
-    const pn = document.getElementById('player-card-name'); if(pn) pn.innerText = '탐험가';
+    const pn = document.getElementById('player-card-name'); if(pn) pn.innerText = currentUserDisplayName;
     const pr = document.getElementById('player-card-rarity');
     if(pr) {
         if(equippedCard) { pr.innerText = `[${equippedCard.name}]`; pr.style.color = rarityColor(equippedCard.rarity); }
+
         else { pr.innerText = '[장비 없음]'; pr.style.color = 'var(--text-dim)'; }
     }
     updateCombatUI();
-    document.getElementById('combat-log').innerHTML = `<div class="log-entry">탐험가 vs ${mTypeInfo.icon} ${targetMonster.name} 전투 개시!</div>`;
+    document.getElementById('combat-log').innerHTML = `<div class="log-entry">${currentUserDisplayName} vs ${mTypeInfo.icon} ${targetMonster.name} 전투 개시!</div>`;
     playSound('swordSwing'); showScreen('combat');
     // 1인칭 시점: 적 등장 애니메이션
     const enemyImg = document.getElementById('enemy-img-main');
@@ -755,7 +765,8 @@ function executeEnemyTurn() {
     // 회피 체크 (패시브 dodge)
     const dodgeChance = combatState.dodge || 0;
     if (dodgeChance > 0 && Math.random()*100 < dodgeChance) {
-        renderLog(`💨 탐험가 회피!`, 'player');
+        renderLog(`💨 ${currentUserDisplayName} 회피!`, 'player');
+
         setTimeout(() => { combatState.busy = false; }, 500);
         updateCombatUI(); return;
     }
@@ -811,7 +822,7 @@ function executePlayerTurn() {
     playSound('swordSwing'); setTimeout(() => playSound('hit'), 150);
     const img = document.getElementById('enemy-img-main');
     if(img) { img.classList.add('shake'); setTimeout(() => img.classList.remove('shake'), 400); }
-    renderLog(`탐험가 공격! ${dmg} 대미지${healAmt?` (+${healAmt} 흡혈)`:''}`, 'player');
+    renderLog(`${currentUserDisplayName} 공격! ${dmg} 대미지${healAmt?` (+${healAmt} 흡혈)`:''}`, 'player');
     updateCombatUI();
     if (enemy.hp <= 0) {
         combatState.busy = false;
@@ -931,6 +942,8 @@ function updateCombatUI() {
     const pb = document.getElementById('player-hp-bar'); if (pb) pb.style.width = pPct+'%';
     const pht = document.getElementById('player-hp-text'); if (pht) pht.innerText = `${combatState.playerHP}/${combatState.playerMaxHP} (${Math.round(pPct)}%)`;
     const pot = document.getElementById('btn-potion'); if (pot) { pot.innerText = `💊 HEAL (${combatState.potions})`; pot.disabled = combatState.potions <= 0; }
+    const atk = document.getElementById('player-atk-text'); if(atk) atk.innerText = combatState.playerAtk;
+    const def = document.getElementById('player-def-text'); if(def) def.innerText = combatState.playerDef;
 }
 function renderLog(msg, type) { const log = document.getElementById('combat-log'); if(!log) return; const e = document.createElement('div'); e.className = `log-entry ${type}`; e.innerText = msg; log.prepend(e); }
 function updateClock() { const t = document.getElementById('system-time'); if (t) { const n = new Date(); t.innerText = n.toTimeString().split(' ')[0] + " // " + n.toLocaleDateString('ko-KR'); } }
