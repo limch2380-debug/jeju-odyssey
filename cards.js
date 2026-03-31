@@ -696,24 +696,24 @@ async function loadGameConfigUI() {
 }
 
 // ===== 수정조각 획득 팝업 =====
-function showShardPopup(shardKey) {
-    const info = SHARD_FRAGMENTS[shardKey] || SHARD_FRAGMENTS.shard1;
+function showExodiaShardPopup(cardName, dropPart) {
     const popup = document.createElement('div');
     popup.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:9999;background:rgba(0,0,0,0.9);display:flex;align-items:center;justify-content:center;animation:fadeIn 0.3s;cursor:pointer;';
     popup.onclick = () => { popup.style.opacity='0'; popup.style.transition='opacity 0.3s'; setTimeout(()=>popup.remove(),300); };
     popup.innerHTML = `
         <div style="text-align:center;animation:popIn 0.5s;">
             <div style="position:relative;width:120px;height:120px;margin:0 auto 20px;">
-                <img src="shard.png" style="width:120px;height:120px;object-fit:contain;filter:${info.hue} drop-shadow(0 0 25px ${info.glow}) drop-shadow(0 0 50px ${info.glow});animation:glow 1.5s infinite alternate;" onerror="this.outerHTML='<div style=font-size:5rem;>${info.icon}</div>'">
-                <div style="position:absolute;inset:0;border-radius:50%;background:radial-gradient(circle,${info.glow} 0%,transparent 70%);opacity:0.4;animation:pulse 1.5s infinite;"></div>
+                <img src="shard.png" style="width:120px;height:120px;object-fit:contain;filter:drop-shadow(0 0 25px gold) drop-shadow(0 0 50px yellow);animation:glow 1.5s infinite alternate;" onerror="this.outerHTML='<div style=font-size:5rem;>💎</div>'">
+                <div style="position:absolute;inset:0;border-radius:50%;background:radial-gradient(circle,rgba(255,215,0,0.5) 0%,transparent 70%);opacity:0.6;animation:pulse 1.5s infinite;"></div>
+                <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:2rem;font-weight:900;color:#000;text-shadow:0 0 5px white;">#${dropPart}</div>
             </div>
-            <div style="font-size:1.4rem;color:${info.color};font-weight:900;text-shadow:0 0 20px ${info.glow};letter-spacing:2px;">${info.name} 획득!</div>
-            <div style="font-size:0.8rem;color:var(--text-dim);margin-top:8px;">차원의 에너지가 결정화되었습니다</div>
+            <div style="font-size:1.1rem;color:gold;font-weight:900;text-shadow:0 0 15px yellow;letter-spacing:1px;margin-bottom:8px;">[${cardName}] 조각 획득!</div>
+            <div style="font-size:0.8rem;color:var(--text-dim);">해당 카드의 ${dropPart}번 조각을 획득했습니다.</div>
             <div style="font-size:0.65rem;color:rgba(255,255,255,0.3);margin-top:15px;">화면을 터치하여 닫기</div>
         </div>`;
     document.body.appendChild(popup);
     if ('vibrate' in navigator) navigator.vibrate([100, 50, 200]);
-    playSound('victory');
+    if (typeof playSound === 'function') playSound('victory');
     setTimeout(() => { if(popup.parentNode) { popup.style.opacity='0'; popup.style.transition='opacity 0.3s'; setTimeout(()=>popup.remove(),300); }}, 3000);
 }
 
