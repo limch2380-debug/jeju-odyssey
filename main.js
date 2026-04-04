@@ -578,22 +578,24 @@ function showPortalModal(mode, portal, isBoss) {
 
     if (mode === 'enter') {
         icon.innerText = isBoss ? '⚔' : '⚡';
-        icon.style.color = isBoss ? 'var(--primary-gold)' : 'var(--secondary-cyan)';
         title.innerText = isBoss ? `🔥 보스 포탈: ${portal.name}` : `📍 ${portal.name}`;
-        title.style.color = isBoss ? 'var(--primary-gold)' : 'var(--secondary-cyan)';
+        title.style.color = isBoss ? '#ffe16f' : '#00fdec';
         desc.innerText = portal.mission_text || '이 지역에 차원 균열이 감지되었습니다.';
+        desc.style.color = '#ffffff';
         const spawnPct = Math.round((portal.spawn_chance ?? 1) * 100);
         mission.innerText = `이동 ${portal.spawn_distance_requirement||20}m마다 인카운터 (출현율 ${spawnPct}%)`;
+        mission.style.color = '#00fdec';
         confirmBtn.innerText = isBoss ? '⚔ 보스 도전!' : '⚡ 진입하기';
         confirmBtn.style.background = isBoss ? 'linear-gradient(135deg, #e9c400, #ff6b00)' : '';
         cancelBtn.innerText = '무시하기';
     } else {
         icon.innerText = '🚪';
-        icon.style.color = 'var(--accent-red)';
         title.innerText = `${portal.name} 구역 이탈`;
-        title.style.color = 'var(--accent-red)';
+        title.style.color = '#ff6b6b';
         desc.innerText = '포탈 범위를 벗어났습니다.';
+        desc.style.color = '#ffffff';
         mission.innerText = '이탈하면 자동사냥이 종료됩니다.';
+        mission.style.color = '#ff6b6b';
         confirmBtn.innerText = '이탈하기';
         confirmBtn.style.background = '';
         cancelBtn.innerText = '돌아가기';

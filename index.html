@@ -235,15 +235,15 @@
         </div>
 
         <!-- 포탈 진입/이탈 확인 모달 -->
-        <div id="portal-confirm-modal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; z-index:9999; background:rgba(0,0,0,0.75); backdrop-filter:blur(10px); align-items:center; justify-content:center;">
-            <div class="glass-panel" style="margin:20px; padding:28px; border-radius:20px; max-width:400px; width:calc(100% - 40px); text-align:center; border-color:rgba(233,196,0,0.2); background:rgba(15,18,32,0.95);">
-                <div id="portal-modal-icon" style="font-size:2.5rem; margin-bottom:12px;">⚡</div>
-                <div id="portal-modal-title" style="font-size:1.15rem; color:var(--primary-gold); font-weight:700; margin-bottom:10px;">차원 균열 감지</div>
-                <div id="portal-modal-desc" style="font-size:0.9rem; color:rgba(225,225,246,0.85); margin-bottom:8px; line-height:1.5;"></div>
-                <div id="portal-modal-mission" style="font-size:0.8rem; color:var(--secondary-cyan); margin-bottom:20px; line-height:1.4;"></div>
-                <div style="display:flex; gap:10px;">
-                    <button id="portal-modal-cancel" class="btn-nav" style="flex:1; padding:16px; font-size:0.9rem; text-align:center;" onclick="rejectPortalAction()">취소</button>
-                    <button id="portal-modal-confirm" class="btn-primary" style="flex:1; padding:16px; font-size:0.9rem;" onclick="confirmPortalAction()">진입하기</button>
+        <div id="portal-confirm-modal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; z-index:9999; background:rgba(0,0,0,0.8); backdrop-filter:blur(12px); align-items:center; justify-content:center;">
+            <div style="margin:20px; padding:30px 24px; border-radius:20px; max-width:400px; width:calc(100% - 40px); text-align:center; background:#1a1c2e; border:2px solid rgba(233,196,0,0.3); box-shadow:0 0 60px rgba(233,196,0,0.15), 0 20px 60px rgba(0,0,0,0.5);">
+                <div id="portal-modal-icon" style="font-size:3rem; margin-bottom:14px;">⚡</div>
+                <div id="portal-modal-title" style="font-size:1.3rem; color:#ffe16f; font-weight:900; margin-bottom:12px; text-shadow:0 0 20px rgba(233,196,0,0.4);">차원 균열 감지</div>
+                <div id="portal-modal-desc" style="font-size:1rem; color:#ffffff; margin-bottom:10px; line-height:1.6; font-weight:500;"></div>
+                <div id="portal-modal-mission" style="font-size:0.9rem; color:#00fdec; margin-bottom:22px; line-height:1.5; font-weight:600; text-shadow:0 0 10px rgba(0,253,236,0.3);"></div>
+                <div style="display:flex; gap:12px;">
+                    <button id="portal-modal-cancel" class="btn-nav" style="flex:1; padding:16px; font-size:1rem; text-align:center; color:#ffffff; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.2); border-radius:14px;" onclick="rejectPortalAction()">취소</button>
+                    <button id="portal-modal-confirm" class="btn-primary" style="flex:1; padding:16px; font-size:1rem; border-radius:14px;" onclick="confirmPortalAction()">진입하기</button>
                 </div>
             </div>
         </div>
