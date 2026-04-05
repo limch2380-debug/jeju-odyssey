@@ -202,49 +202,118 @@ function getPassiveBonus(card) {
 }
 
 // ===== 인벤토리 UI =====
+let expandedCardGroup = null; // 현재 펼쳐진 그룹의 templateId
+
 async function renderInventory() {
     const inv = await getInventory();
     equippedCardIdx = await getEquippedIdx();
     document.getElementById('inv-count').innerText = `${inv.length} / 10`;
     
-    // 조각 현황 패널 삭제 처리
     const fragPanel = document.getElementById('inv-fragment-panel');
-    if (fragPanel) {
-        fragPanel.style.display = 'none';
-        fragPanel.innerHTML = '';
-    }
+    if (fragPanel) { fragPanel.style.display = 'none'; fragPanel.innerHTML = ''; }
     const drawPanel = document.getElementById('craft-card-panel');
     if (drawPanel) drawPanel.style.display = 'none'; 
 
     const grid = document.getElementById('inventory-grid');
     grid.innerHTML = '';
     
-    inv.forEach((c,i) => {
-        const equipped = i===equippedCardIdx;
-        const rc = rarityColor(c.rarity);
-        const rb = rarityBorder(c.rarity);
+    // 같은 templateId끼리 그룹화
+    const groups = {};
+    inv.forEach((c, i) => {
+        const key = c.templateId || c.name;
+        if (!groups[key]) groups[key] = [];
+        groups[key].push({ card: c, idx: i });
+    });
+
+    Object.entries(groups).forEach(([templateId, items]) => {
+        const first = items[0].card;
+        const rc = rarityColor(first.rarity);
+        const rb = rarityBorder(first.rarity);
+        const count = items.length;
+        const hasEquipped = items.some(it => it.idx === equippedCardIdx);
+        const isExpanded = expandedCardGroup === templateId;
+        
         const div = document.createElement('div');
-        div.className = 'glass-panel';
-        let borderC = equipped?rc:rb;
-        let bgExtra = equipped?`background:${RARITIES[c.rarity]?.bg};box-shadow:0 0 15px ${rb};`:'';
+        div.className = 'glass-panel card-group';
+        let borderC = hasEquipped ? rc : rb;
+        let bgExtra = hasEquipped ? `background:${RARITIES[first.rarity]?.bg};box-shadow:0 0 15px ${rb};` : '';
         
         div.style.cssText = `padding:14px;text-align:center;border-color:${borderC};${bgExtra}cursor:pointer;position:relative;`;
-        let badge = '';
-        if (equipped) badge = `<div style="position:absolute;top:8px;right:10px;font-size:0.6rem;color:${rc};font-weight:700;">🎴 장착</div>`;
-        const p1 = `${PASSIVE_SKILLS[c.passive1]?.icon||''} +${c.passive1Value||0}%`;
-        const p2 = (c.passiveCount >= 2 && c.passive2) ? `${PASSIVE_SKILLS[c.passive2]?.icon||''} +${c.passive2Value||0}%` : '';
-        const passiveDisplay = p2 ? `${p1} / ${p2}` : p1;
+
+        // 수량 뱃지
+        let countBadge = '';
+        if (count > 1) {
+            countBadge = `<div style="position:absolute;top:6px;left:8px;background:linear-gradient(135deg,rgba(233,196,0,0.9),rgba(255,165,0,0.9));color:#1a1a1a;font-size:0.75rem;font-weight:900;padding:2px 8px;border-radius:10px;z-index:2;">×${count}</div>`;
+        }
+        // 장착 뱃지
+        let equipBadge = '';
+        if (hasEquipped) {
+            equipBadge = `<div style="position:absolute;top:6px;right:8px;font-size:0.6rem;color:${rc};font-weight:700;">🎴 장착중</div>`;
+        }
+
+        // 대표 패시브 표시 (첫번째 카드)
+        const p1 = `${PASSIVE_SKILLS[first.passive1]?.icon||''} +${first.passive1Value||0}%`;
+        const p2 = (first.passiveCount >= 2 && first.passive2) ? ` / ${PASSIVE_SKILLS[first.passive2]?.icon||''} +${first.passive2Value||0}%` : '';
         
-        div.innerHTML = `${badge}
-            <img src="${c.img}" style="width:65px;height:80px;object-fit:cover;border-radius:8px;border:2px solid ${rc};margin-bottom:6px;" onerror="this.src='goblin_card.png'">
-            <div style="font-size:0.9rem;color:${rc};font-weight:700;">${c.name}</div>
-            <div style="font-size:0.65rem;color:var(--text-dim);">[${rarityLabel(c.rarity)}]</div>
-            <div style="font-size:0.65rem;color:var(--secondary-cyan);margin-top:4px;">${passiveDisplay}</div>
-            <div style="display:flex;gap:4px;margin-top:8px;">
-                <button class="btn-primary" style="flex:1;padding:8px;font-size:0.7rem;" onclick="event.stopPropagation();equipCard(${i})">${equipped?'해제':'장착'}</button>
-                <button class="btn-nav" style="padding:8px 10px;font-size:0.7rem;color:var(--accent-red);border-color:var(--accent-red);text-align:center;" onclick="event.stopPropagation();confirmDeleteCard(${c.id})">✕ 삭제</button>
-            </div>`;
+        div.innerHTML = `${countBadge}${equipBadge}
+            <img src="${first.img}" style="width:65px;height:80px;object-fit:cover;border-radius:8px;border:2px solid ${rc};margin-bottom:6px;" onerror="this.src='goblin_card.png'">
+            <div style="font-size:0.9rem;color:${rc};font-weight:700;">${first.name}</div>
+            <div style="font-size:0.65rem;color:var(--text-dim);">[${rarityLabel(first.rarity)}]</div>
+            ${count === 1 ? `<div style="font-size:0.65rem;color:var(--secondary-cyan);margin-top:4px;">${p1}${p2}</div>` : ''}
+            ${count === 1 ? `
+                <div style="display:flex;gap:4px;margin-top:8px;">
+                    <button class="btn-primary" style="flex:1;padding:8px;font-size:0.7rem;" onclick="event.stopPropagation();equipCard(${items[0].idx})">${items[0].idx===equippedCardIdx?'해제':'장착'}</button>
+                    <button class="btn-nav" style="padding:8px 10px;font-size:0.7rem;color:var(--accent-red);border-color:var(--accent-red);" onclick="event.stopPropagation();confirmDeleteCard(${first.id})">✕</button>
+                </div>
+            ` : `
+                <div style="font-size:0.6rem;color:var(--secondary-cyan);margin-top:6px;">${isExpanded ? '▲ 접기' : '▼ 카드 선택'}</div>
+            `}`;
+        
+        // 카드가 여러장일 때 클릭하면 확장
+        if (count > 1) {
+            div.onclick = () => {
+                expandedCardGroup = (expandedCardGroup === templateId) ? null : templateId;
+                renderInventory();
+            };
+        }
+
         grid.appendChild(div);
+
+        // 확장된 그룹: 개별 카드 리스트 표시
+        if (count > 1 && isExpanded) {
+            const subContainer = document.createElement('div');
+            subContainer.style.cssText = `grid-column: 1/-1; background:rgba(15,16,37,0.8); border:1px solid ${rb}; border-radius:12px; padding:12px; display:flex; flex-direction:column; gap:8px;`;
+            
+            const subTitle = document.createElement('div');
+            subTitle.style.cssText = `font-size:0.75rem; color:${rc}; font-weight:700; text-align:center; margin-bottom:4px;`;
+            subTitle.innerText = `${first.name} — 보유 ${count}장`;
+            subContainer.appendChild(subTitle);
+
+            items.forEach((it, subIdx) => {
+                const c = it.card;
+                const equipped = it.idx === equippedCardIdx;
+                const sp1 = `${PASSIVE_SKILLS[c.passive1]?.icon||''} ${PASSIVE_SKILLS[c.passive1]?.name||''} +${c.passive1Value||0}%`;
+                const sp2 = (c.passiveCount >= 2 && c.passive2) ? ` / ${PASSIVE_SKILLS[c.passive2]?.icon||''} +${c.passive2Value||0}%` : '';
+                
+                const row = document.createElement('div');
+                row.style.cssText = `display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:10px; border:1px solid ${equipped?rc:'rgba(255,255,255,0.06)'}; background:${equipped?RARITIES[c.rarity]?.bg:'rgba(25,26,42,0.5)'};`;
+                
+                row.innerHTML = `
+                    <img src="${c.img}" style="width:40px;height:50px;object-fit:cover;border-radius:6px;border:2px solid ${equipped?rc:'rgba(255,255,255,0.15)'};" onerror="this.src='goblin_card.png'">
+                    <div style="flex:1;text-align:left;">
+                        <div style="font-size:0.75rem;color:${equipped?rc:'#fff'};font-weight:700;">#${subIdx+1} ${equipped?'🎴':''}</div>
+                        <div style="font-size:0.6rem;color:var(--secondary-cyan);margin-top:2px;">${sp1}${sp2}</div>
+                    </div>
+                    <div style="display:flex;gap:4px;">
+                        <button class="btn-primary" style="padding:7px 14px;font-size:0.65rem;" onclick="event.stopPropagation();equipCard(${it.idx})">${equipped?'해제':'장착'}</button>
+                        <button class="btn-nav" style="padding:7px 10px;font-size:0.65rem;color:var(--accent-red);border-color:var(--accent-red);" onclick="event.stopPropagation();confirmDeleteCard(${c.id})">✕</button>
+                    </div>
+                `;
+                subContainer.appendChild(row);
+            });
+
+            grid.appendChild(subContainer);
+        }
     });
 }
 
