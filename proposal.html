@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>오디세이 원 | 사업 제안서</title>
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;500;700;800&family=Inter:wght@400;500;600;700&family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
         :root {
@@ -27,7 +28,8 @@
         body {
             background: var(--bg-void);
             color: var(--text-main);
-            font-family: 'Noto Sans KR', 'Inter', sans-serif;
+            font-family: 'Pretendard', 'Noto Sans KR', 'Inter', sans-serif;
+            font-size: 18px;
             overflow-x: hidden;
         }
 
@@ -51,7 +53,7 @@
             border-radius: 6px;
             font-family: 'Manrope', sans-serif;
             font-weight: 800;
-            font-size: 0.85rem;
+            font-size: 1rem;
             cursor: pointer;
             letter-spacing: 1px;
             text-transform: uppercase;
@@ -64,9 +66,9 @@
 
         /* Proposal Container */
         #proposal-content {
-            max-width: 900px;
+            max-width: 1000px;
             margin: 0 auto;
-            padding: 0 40px;
+            padding: 0 50px;
         }
 
         /* COVER */
@@ -93,7 +95,7 @@
         }
         .cover-badge {
             font-family: 'Manrope';
-            font-size: 0.7rem;
+            font-size: 0.9rem;
             letter-spacing: 6px;
             color: var(--cyan);
             text-transform: uppercase;
@@ -114,14 +116,14 @@
         }
         .cover-subtitle {
             font-family: 'Noto Sans KR';
-            font-size: clamp(1.1rem, 2.5vw, 1.6rem);
+            font-size: clamp(1.3rem, 3vw, 2rem);
             font-weight: 300;
             color: var(--text-main);
             margin-bottom: 40px;
             letter-spacing: 3px;
         }
         .cover-tagline {
-            font-size: 0.9rem;
+            font-size: 1.15rem;
             color: var(--text-dim);
             line-height: 1.8;
             max-width: 500px;
@@ -140,7 +142,7 @@
         }
         .section-label {
             font-family: 'Manrope';
-            font-size: 0.65rem;
+            font-size: 0.85rem;
             letter-spacing: 5px;
             color: var(--cyan);
             text-transform: uppercase;
@@ -148,14 +150,14 @@
         }
         .section-title {
             font-family: 'Manrope';
-            font-size: clamp(1.5rem, 3.5vw, 2.2rem);
+            font-size: clamp(1.8rem, 4vw, 2.8rem);
             font-weight: 800;
             color: var(--gold);
             margin-bottom: 15px;
             line-height: 1.3;
         }
         .section-desc {
-            font-size: 0.9rem;
+            font-size: 1.1rem;
             color: var(--text-body);
             line-height: 1.8;
             max-width: 600px;
@@ -187,7 +189,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.5rem;
+            font-size: 1.8rem;
             border-radius: 12px;
             margin-bottom: 18px;
             background: rgba(0,253,236,0.06);
@@ -195,13 +197,13 @@
         }
         .feature-title {
             font-family: 'Manrope';
-            font-size: 1rem;
+            font-size: 1.2rem;
             font-weight: 700;
             color: var(--text-main);
             margin-bottom: 10px;
         }
         .feature-desc {
-            font-size: 0.8rem;
+            font-size: 1rem;
             color: var(--text-dim);
             line-height: 1.7;
         }
@@ -229,12 +231,12 @@
         .strategy-card.red::before { background: linear-gradient(90deg, var(--red), transparent); }
 
         .strategy-icon {
-            font-size: 2rem;
+            font-size: 2.5rem;
             margin-bottom: 18px;
         }
         .strategy-title {
             font-family: 'Manrope';
-            font-size: 1.1rem;
+            font-size: 1.35rem;
             font-weight: 800;
             margin-bottom: 8px;
         }
@@ -243,7 +245,7 @@
         .strategy-card.red .strategy-title { color: var(--red); }
 
         .strategy-desc {
-            font-size: 0.82rem;
+            font-size: 1.05rem;
             color: var(--text-body);
             line-height: 1.8;
             margin-bottom: 20px;
@@ -252,7 +254,7 @@
             display: inline-block;
             padding: 5px 14px;
             border-radius: 4px;
-            font-size: 0.65rem;
+            font-size: 0.85rem;
             font-weight: 700;
             letter-spacing: 1px;
         }
@@ -271,19 +273,19 @@
         }
         .kpi-value {
             font-family: 'Manrope';
-            font-size: 2rem;
+            font-size: 2.5rem;
             font-weight: 800;
             margin-bottom: 8px;
         }
         .kpi-label {
-            font-size: 0.75rem;
+            font-size: 0.95rem;
             font-weight: 600;
             letter-spacing: 2px;
             text-transform: uppercase;
             margin-bottom: 14px;
         }
         .kpi-desc {
-            font-size: 0.8rem;
+            font-size: 1rem;
             color: var(--text-dim);
             line-height: 1.7;
         }
@@ -301,13 +303,13 @@
         }
         .cta-title {
             font-family: 'Manrope';
-            font-size: 1.5rem;
+            font-size: 1.8rem;
             font-weight: 800;
             color: var(--gold);
             margin-bottom: 15px;
         }
         .cta-desc {
-            font-size: 0.9rem;
+            font-size: 1.1rem;
             color: var(--text-body);
             line-height: 1.8;
             margin-bottom: 35px;
@@ -322,23 +324,32 @@
             text-align: center;
         }
         .cta-item-label {
-            font-size: 0.6rem;
+            font-size: 0.85rem;
             letter-spacing: 3px;
             color: var(--cyan);
             text-transform: uppercase;
             margin-bottom: 6px;
         }
         .cta-item-value {
-            font-size: 0.95rem;
+            font-size: 1.15rem;
             color: var(--text-main);
             font-weight: 500;
+        }
+        .cta-item-value a {
+            color: var(--cyan);
+            text-decoration: none;
+            transition: 0.3s;
+        }
+        .cta-item-value a:hover {
+            text-decoration: underline;
+            color: var(--gold);
         }
 
         /* Footer */
         .proposal-footer {
             text-align: center;
             padding: 40px 0 60px;
-            font-size: 0.65rem;
+            font-size: 0.85rem;
             color: rgba(255,255,255,0.2);
             letter-spacing: 3px;
         }
@@ -362,13 +373,13 @@
         }
         .flow-step-num {
             font-family: 'Manrope';
-            font-size: 0.6rem;
+            font-size: 0.8rem;
             color: var(--cyan);
             letter-spacing: 2px;
             margin-bottom: 6px;
         }
         .flow-step-text {
-            font-size: 0.8rem;
+            font-size: 1rem;
             color: var(--text-main);
             font-weight: 600;
         }
@@ -391,8 +402,8 @@
 
         /* Print / PNG specific */
         #proposal-content.rendering {
-            width: 900px !important;
-            max-width: 900px !important;
+            width: 1000px !important;
+            max-width: 1000px !important;
         }
         #proposal-content.rendering .grid-4 { grid-template-columns: repeat(4,1fr) !important; }
         #proposal-content.rendering .grid-3 { grid-template-columns: repeat(3,1fr) !important; }
@@ -607,15 +618,15 @@
                 <div class="cta-contacts">
                     <div class="cta-item">
                         <div class="cta-item-label">Email</div>
-                        <div class="cta-item-value">contact@odyssey-one.kr</div>
+                        <div class="cta-item-value"><a href="mailto:limch2380@naver.com">limch2380@naver.com</a></div>
                     </div>
                     <div class="cta-item">
                         <div class="cta-item-label">Phone</div>
-                        <div class="cta-item-value">064-000-0000</div>
+                        <div class="cta-item-value"><a href="tel:010-2621-2380">010-2621-2380</a></div>
                     </div>
                     <div class="cta-item">
-                        <div class="cta-item-label">Web</div>
-                        <div class="cta-item-value">odyssey-one.kr</div>
+                        <div class="cta-item-label">게임 데모</div>
+                        <div class="cta-item-value"><a href="https://limch2380-debug.github.io/jeju-odyssey/" target="_blank">🎮 지금 바로 체험하기</a></div>
                     </div>
                 </div>
             </div>
@@ -645,14 +656,14 @@
                     scale: 2,
                     useCORS: true,
                     logging: false,
-                    width: 900,
-                    windowWidth: 900,
+                    width: 1000,
+                    windowWidth: 1000,
                     scrollX: 0,
                     scrollY: -window.scrollY,
                     onclone: (doc) => {
                         const clone = doc.getElementById('proposal-content');
-                        clone.style.width = '900px';
-                        clone.style.maxWidth = '900px';
+                        clone.style.width = '1000px';
+                        clone.style.maxWidth = '1000px';
                     }
                 });
 
