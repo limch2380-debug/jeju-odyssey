@@ -383,11 +383,17 @@
                     </div>
 
                     <!-- TAB: 차원 균열 관리 -->
-                    <div id="tab-portals" class="settings-tab-panel" style="display:none;">
-                        <div class="glass-panel" style="padding: 20px;">
-                            <h3 style="color: var(--secondary-cyan); font-size: 0.85rem; margin-bottom: 12px;">🌀 차원 균열 관리</h3>
-                            <div id="set-map" style="height: 250px; border-radius: 12px; margin-bottom: 15px; border: 1px solid var(--glass-border);"></div>
-                            <div id="set-portal-list"></div>
+                    <div id="tab-portals" class="settings-tab-panel" style="display:none; height:100%;">
+                        <div style="display:flex; flex-direction:column; height:calc(100vh - 130px);">
+                            <!-- 지도 (항상 보이는 영역) -->
+                            <div style="flex-shrink:0; padding:0 0 10px;">
+                                <h3 style="color: var(--secondary-cyan); font-size: 0.85rem; margin-bottom: 10px;">🌀 차원 균열 관리</h3>
+                                <div id="set-map" style="height: 220px; border-radius: 12px; border: 1px solid var(--glass-border);"></div>
+                            </div>
+                            <!-- 포탈 목록 (스크롤 영역) -->
+                            <div style="flex:1; overflow-y:auto; min-height:0;">
+                                <div id="set-portal-list"></div>
+                            </div>
                         </div>
                     </div>
 
