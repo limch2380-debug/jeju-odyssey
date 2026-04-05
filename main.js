@@ -961,10 +961,67 @@ window.addEventListener('resize', () => { if (map) map.invalidateSize(); if (set
 
 // ===== SETTINGS =====
 let setMap;
+let settingsInitialized = { player:false, cards:false, monsters:false, portals:false, users:false };
+
+function switchSettingsTab(tabId, btn) {
+    // Hide all panels
+    document.querySelectorAll('.settings-tab-panel').forEach(p => p.style.display = 'none');
+    // Show selected panel
+    const panel = document.getElementById(tabId);
+    if (panel) panel.style.display = 'block';
+
+    // Update tab button styles
+    const tabColors = {
+        'tab-player': { bg:'rgba(0,253,236,0.1)', border:'rgba(0,253,236,0.3)', color:'#00fdec' },
+        'tab-cards': { bg:'rgba(233,196,0,0.1)', border:'rgba(233,196,0,0.3)', color:'#e9c400' },
+        'tab-monsters': { bg:'rgba(255,77,77,0.1)', border:'rgba(255,77,77,0.3)', color:'#ff4d4d' },
+        'tab-portals': { bg:'rgba(0,253,236,0.1)', border:'rgba(0,253,236,0.3)', color:'#00fdec' },
+        'tab-users': { bg:'rgba(255,77,77,0.1)', border:'rgba(255,77,77,0.3)', color:'#ff4d4d' }
+    };
+    document.querySelectorAll('.settings-tab').forEach(t => {
+        t.style.background = 'transparent';
+        t.style.color = 'var(--text-dim)';
+        t.classList.remove('active');
+    });
+    if (btn) {
+        const tc = tabColors[tabId] || tabColors['tab-player'];
+        btn.style.background = tc.bg;
+        btn.style.color = tc.color;
+        btn.style.borderColor = tc.border;
+        btn.classList.add('active');
+    }
+
+    // Lazy init per tab
+    if (tabId === 'tab-portals' && !settingsInitialized.portals) {
+        settingsInitialized.portals = true;
+        initSettingsMap();
+        renderSettingsPortalList();
+    } else if (tabId === 'tab-portals' && setMap) {
+        setTimeout(() => setMap.invalidateSize(), 100);
+    }
+    if (tabId === 'tab-monsters' && !settingsInitialized.monsters) {
+        settingsInitialized.monsters = true;
+        renderSettingsMonsterList();
+    }
+    if (tabId === 'tab-cards' && !settingsInitialized.cards) {
+        settingsInitialized.cards = true;
+        if (typeof renderCardEditor === 'function') renderCardEditor();
+    }
+    if (tabId === 'tab-users' && !settingsInitialized.users) {
+        settingsInitialized.users = true;
+        if (typeof loadAdminUserList === 'function') loadAdminUserList();
+    }
+    if (tabId === 'tab-player' && !settingsInitialized.player) {
+        settingsInitialized.player = true;
+        if (typeof loadGameConfigUI === 'function') loadGameConfigUI();
+    }
+}
+
 async function initSettings() {
-    renderSettingsMonsterList();
-    initSettingsMap();
-    renderSettingsPortalList();
+    // Reset init flags
+    settingsInitialized = { player:false, cards:false, monsters:false, portals:false, users:false };
+    // Load first tab (player)
+    switchSettingsTab('tab-player', document.querySelector('.settings-tab[data-tab="tab-player"]'));
 }
 
 async function renderSettingsMonsterList() {
