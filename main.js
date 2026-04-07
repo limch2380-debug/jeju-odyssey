@@ -30,7 +30,7 @@ const WILD_CONFIG = {
 };
 
 // ===== 세션 사냥 기록 =====
-let huntLog = { kills: 0, bossKills: 0, potions: 0, cardsGot: 0 };
+let huntLog = { kills: 0, bossKills: 0, potions: 0, cardsGot: 0, shardsGot: 0 };
 
 // ===== WAKE LOCK — 백그라운드 유지 =====
 let wakeLock = null;
@@ -268,7 +268,7 @@ function doLogout() {
     currentUserId = null;
     window.isAdmin = false;
     cachedPlayerStats = null;
-    huntLog = { kills: 0, bossKills: 0, potions: 0, cardsGot: 0 };
+    huntLog = { kills: 0, bossKills: 0, potions: 0, cardsGot: 0, shardsGot: 0 };
     stopHeartbeat();
     showScreen('login');
 }
@@ -481,6 +481,8 @@ function updateHuntLogUI() {
     const hk = document.getElementById('hunt-kills'); if(hk) hk.innerText = huntLog.kills;
     const hb = document.getElementById('hunt-boss-kills'); if(hb) hb.innerText = huntLog.bossKills;
     const hp = document.getElementById('hunt-potions'); if(hp) hp.innerText = huntLog.potions;
+    const hs = document.getElementById('hunt-shards'); if(hs) hs.innerText = huntLog.shardsGot || 0;
+    const hc = document.getElementById('hunt-cards'); if(hc) hc.innerText = huntLog.cardsGot || 0;
 }
 
 // ===== PROXIMITY / ENCOUNTER =====
@@ -892,7 +894,7 @@ async function startCombat(forcedMonsterName = null, autoStart = false) {
     // 장착 카드 패시브 적용
     const inv = await getInventory();
     equippedCardIdx = await getEquippedIdx();
-    let bonus = {hp:0,atk:0,def:0,crit:0,dodge:0,drain:0};
+    let bonus = {hp:0,atk:0,def:0,crit:0,dodge:0,drain:0,xp:0,gold:0,reflect:0,thorns:0,regen:0,speed:0};
     let equippedCard = null;
     if (equippedCardIdx>=0 && equippedCardIdx<inv.length) {
         equippedCard = inv[equippedCardIdx];
@@ -920,6 +922,8 @@ async function startCombat(forcedMonsterName = null, autoStart = false) {
         playerHP: finalHp, playerMaxHP: finalHp,
         playerAtk: finalAtk, playerDef: finalDef,
         crit: bonus.crit, dodge: bonus.dodge, drain: bonus.drain,
+        reflect: bonus.reflect, thorns: bonus.thorns, regen: bonus.regen, speed: bonus.speed,
+        xpBonus: bonus.xp, goldBonus: bonus.gold,
         potions: playerData.potions || 0,
 
         currentEnemy: { ...targetMonster, hp: mHp, maxHp: mHp, dmg: mAtk, def: mDef },
@@ -960,10 +964,13 @@ async function startCombat(forcedMonsterName = null, autoStart = false) {
 }
 function startAutoCombat() {
     if (autoBattleInterval) clearInterval(autoBattleInterval);
+    // speed 패시브: 기본 1200ms, 최소 600ms
+    const speedReduction = Math.min(600, Math.floor(1200 * (combatState.speed || 0) / 100));
+    const interval = Math.max(600, 1200 - speedReduction);
     autoBattleInterval = setInterval(() => {
         if (!combatState.isGameOver && !combatState.busy) executePlayerTurn();
         else if (combatState.isGameOver) { clearInterval(autoBattleInterval); autoBattleInterval=null; }
-    }, 1200);
+    }, interval);
     // ★ 안전장치: busy가 3초 이상 지속되면 강제 해제
     setInterval(() => {
         if (combatState.busy && !combatState.isGameOver) {
@@ -1008,6 +1015,13 @@ function executeEnemyTurn() {
     if (dodgeChance > 0 && Math.random()*100 < dodgeChance) {
         renderLog(`💨 ${currentUserDisplayName} 회피!`, 'player');
 
+        // 재생(regen) - 회피 시에도 적용
+        const regenRate = combatState.regen || 0;
+        if (regenRate > 0) {
+            const regenAmt = Math.max(1, Math.floor(combatState.playerMaxHP * regenRate / 100));
+            combatState.playerHP = Math.min(combatState.playerMaxHP, combatState.playerHP + regenAmt);
+            renderLog(`💚 재생 +${regenAmt} HP`, 'player');
+        }
         setTimeout(() => { combatState.busy = false; }, 500);
         updateCombatUI(); return;
     }
@@ -1017,6 +1031,39 @@ function executeEnemyTurn() {
     const scene = document.querySelector('.combat-scene');
     if(scene) { scene.classList.add('flash-red','glitch'); setTimeout(() => scene.classList.remove('flash-red','glitch'), 300); }
     renderLog(`${enemy.name} 공격! ${dmg} 대미지`, 'enemy');
+
+    // 반사(reflect) - 받은 데미지 일부를 적에게 반환
+    const reflectRate = combatState.reflect || 0;
+    if (reflectRate > 0 && dmg > 0) {
+        const reflectDmg = Math.max(1, Math.floor(dmg * reflectRate / 100));
+        enemy.hp = Math.max(0, enemy.hp - reflectDmg);
+        renderLog(`🪞 반사! ${reflectDmg} 데미지 반환`, 'player');
+    }
+
+    // 가시(thorns) - 고정 카운터 데미지
+    const thornsRate = combatState.thorns || 0;
+    if (thornsRate > 0) {
+        const thornsDmg = Math.max(1, Math.floor(combatState.playerAtk * thornsRate / 100));
+        enemy.hp = Math.max(0, enemy.hp - thornsDmg);
+        renderLog(`🌵 가시! ${thornsDmg} 반격 데미지`, 'player');
+    }
+
+    // 반사/가시로 적 처치 확인
+    if (enemy.hp <= 0) {
+        combatState.busy = false;
+        handleVictory();
+        updateCombatUI();
+        return;
+    }
+
+    // 재생(regen) - HP 자동 회복
+    const regenRate = combatState.regen || 0;
+    if (regenRate > 0 && combatState.playerHP > 0) {
+        const regenAmt = Math.max(1, Math.floor(combatState.playerMaxHP * regenRate / 100));
+        combatState.playerHP = Math.min(combatState.playerMaxHP, combatState.playerHP + regenAmt);
+        renderLog(`💚 재생 +${regenAmt} HP`, 'player');
+    }
+
     if (combatState.playerHP <= 0) {
         renderLog('카드 파괴! 후퇴.', 'enemy');
         combatState.isGameOver = true;
@@ -1105,13 +1152,13 @@ async function handleVictory() {
                         const t = templates.find(x => x.templateId === monster.dropCardTemplateId);
                         if (t) {
                             const inv = await getInventory();
-                            if (inv.length < 10) { // 인벤토리 제한 확인
+                            if (inv.length < 20) {
                                 const card = await generateCard(t);
                                 inv.push(card);
                                 await saveInventory(inv);
                                 cardDropped = true;
                                 huntLog.cardsGot++;
-                                renderLog(`🎴 [${t.name}] 카드 획득!`, 'player');
+                                renderLog(`🎴 [${t.name}] [${rarityLabel(card.rarity)}] 카드 획득!`, 'player');
                                 if (typeof showCardDropPopup === 'function') {
                                     showCardDropPopup(card);
                                 }
@@ -1124,10 +1171,45 @@ async function handleVictory() {
             }
         } catch(e) { console.error('카드 드랍 오류:', e); }
 
+        // 수정조각 드랍
+        const shardRate = config.shardDropRate?.[mType] || (tierDrop.shardRate || DEFAULT_GAME_CONFIG.shardDropRate[mType] || 40);
+        if (Math.random() * 100 < shardRate) {
+            const amtRange = config.shardDropAmount?.[mType] || DEFAULT_GAME_CONFIG.shardDropAmount[mType] || [1,2];
+            const amt = Math.floor(Math.random() * (amtRange[1] - amtRange[0] + 1)) + amtRange[0];
+            // gold_boost 패시브 적용
+            let bonusAmt = amt;
+            if (equippedCardIdx >= 0) {
+                const inv = await getInventory();
+                if (inv[equippedCardIdx]) {
+                    const bonus = getPassiveBonus(inv[equippedCardIdx]);
+                    if (bonus.gold > 0) bonusAmt = Math.ceil(amt * (1 + bonus.gold / 100));
+                }
+            }
+            const curShards = await getShards();
+            await saveShards(curShards + bonusAmt);
+            huntLog.shardsGot = (huntLog.shardsGot || 0) + bonusAmt;
+            renderLog(`💎 수정조각 ×${bonusAmt} 획득!`, 'player');
+        }
+
         if (!cardDropped) {
-            renderLog('드랍 없음', 'enemy');
+            renderLog('카드 드랍 없음', 'enemy');
         }
         
+        // XP 보상 (몬스터 등급별)
+        const baseXp = { normal: 10, magic: 20, rare: 35, unique: 50 }[mType] || 10;
+        let xpGain = baseXp;
+        const xpBonusRate = combatState.xpBonus || 0;
+        if (xpBonusRate > 0) xpGain = Math.ceil(baseXp * (1 + xpBonusRate / 100));
+        stats.xp = (stats.xp || 0) + xpGain;
+        // 레벨업 체크 (100 XP per level)
+        const xpPerLv = 100;
+        while (stats.xp >= xpPerLv) {
+            stats.xp -= xpPerLv;
+            stats.level = (stats.level || 1) + 1;
+            renderLog(`🎉 레벨 업! Lv.${stats.level}`, 'player');
+        }
+        renderLog(`✨ +${xpGain} XP${xpBonusRate > 0 ? ` (보너스 +${xpBonusRate}%)` : ''}`, 'player');
+
         // 포션 드랍
         if (Math.random() * 100 < (tierDrop.potionRate || 20)) {
             stats.potions = (stats.potions||0) + 1;
