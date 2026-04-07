@@ -51,12 +51,11 @@ const DEFAULT_CARD_TEMPLATES = [
       passives:['hp_boost','drain','reflect','thorns'], passiveCount:3, passiveMin:15, passiveMax:30 }
 ];
 
-// 카드 등급 결정 (패시브 수 + 수치로 자동 결정)
-function determineCardRarity(passiveCount, totalPassiveValue) {
-    // 패시브 4개 + 높은 수치 = 유니크, 3개 = 레어, 2개=매직, 1개=일반
-    if (passiveCount >= 4 && totalPassiveValue >= 60) return 'unique';
-    if (passiveCount >= 3 && totalPassiveValue >= 40) return 'rare';
-    if (passiveCount >= 2 && totalPassiveValue >= 20) return 'magic';
+// 카드 등급 결정 (패시브 수로 자동 결정)
+function determineCardRarity(passiveCount) {
+    if (passiveCount >= 4) return 'unique';
+    if (passiveCount >= 3) return 'rare';
+    if (passiveCount >= 2) return 'magic';
     return 'common';
 }
 
@@ -158,7 +157,7 @@ async function generateCard(template, forcedRarity = null) {
     }
 
     let totalVal = chosenPassives.reduce((s,p) => s + p.value, 0);
-    let rarity = forcedRarity || determineCardRarity(chosenPassives.length, totalVal);
+    let rarity = forcedRarity || determineCardRarity(chosenPassives.length);
 
     let card = {
         id: Date.now() + Math.floor(Math.random()*10000),
