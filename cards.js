@@ -19,12 +19,10 @@ const PASSIVE_SKILLS = {
     critical: {name:'크리티컬',icon:'💥',desc:'크리율 +N%',unit:'%'},
     dodge: {name:'회피',icon:'💨',desc:'회피율 +N%',unit:'%'},
     drain: {name:'흡혈',icon:'🩸',desc:'흡혈 +N%',unit:'%'},
-    xp_boost: {name:'경험치 증가',icon:'📚',desc:'EXP +N%',unit:'%'},
     gold_boost: {name:'조각 추가 획득',icon:'💎',desc:'수정조각 +N%',unit:'%'},
     reflect: {name:'반사',icon:'🪞',desc:'데미지 반사 N%',unit:'%'},
     thorns: {name:'가시',icon:'🌹',desc:'피격 시 N% 반격',unit:'%'},
-    regen: {name:'재생',icon:'🌿',desc:'턴마다 HP N% 회복',unit:'%'},
-    speed: {name:'속도',icon:'⚡',desc:'선제공격 확률 +N%',unit:'%'}
+    regen: {name:'재생',icon:'🌿',desc:'턴마다 HP N% 회복',unit:'%'}
 };
 
 // ===== 수정조각 시스템 =====
@@ -48,7 +46,7 @@ const DEFAULT_CARD_TEMPLATES = [
     { templateId:'goblin_soldier', name:'고블린 병사', img:'goblin_card.png',
       passives:['atk_boost','critical','dodge','hp_boost'], passiveCount:2, passiveMin:10, passiveMax:20 },
     { templateId:'goblin_archer', name:'고블린 궁수', img:'goblin_card.png',
-      passives:['dodge','critical','speed','atk_boost'], passiveCount:2, passiveMin:10, passiveMax:20 },
+      passives:['dodge','critical','drain','atk_boost'], passiveCount:2, passiveMin:10, passiveMax:20 },
     { templateId:'great_goblin', name:'대왕 고블린', img:'boss_goblin_card.png',
       passives:['hp_boost','drain','reflect','thorns'], passiveCount:3, passiveMin:15, passiveMax:30 }
 ];
@@ -266,7 +264,7 @@ async function updateEquippedCardDisplay() {
 }
 
 function getPassiveBonus(card) {
-    let hp=0,atk=0,def=0,crit=0,dodge=0,drain=0,xp=0,gold=0,reflect=0,thorns=0,regen=0,speed=0;
+    let hp=0,atk=0,def=0,crit=0,dodge=0,drain=0,gold=0,reflect=0,thorns=0,regen=0;
     const apply = (skill,val) => {
         if(skill==='hp_boost') hp+=val;
         else if(skill==='atk_boost') atk+=val;
@@ -274,17 +272,15 @@ function getPassiveBonus(card) {
         else if(skill==='critical') crit+=val;
         else if(skill==='dodge') dodge+=val;
         else if(skill==='drain') drain+=val;
-        else if(skill==='xp_boost') xp+=val;
         else if(skill==='gold_boost') gold+=val;
         else if(skill==='reflect') reflect+=val;
         else if(skill==='thorns') thorns+=val;
         else if(skill==='regen') regen+=val;
-        else if(skill==='speed') speed+=val;
     };
     for (let i = 1; i <= 4; i++) {
         if (card[`passive${i}`]) apply(card[`passive${i}`], card[`passive${i}Value`] || 0);
     }
-    return {hp,atk,def,crit,dodge,drain,xp,gold,reflect,thorns,regen,speed};
+    return {hp,atk,def,crit,dodge,drain,gold,reflect,thorns,regen};
 }
 
 // 카드 패시브 텍스트 생성 헬퍼

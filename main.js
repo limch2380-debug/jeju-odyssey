@@ -894,7 +894,7 @@ async function startCombat(forcedMonsterName = null, autoStart = false) {
     // 장착 카드 패시브 적용
     const inv = await getInventory();
     equippedCardIdx = await getEquippedIdx();
-    let bonus = {hp:0,atk:0,def:0,crit:0,dodge:0,drain:0,xp:0,gold:0,reflect:0,thorns:0,regen:0,speed:0};
+    let bonus = {hp:0,atk:0,def:0,crit:0,dodge:0,drain:0,gold:0,reflect:0,thorns:0,regen:0};
     let equippedCard = null;
     if (equippedCardIdx>=0 && equippedCardIdx<inv.length) {
         equippedCard = inv[equippedCardIdx];
@@ -922,8 +922,8 @@ async function startCombat(forcedMonsterName = null, autoStart = false) {
         playerHP: finalHp, playerMaxHP: finalHp,
         playerAtk: finalAtk, playerDef: finalDef,
         crit: bonus.crit, dodge: bonus.dodge, drain: bonus.drain,
-        reflect: bonus.reflect, thorns: bonus.thorns, regen: bonus.regen, speed: bonus.speed,
-        xpBonus: bonus.xp, goldBonus: bonus.gold,
+        reflect: bonus.reflect, thorns: bonus.thorns, regen: bonus.regen,
+        goldBonus: bonus.gold,
         potions: playerData.potions || 0,
 
         currentEnemy: { ...targetMonster, hp: mHp, maxHp: mHp, dmg: mAtk, def: mDef },
