@@ -884,8 +884,19 @@ async function spawnRiftMonsters(portal) {
     const spawnCount = portal.rift_spawn_count || 5;
     const riftRadius = portal.radius || 100;
 
+    const rates = portal.rift_respawn_rates || {normal:100, magic:80, rare:10, unique:3};
+
     for (let i = 0; i < spawnCount; i++) {
-        const monster = riftPool[Math.floor(Math.random() * riftPool.length)];
+        // 등급별 스폰 확률 판정 (최대 10회 재시도)
+        let monster = null;
+        for (let retry = 0; retry < 10; retry++) {
+            const candidate = riftPool[Math.floor(Math.random() * riftPool.length)];
+            const cType = candidate.type || 'normal';
+            const chance = (rates[cType] ?? 100) / 100;
+            if (Math.random() < chance) { monster = candidate; break; }
+        }
+        if (!monster) monster = riftPool.find(m => (m.type||'normal') === 'normal') || riftPool[0];
+
         const mType = monster.type || 'normal';
         const mTypeInfo = MONSTER_TYPES[mType] || MONSTER_TYPES.normal;
         const [lat, lng] = generateWildSpawnPos(portal.lat, portal.lng, 10, riftRadius * 0.85);
@@ -935,7 +946,7 @@ async function spawnRiftMonsters(portal) {
         });
         riftMonsters.push(riftEntry);
     }
-    console.log(`[RIFT] ${portal.name} 균열에 ${spawnCount}마리 스폰`);
+    console.log(`[RIFT] ${portal.name} 균열에 ${riftMonsters.filter(r=>r.portalId===portal.id).length}마리 스폰`);
 
     // 주기적 리스폰 (처치된 자리 보충)
     if (riftSpawnTimer) clearInterval(riftSpawnTimer);
