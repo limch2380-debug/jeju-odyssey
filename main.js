@@ -964,13 +964,10 @@ async function startCombat(forcedMonsterName = null, autoStart = false) {
 }
 function startAutoCombat() {
     if (autoBattleInterval) clearInterval(autoBattleInterval);
-    // speed 패시브: 기본 1200ms, 최소 600ms
-    const speedReduction = Math.min(600, Math.floor(1200 * (combatState.speed || 0) / 100));
-    const interval = Math.max(600, 1200 - speedReduction);
     autoBattleInterval = setInterval(() => {
         if (!combatState.isGameOver && !combatState.busy) executePlayerTurn();
         else if (combatState.isGameOver) { clearInterval(autoBattleInterval); autoBattleInterval=null; }
-    }, interval);
+    }, 1200);
     // ★ 안전장치: busy가 3초 이상 지속되면 강제 해제
     setInterval(() => {
         if (combatState.busy && !combatState.isGameOver) {
@@ -1194,21 +1191,7 @@ async function handleVictory() {
         if (!cardDropped) {
             renderLog('카드 드랍 없음', 'enemy');
         }
-        
-        // XP 보상 (몬스터 등급별)
-        const baseXp = { normal: 10, magic: 20, rare: 35, unique: 50 }[mType] || 10;
-        let xpGain = baseXp;
-        const xpBonusRate = combatState.xpBonus || 0;
-        if (xpBonusRate > 0) xpGain = Math.ceil(baseXp * (1 + xpBonusRate / 100));
-        stats.xp = (stats.xp || 0) + xpGain;
-        // 레벨업 체크 (100 XP per level)
-        const xpPerLv = 100;
-        while (stats.xp >= xpPerLv) {
-            stats.xp -= xpPerLv;
-            stats.level = (stats.level || 1) + 1;
-            renderLog(`🎉 레벨 업! Lv.${stats.level}`, 'player');
-        }
-        renderLog(`✨ +${xpGain} XP${xpBonusRate > 0 ? ` (보너스 +${xpBonusRate}%)` : ''}`, 'player');
+
 
         // 포션 드랍
         if (Math.random() * 100 < (tierDrop.potionRate || 20)) {
