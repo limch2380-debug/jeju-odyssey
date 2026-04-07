@@ -15,6 +15,20 @@ let ignoredPortalIds = new Set();
 let encounterPending = false;
 let autoHuntPortal = null; // 현재 자동사냥 중인 포탈 정보
 
+// ===== 야생 몬스터 자동 스폰 시스템 =====
+let wildMonsters = [];       // [{id, monster, lat, lng, marker, type}]
+let wildMonsterMarkers = [];
+let wildSpawnTimer = null;
+const WILD_CONFIG = {
+    maxSpawns: 8,             // 동시 최대 스폰 수
+    spawnRadius: 300,         // 플레이어 주변 스폰 반경 (미터)
+    minSpawnDist: 30,         // 너무 가까이 스폰 방지 (미터)
+    encounterDist: 20,        // 이 거리 이내 접근 시 전투
+    respawnInterval: 30000,   // 30초마다 리스폰 체크
+    despawnDist: 500,         // 500m 이상 떨어지면 디스폰
+    rarityWeights: { normal: 55, magic: 28, rare: 12, unique: 5 } // 등급별 출현 확률 (%)
+};
+
 // ===== 세션 사냥 기록 =====
 let huntLog = { kills: 0, bossKills: 0, potions: 0, cardsGot: 0 };
 
@@ -313,7 +327,7 @@ function showScreen(screenId) {
     }
 
     if (screenId === 'dashboard') {
-        setTimeout(() => { initMap(); startTracking(); loadPortals(); if (map) { map.invalidateSize(); map.setView(currentUserPos, 17); } }, 100);
+        setTimeout(async () => { initMap(); startTracking(); loadPortals(); await loadWildSpawnSettings(); startWildSpawnSystem(); if (map) { map.invalidateSize(); map.setView(currentUserPos, 17); } }, 100);
     } else if (screenId === 'settings') {
         setTimeout(() => { initSettings(); renderCardEditor(); loadDropSettingsUI(); loadGameConfigUI(); loadAdminUserList(); }, 100);
     } else if (screenId === 'inventory') {
@@ -422,6 +436,7 @@ function startTracking() {
             if (accuracyCircle) { accuracyCircle.setLatLng(currentUserPos); accuracyCircle.setRadius(pos.coords.accuracy); }
             if (map && activeScreen === 'dashboard') map.panTo(currentUserPos);
             checkProximity();
+            checkWildEncounters();
             updateDashboardHUD();
         }, (err) => console.error("GPS_ERROR:", err), { enableHighAccuracy: true, maximumAge: 2000 });
     }
@@ -443,6 +458,21 @@ async function updateDashboardHUD() {
     if (hpText && combatState.playerMaxHP > 0) hpText.innerText = `${Math.ceil((combatState.playerHP/combatState.playerMaxHP)*100)}%`;
     const hpBar = document.getElementById('hud-hp-bar');
     if (hpBar && combatState.playerMaxHP > 0) hpBar.style.width = `${(combatState.playerHP/combatState.playerMaxHP)*100}%`;
+
+    // 야생 몬스터 HUD 업데이트
+    const wildEl = document.getElementById('wild-monster-count');
+    if (wildEl) {
+        if (wildMonsters.length > 0) {
+            let nearest = Infinity;
+            wildMonsters.forEach(wm => {
+                const d = L.latLng(currentUserPos).distanceTo([wm.lat, wm.lng]);
+                if (d < nearest) nearest = d;
+            });
+            wildEl.innerText = `🌍 야생 몬스터 ${wildMonsters.length}마리 | 가장 가까운: ${Math.round(nearest)}m`;
+        } else {
+            wildEl.innerText = '🌍 주변에 야생 몬스터 없음';
+        }
+    }
 }
 
 function updateHuntLogUI() {
@@ -650,7 +680,209 @@ function rejectPortalAction() {
     portalActionTarget = null;
 }
 
-function stopTracking() { if (watchId) navigator.geolocation.clearWatch(watchId); }
+// ===== 야생 몬스터 스폰 시스템 =====
+async function loadWildSpawnSettings() {
+    try {
+        const { data } = await db.from('game_settings').select('value').eq('name', 'wildSpawnConfig').single();
+        if (data && data.value) {
+            Object.assign(WILD_CONFIG, data.value);
+        }
+    } catch(e) { console.log('[WILD] 기본 설정 사용'); }
+    // UI에 반영
+    const set = (id, v) => { const el = document.getElementById(id); if(el) el.value = v; };
+    set('ws-max-spawns', WILD_CONFIG.maxSpawns);
+    set('ws-spawn-radius', WILD_CONFIG.spawnRadius);
+    set('ws-encounter-dist', WILD_CONFIG.encounterDist);
+    set('ws-respawn-sec', WILD_CONFIG.respawnInterval / 1000);
+    set('ws-w-normal', WILD_CONFIG.rarityWeights.normal);
+    set('ws-w-magic', WILD_CONFIG.rarityWeights.magic);
+    set('ws-w-rare', WILD_CONFIG.rarityWeights.rare);
+    set('ws-w-unique', WILD_CONFIG.rarityWeights.unique);
+}
+
+async function saveWildSpawnSettings() {
+    const getVal = (id, def) => parseInt(document.getElementById(id)?.value) || def;
+    WILD_CONFIG.maxSpawns = getVal('ws-max-spawns', 8);
+    WILD_CONFIG.spawnRadius = getVal('ws-spawn-radius', 300);
+    WILD_CONFIG.minSpawnDist = 30;
+    WILD_CONFIG.encounterDist = getVal('ws-encounter-dist', 20);
+    WILD_CONFIG.respawnInterval = getVal('ws-respawn-sec', 30) * 1000;
+    WILD_CONFIG.despawnDist = WILD_CONFIG.spawnRadius * 1.7;
+    WILD_CONFIG.rarityWeights = {
+        normal: getVal('ws-w-normal', 55),
+        magic: getVal('ws-w-magic', 28),
+        rare: getVal('ws-w-rare', 12),
+        unique: getVal('ws-w-unique', 5)
+    };
+    await db.from('game_settings').upsert({ name: 'wildSpawnConfig', value: WILD_CONFIG });
+    alert('✅ 야생 스폰 설정 저장 완료!\n\n' +
+        `동시 스폰: ${WILD_CONFIG.maxSpawns}마리\n` +
+        `스폰 반경: ${WILD_CONFIG.spawnRadius}m\n` +
+        `인카운터: ${WILD_CONFIG.encounterDist}m\n` +
+        `리스폰: ${WILD_CONFIG.respawnInterval/1000}초\n` +
+        `비율: 일반${WILD_CONFIG.rarityWeights.normal}% 매직${WILD_CONFIG.rarityWeights.magic}% 레어${WILD_CONFIG.rarityWeights.rare}% 유니크${WILD_CONFIG.rarityWeights.unique}%`);
+    // 실시간 반영: 기존 스폰 초기화 후 재스폰
+    stopWildSpawnSystem();
+    startWildSpawnSystem();
+}
+
+function generateWildSpawnPos(centerLat, centerLng, minDist, maxDist) {
+    // 랜덤 거리, 랜덤 방향으로 좌표 생성
+    const dist = minDist + Math.random() * (maxDist - minDist);
+    const angle = Math.random() * 2 * Math.PI;
+    const dLat = (dist * Math.cos(angle)) / 111320;
+    const dLng = (dist * Math.sin(angle)) / (111320 * Math.cos(centerLat * Math.PI / 180));
+    return [centerLat + dLat, centerLng + dLng];
+}
+
+function pickWildMonsterRarity() {
+    const w = WILD_CONFIG.rarityWeights;
+    const total = w.normal + w.magic + w.rare + w.unique;
+    const roll = Math.random() * total;
+    let acc = 0;
+    if ((acc += w.normal) > roll) return 'normal';
+    if ((acc += w.magic) > roll) return 'magic';
+    if ((acc += w.rare) > roll) return 'rare';
+    return 'unique';
+}
+
+async function spawnWildMonsters() {
+    if (!map || activeScreen === 'combat') return;
+    const pool = await getMonsterPool();
+    if (pool.length === 0) return;
+
+    // 멀리 떨어진 몬스터 디스폰
+    wildMonsters = wildMonsters.filter(wm => {
+        const dist = L.latLng(currentUserPos).distanceTo([wm.lat, wm.lng]);
+        if (dist > WILD_CONFIG.despawnDist) {
+            if (wm.marker) map.removeLayer(wm.marker);
+            if (wm.circle) map.removeLayer(wm.circle);
+            return false;
+        }
+        return true;
+    });
+
+    // 최대 수 채우기
+    const toSpawn = WILD_CONFIG.maxSpawns - wildMonsters.length;
+    for (let i = 0; i < toSpawn; i++) {
+        const rarity = pickWildMonsterRarity();
+        const candidates = pool.filter(m => m.type === rarity);
+        if (candidates.length === 0) continue;
+        const monster = candidates[Math.floor(Math.random() * candidates.length)];
+        const [lat, lng] = generateWildSpawnPos(currentUserPos[0], currentUserPos[1], WILD_CONFIG.minSpawnDist, WILD_CONFIG.spawnRadius);
+        
+        const mTypeInfo = MONSTER_TYPES[rarity] || MONSTER_TYPES.normal;
+        const iconSize = rarity === 'unique' ? 32 : rarity === 'rare' ? 28 : 22;
+        const pulseClass = (rarity === 'unique' || rarity === 'rare') ? 'wild-pulse' : '';
+        
+        const icon = L.divIcon({
+            className: 'wild-monster-marker',
+            html: `<div class="wild-monster-icon ${pulseClass}" style="
+                width:${iconSize}px;height:${iconSize}px;
+                background:${mTypeInfo.color};
+                border-radius:50%;
+                display:flex;align-items:center;justify-content:center;
+                font-size:${iconSize * 0.5}px;
+                box-shadow:0 0 ${iconSize}px ${mTypeInfo.color}40, 0 0 ${iconSize/2}px ${mTypeInfo.color}60;
+                border:2px solid ${mTypeInfo.color};
+                cursor:pointer;
+                animation: wildBounce 2s ease-in-out infinite;
+            ">${mTypeInfo.icon}</div>`,
+            iconSize: [iconSize, iconSize],
+            iconAnchor: [iconSize/2, iconSize/2]
+        });
+
+        const marker = L.marker([lat, lng], { icon }).addTo(map);
+        
+        // 인카운터 범위 원 (유니크/레어만 표시)
+        let circle = null;
+        if (rarity === 'rare' || rarity === 'unique') {
+            circle = L.circle([lat, lng], {
+                radius: WILD_CONFIG.encounterDist,
+                color: mTypeInfo.color,
+                weight: 1,
+                opacity: 0.3,
+                fillColor: mTypeInfo.color,
+                fillOpacity: 0.05,
+                dashArray: '4, 4'
+            }).addTo(map);
+        }
+
+        const wmId = Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+        const wildEntry = { id: wmId, monster, lat, lng, marker, circle, type: rarity };
+        
+        marker.on('click', () => {
+            const dist = L.latLng(currentUserPos).distanceTo([lat, lng]);
+            if (dist <= WILD_CONFIG.encounterDist * 2) {
+                startWildEncounter(wildEntry);
+            } else {
+                // 너무 멀면 거리 표시
+                const popup = L.popup({ closeButton: false, autoClose: true, closeOnClick: true })
+                    .setLatLng([lat, lng])
+                    .setContent(`<div style="text-align:center;font-size:12px;font-weight:bold;color:${mTypeInfo.color};">${mTypeInfo.icon} ${monster.name}<br><span style="color:#888;">거리: ${Math.round(dist)}m</span></div>`)
+                    .openOn(map);
+                setTimeout(() => map.closePopup(popup), 2000);
+            }
+        });
+
+        wildMonsters.push(wildEntry);
+    }
+}
+
+async function checkWildEncounters() {
+    if (activeScreen !== 'dashboard' || encounterPending) return;
+    // 자동사냥 중이면 야생 인카운터 스킵
+    if (autoHuntPortal) return;
+    
+    for (const wm of wildMonsters) {
+        const dist = L.latLng(currentUserPos).distanceTo([wm.lat, wm.lng]);
+        if (dist <= WILD_CONFIG.encounterDist) {
+            startWildEncounter(wm);
+            break;
+        }
+    }
+}
+
+async function startWildEncounter(wildEntry) {
+    if (encounterPending || activeScreen === 'combat') return;
+    encounterPending = true;
+
+    // 맵에서 해당 몬스터 제거
+    if (wildEntry.marker) map.removeLayer(wildEntry.marker);
+    if (wildEntry.circle) map.removeLayer(wildEntry.circle);
+    wildMonsters = wildMonsters.filter(wm => wm.id !== wildEntry.id);
+
+    const mTypeInfo = MONSTER_TYPES[wildEntry.type] || MONSTER_TYPES.normal;
+    triggerPortalAlert();
+    document.getElementById('map-status').innerHTML = `<span style="color:${mTypeInfo.color}; animation: pulse 1s infinite; font-weight:bold;">${mTypeInfo.icon} 야생 ${mTypeInfo.name} ${wildEntry.monster.name} 출현!</span>`;
+    
+    setTimeout(() => {
+        encounterPending = false;
+        startCombat(wildEntry.monster.name, true);
+    }, 1200);
+}
+
+function startWildSpawnSystem() {
+    // 초기 스폰
+    spawnWildMonsters();
+    // 주기적 리스폰
+    if (wildSpawnTimer) clearInterval(wildSpawnTimer);
+    wildSpawnTimer = setInterval(() => spawnWildMonsters(), WILD_CONFIG.respawnInterval);
+}
+
+function stopWildSpawnSystem() {
+    if (wildSpawnTimer) { clearInterval(wildSpawnTimer); wildSpawnTimer = null; }
+    wildMonsters.forEach(wm => {
+        if (wm.marker) map.removeLayer(wm.marker);
+        if (wm.circle) map.removeLayer(wm.circle);
+    });
+    wildMonsters = [];
+}
+
+function stopTracking() {
+    if (watchId) navigator.geolocation.clearWatch(watchId);
+    stopWildSpawnSystem();
+}
 
 // ===== COMBAT — 완전 자동 전투 =====
 async function startCombat(forcedMonsterName = null, autoStart = false) {
@@ -1002,6 +1234,7 @@ function switchSettingsTab(tabId, btn) {
     if (tabId === 'tab-monsters' && !settingsInitialized.monsters) {
         settingsInitialized.monsters = true;
         renderSettingsMonsterList();
+        loadWildSpawnSettings();
     }
     if (tabId === 'tab-cards' && !settingsInitialized.cards) {
         settingsInitialized.cards = true;

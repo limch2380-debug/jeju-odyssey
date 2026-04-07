@@ -230,6 +230,7 @@
                 <div class="glass-panel" style="padding:12px 16px; border-radius:16px;">
                     <div id="map-status" style="font-size:0.65rem; color:var(--secondary-cyan); text-align:center;">시스템 온라인</div>
                     <div id="distance-info" style="margin-top:5px; font-size:0.55rem; color:var(--text-dim); text-align:center;">가까운 균열을 찾는 중...</div>
+                    <div id="wild-monster-count" style="margin-top:4px; font-size:0.55rem; color:var(--primary-gold); text-align:center;">🌍 야생 몬스터: 탐색 중...</div>
                 </div>
             </div>
         </div>
@@ -379,6 +380,49 @@
                             </div>
                             <div id="set-monster-list"></div>
                             <button class="btn-primary" style="margin-top:12px; width:100%; padding:12px; font-size:0.8rem; background:linear-gradient(135deg, var(--accent-red) 0%, #b30000 100%);" onclick="saveMonsterPool()">몬스터 데이터 저장</button>
+                        </div>
+
+                        <!-- 야생 스폰 설정 -->
+                        <div class="glass-panel" style="padding: 20px; margin-top:12px;">
+                            <h3 style="color: var(--primary-gold); font-size: 0.85rem; margin-bottom: 12px;">🌍 야생 스폰 설정</h3>
+                            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px;">
+                                <div>
+                                    <label style="font-size:0.6rem; color:var(--text-dim); display:block; margin-bottom:4px;">동시 스폰 수</label>
+                                    <input type="number" id="ws-max-spawns" class="btn-nav" value="8" min="1" max="20" style="width:100%; padding:8px; text-align:center; font-size:0.8rem;">
+                                </div>
+                                <div>
+                                    <label style="font-size:0.6rem; color:var(--text-dim); display:block; margin-bottom:4px;">스폰 반경(m)</label>
+                                    <input type="number" id="ws-spawn-radius" class="btn-nav" value="300" min="50" max="1000" style="width:100%; padding:8px; text-align:center; font-size:0.8rem;">
+                                </div>
+                                <div>
+                                    <label style="font-size:0.6rem; color:var(--text-dim); display:block; margin-bottom:4px;">인카운터 거리(m)</label>
+                                    <input type="number" id="ws-encounter-dist" class="btn-nav" value="20" min="5" max="100" style="width:100%; padding:8px; text-align:center; font-size:0.8rem;">
+                                </div>
+                                <div>
+                                    <label style="font-size:0.6rem; color:var(--text-dim); display:block; margin-bottom:4px;">리스폰 주기(초)</label>
+                                    <input type="number" id="ws-respawn-sec" class="btn-nav" value="30" min="10" max="300" style="width:100%; padding:8px; text-align:center; font-size:0.8rem;">
+                                </div>
+                            </div>
+                            <h4 style="color: var(--secondary-cyan); font-size: 0.7rem; margin-bottom:8px;">등급별 출현 확률 (%)</h4>
+                            <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:6px; margin-bottom:12px;">
+                                <div style="text-align:center;">
+                                    <label style="font-size:0.55rem; color:#fff; display:block; margin-bottom:4px;">🗡 일반</label>
+                                    <input type="number" id="ws-w-normal" class="btn-nav" value="55" min="0" max="100" style="width:100%; padding:6px; text-align:center; font-size:0.75rem;">
+                                </div>
+                                <div style="text-align:center;">
+                                    <label style="font-size:0.55rem; color:#4488ff; display:block; margin-bottom:4px;">✨ 매직</label>
+                                    <input type="number" id="ws-w-magic" class="btn-nav" value="28" min="0" max="100" style="width:100%; padding:6px; text-align:center; font-size:0.75rem;">
+                                </div>
+                                <div style="text-align:center;">
+                                    <label style="font-size:0.55rem; color:#ffdd00; display:block; margin-bottom:4px;">⚔ 레어</label>
+                                    <input type="number" id="ws-w-rare" class="btn-nav" value="12" min="0" max="100" style="width:100%; padding:6px; text-align:center; font-size:0.75rem;">
+                                </div>
+                                <div style="text-align:center;">
+                                    <label style="font-size:0.55rem; color:#ffa500; display:block; margin-bottom:4px;">👑 유니크</label>
+                                    <input type="number" id="ws-w-unique" class="btn-nav" value="5" min="0" max="100" style="width:100%; padding:6px; text-align:center; font-size:0.75rem;">
+                                </div>
+                            </div>
+                            <button class="btn-primary" style="width:100%; padding:12px; font-size:0.8rem; background:linear-gradient(135deg, var(--primary-gold) 0%, #ff8800 100%);" onclick="saveWildSpawnSettings()">🌍 야생 스폰 설정 저장</button>
                         </div>
                     </div>
 

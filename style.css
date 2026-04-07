@@ -322,6 +322,25 @@ input[type="number"].btn-nav {
     100% { transform: scale(1); opacity: 0.8; box-shadow: 0 0 20px var(--secondary-cyan); }
 }
 
+/* 야생 몬스터 마커 */
+.wild-monster-marker { background: transparent !important; border: none !important; }
+.wild-monster-icon { transition: transform 0.3s ease; }
+.wild-monster-icon:hover { transform: scale(1.3) !important; }
+
+@keyframes wildBounce {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-4px); }
+}
+
+.wild-pulse {
+    animation: wildBounce 2s ease-in-out infinite, wildGlow 1.5s ease-in-out infinite alternate !important;
+}
+
+@keyframes wildGlow {
+    0% { filter: brightness(1); }
+    100% { filter: brightness(1.4) drop-shadow(0 0 8px currentColor); }
+}
+
 .shake {
     animation: shake-anim 0.4s ease-in-out;
 }
