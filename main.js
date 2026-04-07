@@ -545,40 +545,12 @@ async function checkProximity() {
                 missionOverlay.style.display = 'block';
                 document.getElementById('mission-title').innerText = insidePortal.name;
                 document.getElementById('mission-desc').innerText = insidePortal.mission_text || "이 지역을 조사하십시오.";
-                const targetDist = insidePortal.spawn_distance_requirement || 20;
-                document.getElementById('mission-walk-dist').innerText = Math.floor(walkAccumulator);
-                document.getElementById('mission-target-dist').innerText = targetDist;
-                document.getElementById('mission-xp-bar').style.width = `${Math.min(100, (walkAccumulator / targetDist) * 100)}%`;
-
-                if (walkAccumulator >= targetDist) {
-                    const chance = insidePortal.spawn_chance ?? 1;
-                    const roll = Math.random();
-                    console.log('[ENCOUNTER] 거리 충족! 확률 체크:', Math.round(chance*100)+'%', 'roll:', roll.toFixed(2));
-                    if (roll < chance) {
-                        encounterPending = true;
-                        const assignedNames = parsePortalMonsters(insidePortal.target_monster_name);
-                        let monsterToSpawn = null;
-                        if (assignedNames.length > 0) {
-                            monsterToSpawn = assignedNames[Math.floor(Math.random() * assignedNames.length)];
-                        } else {
-                            // 균열 등급에 따라 자동으로 몬스터 필터링
-                            const riftGrade = getPortalRiftGrade(insidePortal.id);
-                            const filtered = getMonstersByRiftGrade(pool, riftGrade);
-                            if (filtered.length > 0) {
-                                monsterToSpawn = filtered[Math.floor(Math.random() * filtered.length)].name;
-                            }
-                        }
-                        triggerPortalAlert();
-                        document.getElementById('map-status').innerHTML = `<span style="color: var(--accent-red); animation: pulse 1s infinite; font-weight:bold;">[!] 적의 기습! 자동전투 진입...</span>`;
-                        missionOverlay.style.display = 'none';
-                        setTimeout(() => { walkAccumulator = 0; encounterPending = false; startCombat(monsterToSpawn, true); }, 1200);
-                        proximityRunning = false;
-                        return;
-                    } else {
-                        walkAccumulator = 0;
-                        document.getElementById('map-status').innerHTML = `<span style="color: var(--text-dim);">[...] 기척이 사라졌다... 다시 탐색 중 (${Math.round(chance*100)}%)</span>`;
-                    }
-                }
+                // 균열 몬스터 현황 표시
+                const riftAlive = riftMonsters.filter(rm => rm.portalId === insidePortal.id).length;
+                const riftMax = insidePortal.rift_spawn_count || 5;
+                document.getElementById('mission-walk-dist').innerText = riftAlive;
+                document.getElementById('mission-target-dist').innerText = riftMax;
+                document.getElementById('mission-xp-bar').style.width = `${Math.min(100, (riftAlive / riftMax) * 100)}%`;
             }
         } else {
             // 포탈 반경 밖으로 나감
@@ -977,8 +949,11 @@ async function respawnRiftMonsters(portal, riftPool) {
     const toSpawn = spawnCount - currentCount;
     if (toSpawn <= 0 || riftPool.length === 0) return;
 
+    const respawnChance = (portal.rift_respawn_chance || 80) / 100;
     const riftRadius = portal.radius || 100;
     for (let i = 0; i < toSpawn; i++) {
+        // 리스폰 확률 판정
+        if (Math.random() > respawnChance) continue;
         const monster = riftPool[Math.floor(Math.random() * riftPool.length)];
         const mType = monster.type || 'normal';
         const mTypeInfo = MONSTER_TYPES[mType] || MONSTER_TYPES.normal;
@@ -1709,7 +1684,7 @@ async function renderSettingsPortalList() {
                     </div>
                     <div style="font-size:0.55rem; color:var(--text-dim); margin-bottom:6px;">${p.mission_text?.substring(0,30) || ''}...</div>
                     <div style="display:flex; flex-wrap:wrap; gap:4px; align-items:center; margin-bottom:4px;">${monsterTags}</div>
-                    <div style="font-size:0.5rem; color:var(--text-dim);">반경 ${p.radius || 100}m | 조사 ${p.spawn_distance_requirement || 20}m | 출현율 ${Math.round((p.spawn_chance ?? 1) * 100)}% | 스폰 ${p.rift_spawn_count || 5}마리</div>
+                    <div style="font-size:0.5rem; color:var(--text-dim);">반경 ${p.radius || 100}m | 스폰 ${p.rift_spawn_count || 5}마리 | 리스폰 ${p.rift_respawn_chance || 80}%</div>
                 </div>
                 <div style="display:flex; gap:8px; flex-shrink:0; padding-top:5px;">
                     <button class="btn-nav" style="padding:5px 12px; font-size:0.6rem; border-color:var(--secondary-cyan);" onclick="openPortalEditor(${p.id})">EDIT</button>
@@ -1744,9 +1719,8 @@ async function openPortalEditor(id) {
     document.getElementById('ed-p-name').value = p.name;
     document.getElementById('ed-p-mission').value = p.mission_text || "";
     document.getElementById('ed-p-radius').value = p.radius || 100;
-    document.getElementById('ed-p-walk').value = p.spawn_distance_requirement || 20;
-    document.getElementById('ed-p-chance').value = Math.round((p.spawn_chance ?? 1) * 100);
     document.getElementById('ed-p-spawn-count').value = p.rift_spawn_count || 5;
+    document.getElementById('ed-p-respawn-chance').value = p.rift_respawn_chance || 80;
     
     // 균열 등급 라디오 버튼 설정
     const gradeRadios = document.querySelectorAll('input[name="rift-grade"]');
@@ -1796,16 +1770,15 @@ function closePortalEditor() { document.getElementById('portal-editor-modal').st
 async function applyPortalEdit() {
     const checks = document.querySelectorAll('.ed-monster-check:checked');
     const selectedNames = Array.from(checks).map(c => c.value);
-    const chancePct = parseInt(document.getElementById('ed-p-chance').value) || 50;
     const spawnCount = parseInt(document.getElementById('ed-p-spawn-count').value) || 5;
+    const respawnChance = parseInt(document.getElementById('ed-p-respawn-chance').value) || 80;
     const selectedGrade = document.querySelector('input[name="rift-grade"]:checked')?.value || 'normal';
     const data = {
         name: document.getElementById('ed-p-name').value,
         mission_text: document.getElementById('ed-p-mission').value,
         radius: parseInt(document.getElementById('ed-p-radius').value),
-        spawn_distance_requirement: parseInt(document.getElementById('ed-p-walk').value),
-        spawn_chance: Math.min(100, Math.max(1, chancePct)) / 100,
         rift_spawn_count: Math.min(20, Math.max(1, spawnCount)),
+        rift_respawn_chance: Math.min(100, Math.max(1, respawnChance)),
         target_monster_name: selectedNames.length > 0 ? JSON.stringify(selectedNames) : null
     };
     await db.from('portals').update(data).eq('id', editingPortalId);
