@@ -19,6 +19,8 @@ let autoHuntPortal = null; // 현재 자동사냥 중인 포탈 정보
 let wildMonsters = [];       // [{id, monster, lat, lng, marker, type}]
 let wildMonsterMarkers = [];
 let wildSpawnTimer = null;
+let riftMonsters = [];       // 균열 전용 스폰 몬스터
+let riftSpawnTimer = null;
 const WILD_CONFIG = {
     maxSpawns: 8,             // 동시 최대 스폰 수
     spawnRadius: 300,         // 플레이어 주변 스폰 반경 (미터)
@@ -437,6 +439,7 @@ function startTracking() {
             if (map && activeScreen === 'dashboard') map.panTo(currentUserPos);
             checkProximity();
             checkWildEncounters();
+            checkRiftEncounters();
             updateDashboardHUD();
         }, (err) => console.error("GPS_ERROR:", err), { enableHighAccuracy: true, maximumAge: 2000 });
     }
@@ -648,11 +651,15 @@ function confirmPortalAction() {
         lastWalkPos = currentUserPos;
         exitConfirmShown = false;
         if ('vibrate' in navigator) navigator.vibrate(200);
-        const spawnPct = Math.round((portalActionTarget.spawn_chance ?? 1) * 100);
-        document.getElementById('map-status').innerHTML = `<span style="color: var(--secondary-cyan); font-weight:bold;">📍 ${portalActionTarget.name} 탐사 중 (출현율 ${spawnPct}%)</span>`;
+        // 야생 몬스터 정리 → 균열 전용 스폰
+        stopWildSpawnSystem();
+        spawnRiftMonsters(portalActionTarget);
+        document.getElementById('map-status').innerHTML = `<span style="color: var(--secondary-cyan); font-weight:bold;">📍 ${portalActionTarget.name} 균열 탐사 중</span>`;
         checkProximity();
     } else if (portalActionMode === 'exit') {
-        // 이탈 확정
+        // 이탈 확정 → 균열 몬스터 정리, 야생 스폰 재개
+        clearRiftMonsters();
+        startWildSpawnSystem();
         document.getElementById('map-status').innerHTML = `<span style="color: var(--secondary-cyan);">[!] ${autoHuntPortal?.name||'포탈'} 구역 이탈. 탐사 종료.</span>`;
         autoHuntPortal = null;
         activeMissionPortalId = null;
@@ -750,6 +757,8 @@ function pickWildMonsterRarity() {
 
 async function spawnWildMonsters() {
     if (!map || activeScreen === 'combat') return;
+    // 균열 미션 진행 중이면 야생 스폰 안 함 (균열 전용 스폰 사용)
+    if (activeMissionPortalId) return;
     const pool = await getMonsterPool();
     if (pool.length === 0) return;
 
@@ -833,8 +842,8 @@ async function spawnWildMonsters() {
 
 async function checkWildEncounters() {
     if (activeScreen !== 'dashboard' || encounterPending) return;
-    // 자동사냥 중이면 야생 인카운터 스킵
-    if (autoHuntPortal) return;
+    // 자동사냥 중이거나 균열 미션 진행 중이면 야생 인카운터 스킵
+    if (autoHuntPortal || activeMissionPortalId) return;
     
     for (const wm of wildMonsters) {
         const dist = L.latLng(currentUserPos).distanceTo([wm.lat, wm.lng]);
@@ -881,9 +890,163 @@ function stopWildSpawnSystem() {
     wildMonsters = [];
 }
 
+// ===== 균열 전용 몬스터 스폰 시스템 =====
+async function spawnRiftMonsters(portal) {
+    if (!map) return;
+    clearRiftMonsters();
+    const pool = await getMonsterPool();
+    const assignedNames = parsePortalMonsters(portal.target_monster_name);
+    await getRiftGrades();
+    const riftGrade = getPortalRiftGrade(portal.id);
+
+    // 균열에서 사용할 몬스터 풀 결정
+    let riftPool;
+    if (assignedNames.length > 0) {
+        riftPool = pool.filter(m => assignedNames.includes(m.name));
+    } else {
+        riftPool = getMonstersByRiftGrade(pool, riftGrade);
+    }
+    if (riftPool.length === 0) return;
+
+    // 균열별 스폰 수 (DB에서 가져오거나 기본값 5)
+    const spawnCount = portal.rift_spawn_count || 5;
+    const riftRadius = portal.radius || 100;
+
+    for (let i = 0; i < spawnCount; i++) {
+        const monster = riftPool[Math.floor(Math.random() * riftPool.length)];
+        const mType = monster.type || 'normal';
+        const mTypeInfo = MONSTER_TYPES[mType] || MONSTER_TYPES.normal;
+        const [lat, lng] = generateWildSpawnPos(portal.lat, portal.lng, 10, riftRadius * 0.85);
+
+        const iconSize = mType === 'unique' ? 32 : mType === 'rare' ? 28 : 22;
+        const pulseClass = (mType === 'unique' || mType === 'rare') ? 'wild-pulse' : '';
+        const icon = L.divIcon({
+            className: 'wild-monster-marker',
+            html: `<div class="wild-monster-icon ${pulseClass}" style="
+                width:${iconSize}px;height:${iconSize}px;
+                background:${mTypeInfo.color};
+                border-radius:50%;
+                display:flex;align-items:center;justify-content:center;
+                font-size:${iconSize * 0.5}px;
+                box-shadow:0 0 ${iconSize}px ${mTypeInfo.color}40, 0 0 ${iconSize/2}px ${mTypeInfo.color}60;
+                border:2px solid ${mTypeInfo.color};
+                cursor:pointer;
+                animation: wildBounce 2s ease-in-out infinite;
+            ">${mTypeInfo.icon}</div>`,
+            iconSize: [iconSize, iconSize],
+            iconAnchor: [iconSize/2, iconSize/2]
+        });
+        const marker = L.marker([lat, lng], { icon }).addTo(map);
+        let circle = null;
+        if (mType === 'rare' || mType === 'unique') {
+            circle = L.circle([lat, lng], {
+                radius: WILD_CONFIG.encounterDist,
+                color: mTypeInfo.color, weight: 1, opacity: 0.3,
+                fillColor: mTypeInfo.color, fillOpacity: 0.05, dashArray: '4, 4'
+            }).addTo(map);
+        }
+
+        const rmId = 'rift_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+        const riftEntry = { id: rmId, monster, lat, lng, marker, circle, type: mType, portalId: portal.id };
+
+        marker.on('click', () => {
+            const dist = L.latLng(currentUserPos).distanceTo([lat, lng]);
+            if (dist <= WILD_CONFIG.encounterDist * 2) {
+                startRiftEncounter(riftEntry, portal);
+            } else {
+                const popup = L.popup({ closeButton: false, autoClose: true, closeOnClick: true })
+                    .setLatLng([lat, lng])
+                    .setContent(`<div style="text-align:center;font-size:12px;font-weight:bold;color:${mTypeInfo.color};">${mTypeInfo.icon} ${monster.name}<br><span style="color:#888;">거리: ${Math.round(dist)}m</span></div>`)
+                    .openOn(map);
+                setTimeout(() => map.closePopup(popup), 2000);
+            }
+        });
+        riftMonsters.push(riftEntry);
+    }
+    console.log(`[RIFT] ${portal.name} 균열에 ${spawnCount}마리 스폰`);
+
+    // 주기적 리스폰 (처치된 자리 보충)
+    if (riftSpawnTimer) clearInterval(riftSpawnTimer);
+    riftSpawnTimer = setInterval(() => respawnRiftMonsters(portal, riftPool), 15000);
+}
+
+async function respawnRiftMonsters(portal, riftPool) {
+    if (!map || activeScreen === 'combat' || !activeMissionPortalId) return;
+    const spawnCount = portal.rift_spawn_count || 5;
+    const currentCount = riftMonsters.filter(rm => rm.portalId === portal.id).length;
+    const toSpawn = spawnCount - currentCount;
+    if (toSpawn <= 0 || riftPool.length === 0) return;
+
+    const riftRadius = portal.radius || 100;
+    for (let i = 0; i < toSpawn; i++) {
+        const monster = riftPool[Math.floor(Math.random() * riftPool.length)];
+        const mType = monster.type || 'normal';
+        const mTypeInfo = MONSTER_TYPES[mType] || MONSTER_TYPES.normal;
+        const [lat, lng] = generateWildSpawnPos(portal.lat, portal.lng, 10, riftRadius * 0.85);
+        const iconSize = mType === 'unique' ? 32 : mType === 'rare' ? 28 : 22;
+        const pulseClass = (mType === 'unique' || mType === 'rare') ? 'wild-pulse' : '';
+        const icon = L.divIcon({
+            className: 'wild-monster-marker',
+            html: `<div class="wild-monster-icon ${pulseClass}" style="width:${iconSize}px;height:${iconSize}px;background:${mTypeInfo.color};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:${iconSize*0.5}px;box-shadow:0 0 ${iconSize}px ${mTypeInfo.color}40;border:2px solid ${mTypeInfo.color};cursor:pointer;animation:wildBounce 2s ease-in-out infinite;">${mTypeInfo.icon}</div>`,
+            iconSize: [iconSize, iconSize], iconAnchor: [iconSize/2, iconSize/2]
+        });
+        const marker = L.marker([lat, lng], { icon }).addTo(map);
+        const rmId = 'rift_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+        const riftEntry = { id: rmId, monster, lat, lng, marker, circle: null, type: mType, portalId: portal.id };
+        marker.on('click', () => {
+            const dist = L.latLng(currentUserPos).distanceTo([lat, lng]);
+            if (dist <= WILD_CONFIG.encounterDist * 2) {
+                startRiftEncounter(riftEntry, portal);
+            }
+        });
+        riftMonsters.push(riftEntry);
+    }
+}
+
+async function startRiftEncounter(riftEntry, portal) {
+    if (encounterPending || activeScreen === 'combat') return;
+    encounterPending = true;
+    // 맵에서 제거
+    if (riftEntry.marker) map.removeLayer(riftEntry.marker);
+    if (riftEntry.circle) map.removeLayer(riftEntry.circle);
+    riftMonsters = riftMonsters.filter(rm => rm.id !== riftEntry.id);
+
+    const mTypeInfo = MONSTER_TYPES[riftEntry.type] || MONSTER_TYPES.normal;
+    triggerPortalAlert();
+    document.getElementById('map-status').innerHTML = `<span style="color:${mTypeInfo.color}; animation: pulse 1s infinite; font-weight:bold;">${mTypeInfo.icon} 균열 ${mTypeInfo.name} ${riftEntry.monster.name} 출현!</span>`;
+    document.getElementById('mission-overlay').style.display = 'none';
+
+    setTimeout(() => {
+        encounterPending = false;
+        startCombat(riftEntry.monster.name, true);
+    }, 1200);
+}
+
+function checkRiftEncounters() {
+    if (activeScreen !== 'dashboard' || encounterPending || !activeMissionPortalId) return;
+    for (const rm of riftMonsters) {
+        const dist = L.latLng(currentUserPos).distanceTo([rm.lat, rm.lng]);
+        if (dist <= WILD_CONFIG.encounterDist) {
+            const portal = currentMissionPortal || autoHuntPortal;
+            startRiftEncounter(rm, portal);
+            break;
+        }
+    }
+}
+
+function clearRiftMonsters() {
+    if (riftSpawnTimer) { clearInterval(riftSpawnTimer); riftSpawnTimer = null; }
+    riftMonsters.forEach(rm => {
+        if (rm.marker) map.removeLayer(rm.marker);
+        if (rm.circle) map.removeLayer(rm.circle);
+    });
+    riftMonsters = [];
+}
+
 function stopTracking() {
     if (watchId) navigator.geolocation.clearWatch(watchId);
     stopWildSpawnSystem();
+    clearRiftMonsters();
 }
 
 // ===== COMBAT — 완전 자동 전투 =====
@@ -1546,7 +1709,7 @@ async function renderSettingsPortalList() {
                     </div>
                     <div style="font-size:0.55rem; color:var(--text-dim); margin-bottom:6px;">${p.mission_text?.substring(0,30) || ''}...</div>
                     <div style="display:flex; flex-wrap:wrap; gap:4px; align-items:center; margin-bottom:4px;">${monsterTags}</div>
-                    <div style="font-size:0.5rem; color:var(--text-dim);">반경 ${p.radius || 100}m | 조사 ${p.spawn_distance_requirement || 20}m | 출현율 ${Math.round((p.spawn_chance ?? 1) * 100)}%</div>
+                    <div style="font-size:0.5rem; color:var(--text-dim);">반경 ${p.radius || 100}m | 조사 ${p.spawn_distance_requirement || 20}m | 출현율 ${Math.round((p.spawn_chance ?? 1) * 100)}% | 스폰 ${p.rift_spawn_count || 5}마리</div>
                 </div>
                 <div style="display:flex; gap:8px; flex-shrink:0; padding-top:5px;">
                     <button class="btn-nav" style="padding:5px 12px; font-size:0.6rem; border-color:var(--secondary-cyan);" onclick="openPortalEditor(${p.id})">EDIT</button>
@@ -1583,6 +1746,7 @@ async function openPortalEditor(id) {
     document.getElementById('ed-p-radius').value = p.radius || 100;
     document.getElementById('ed-p-walk').value = p.spawn_distance_requirement || 20;
     document.getElementById('ed-p-chance').value = Math.round((p.spawn_chance ?? 1) * 100);
+    document.getElementById('ed-p-spawn-count').value = p.rift_spawn_count || 5;
     
     // 균열 등급 라디오 버튼 설정
     const gradeRadios = document.querySelectorAll('input[name="rift-grade"]');
@@ -1633,6 +1797,7 @@ async function applyPortalEdit() {
     const checks = document.querySelectorAll('.ed-monster-check:checked');
     const selectedNames = Array.from(checks).map(c => c.value);
     const chancePct = parseInt(document.getElementById('ed-p-chance').value) || 50;
+    const spawnCount = parseInt(document.getElementById('ed-p-spawn-count').value) || 5;
     const selectedGrade = document.querySelector('input[name="rift-grade"]:checked')?.value || 'normal';
     const data = {
         name: document.getElementById('ed-p-name').value,
@@ -1640,6 +1805,7 @@ async function applyPortalEdit() {
         radius: parseInt(document.getElementById('ed-p-radius').value),
         spawn_distance_requirement: parseInt(document.getElementById('ed-p-walk').value),
         spawn_chance: Math.min(100, Math.max(1, chancePct)) / 100,
+        rift_spawn_count: Math.min(20, Math.max(1, spawnCount)),
         target_monster_name: selectedNames.length > 0 ? JSON.stringify(selectedNames) : null
     };
     await db.from('portals').update(data).eq('id', editingPortalId);
