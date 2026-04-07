@@ -949,13 +949,14 @@ async function respawnRiftMonsters(portal, riftPool) {
     const toSpawn = spawnCount - currentCount;
     if (toSpawn <= 0 || riftPool.length === 0) return;
 
-    const respawnChance = (portal.rift_respawn_chance || 80) / 100;
+    const rates = portal.rift_respawn_rates || {normal:100, magic:80, rare:10, unique:3};
     const riftRadius = portal.radius || 100;
     for (let i = 0; i < toSpawn; i++) {
-        // 리스폰 확률 판정
-        if (Math.random() > respawnChance) continue;
+        // 먼저 몬스터 선택 → 등급별 리스폰 확률 판정
         const monster = riftPool[Math.floor(Math.random() * riftPool.length)];
         const mType = monster.type || 'normal';
+        const chance = (rates[mType] ?? 100) / 100;
+        if (Math.random() > chance) continue;
         const mTypeInfo = MONSTER_TYPES[mType] || MONSTER_TYPES.normal;
         const [lat, lng] = generateWildSpawnPos(portal.lat, portal.lng, 10, riftRadius * 0.85);
         const iconSize = mType === 'unique' ? 32 : mType === 'rare' ? 28 : 22;
@@ -1684,7 +1685,7 @@ async function renderSettingsPortalList() {
                     </div>
                     <div style="font-size:0.55rem; color:var(--text-dim); margin-bottom:6px;">${p.mission_text?.substring(0,30) || ''}...</div>
                     <div style="display:flex; flex-wrap:wrap; gap:4px; align-items:center; margin-bottom:4px;">${monsterTags}</div>
-                    <div style="font-size:0.5rem; color:var(--text-dim);">반경 ${p.radius || 100}m | 스폰 ${p.rift_spawn_count || 5}마리 | 리스폰 ${p.rift_respawn_chance || 80}%</div>
+                    <div style="font-size:0.5rem; color:var(--text-dim);">반경 ${p.radius || 100}m | 스폰 ${p.rift_spawn_count || 5}마리 | 리스폰 ⚪${(p.rift_respawn_rates||{}).normal??100}% 🔵${(p.rift_respawn_rates||{}).magic??80}% 🟡${(p.rift_respawn_rates||{}).rare??10}% 👑${(p.rift_respawn_rates||{}).unique??3}%</div>
                 </div>
                 <div style="display:flex; gap:8px; flex-shrink:0; padding-top:5px;">
                     <button class="btn-nav" style="padding:5px 12px; font-size:0.6rem; border-color:var(--secondary-cyan);" onclick="openPortalEditor(${p.id})">EDIT</button>
@@ -1720,7 +1721,12 @@ async function openPortalEditor(id) {
     document.getElementById('ed-p-mission').value = p.mission_text || "";
     document.getElementById('ed-p-radius').value = p.radius || 100;
     document.getElementById('ed-p-spawn-count').value = p.rift_spawn_count || 5;
-    document.getElementById('ed-p-respawn-chance').value = p.rift_respawn_chance || 80;
+    // 등급별 리스폰 확률 로딩
+    const rr = p.rift_respawn_rates || {normal:100, magic:80, rare:10, unique:3};
+    document.getElementById('ed-rr-normal').value = rr.normal ?? 100;
+    document.getElementById('ed-rr-magic').value = rr.magic ?? 80;
+    document.getElementById('ed-rr-rare').value = rr.rare ?? 10;
+    document.getElementById('ed-rr-unique').value = rr.unique ?? 3;
     
     // 균열 등급 라디오 버튼 설정
     const gradeRadios = document.querySelectorAll('input[name="rift-grade"]');
@@ -1771,14 +1777,19 @@ async function applyPortalEdit() {
     const checks = document.querySelectorAll('.ed-monster-check:checked');
     const selectedNames = Array.from(checks).map(c => c.value);
     const spawnCount = parseInt(document.getElementById('ed-p-spawn-count').value) || 5;
-    const respawnChance = parseInt(document.getElementById('ed-p-respawn-chance').value) || 80;
     const selectedGrade = document.querySelector('input[name="rift-grade"]:checked')?.value || 'normal';
+    const respawnRates = {
+        normal: Math.min(100, Math.max(0, parseInt(document.getElementById('ed-rr-normal').value) || 100)),
+        magic: Math.min(100, Math.max(0, parseInt(document.getElementById('ed-rr-magic').value) || 80)),
+        rare: Math.min(100, Math.max(0, parseInt(document.getElementById('ed-rr-rare').value) || 10)),
+        unique: Math.min(100, Math.max(0, parseInt(document.getElementById('ed-rr-unique').value) || 3))
+    };
     const data = {
         name: document.getElementById('ed-p-name').value,
         mission_text: document.getElementById('ed-p-mission').value,
         radius: parseInt(document.getElementById('ed-p-radius').value),
         rift_spawn_count: Math.min(20, Math.max(1, spawnCount)),
-        rift_respawn_chance: Math.min(100, Math.max(1, respawnChance)),
+        rift_respawn_rates: respawnRates,
         target_monster_name: selectedNames.length > 0 ? JSON.stringify(selectedNames) : null
     };
     await db.from('portals').update(data).eq('id', editingPortalId);
