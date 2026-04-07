@@ -682,7 +682,7 @@ async function loadWildSpawnSettings() {
 }
 
 async function saveWildSpawnSettings() {
-    const getVal = (id, def) => parseInt(document.getElementById(id)?.value) || def;
+    const getVal = (id, def) => { const v = parseInt(document.getElementById(id)?.value); return isNaN(v) ? def : v; };
     WILD_CONFIG.maxSpawns = getVal('ws-max-spawns', 8);
     WILD_CONFIG.spawnRadius = getVal('ws-spawn-radius', 300);
     WILD_CONFIG.minSpawnDist = 30;
